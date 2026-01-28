@@ -1,4 +1,5 @@
 import { pgTable, text, decimal, boolean, timestamp, uuid, jsonb } from 'drizzle-orm/pg-core';
+import { relations } from 'drizzle-orm';
 
 export const tables = pgTable('tables', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -6,6 +7,10 @@ export const tables = pgTable('tables', {
   name: text('name').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+export const tablesRelations = relations(tables, ({ many }) => ({
+  orders: many(orders),
+}));
 
 export const categories = pgTable('categories', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -34,6 +39,13 @@ export const orders = pgTable('orders', {
   specialInstructions: text('special_instructions'),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+export const ordersRelations = relations(orders, ({ one }) => ({
+  table: one(tables, {
+    fields: [orders.tableId],
+    references: [tables.id],
+  }),
+}));
 
 export const modifiers = pgTable('modifiers', {
   id: uuid('id').defaultRandom().primaryKey(),
