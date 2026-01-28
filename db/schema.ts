@@ -37,6 +37,7 @@ export const orders = pgTable('orders', {
   total: decimal('total', { precision: 10, scale: 2 }).notNull(),
   items: jsonb('items'), // Storing items as JSON for simplicity as agreed
   specialInstructions: text('special_instructions'),
+  paymentMethod: text('payment_method').default('Cash'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 

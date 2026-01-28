@@ -1,11 +1,73 @@
 'use client';
 
 import { useOrder, Order, OrderStatus } from '@/context/OrderContext';
-import { useState, useEffect } from 'react';
-import { LayoutGrid, Clock, ChefHat, Bell, CheckCircle2 } from 'lucide-react';
+import { useState } from 'react';
+import { LayoutGrid, Clock, ChefHat, Bell, X, CreditCard, Banknote, Smartphone } from 'lucide-react';
+
+// Payment method icon helper
+function PaymentIcon({ method }: { method: string }) {
+  const lowerMethod = method.toLowerCase();
+  if (lowerMethod === 'cash') return <Banknote size={12} />;
+  if (lowerMethod === 'gcash' || lowerMethod === 'maya') return <Smartphone size={12} />;
+  return <CreditCard size={12} />;
+}
+
+// Cancel Confirmation Modal
+function CancelConfirmModal({ 
+  isOpen, 
+  order, 
+  onConfirm, 
+  onCancel 
+}: { 
+  isOpen: boolean; 
+  order: Order | null; 
+  onConfirm: () => void; 
+  onCancel: () => void; 
+}) {
+  if (!isOpen || !order) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="bg-red-100 p-2 rounded-full">
+            <X size={20} className="text-red-600" />
+          </div>
+          <h2 className="text-lg font-bold text-gray-900">Cancel Order?</h2>
+        </div>
+        
+        <p className="text-gray-600 mb-2">
+          Are you sure you want to cancel order <span className="font-bold">{order.id}</span>?
+        </p>
+        <p className="text-sm text-gray-400 mb-6">
+          This action cannot be undone.
+        </p>
+
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-3 px-4 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition"
+          >
+            Keep Order
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-3 px-4 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition"
+          >
+            Cancel Order
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function OwnerKanbanPage() {
   const { activeOrders, updateOrderStatus } = useOrder();
+  const [cancelModalOrder, setCancelModalOrder] = useState<Order | null>(null);
+  
+  // Filter out cancelled orders for display
+  const visibleOrders = activeOrders.filter(o => o.status !== 'cancelled');
   
   // Columns
   const columns: { id: OrderStatus, title: string, color: string, icon: any }[] = [
@@ -15,11 +77,18 @@ export default function OwnerKanbanPage() {
   ];
 
   // We will just filter orders for each column
-  const getOrdersByStatus = (status: OrderStatus) => activeOrders.filter(o => o.status === status);
+  const getOrdersByStatus = (status: OrderStatus) => visibleOrders.filter(o => o.status === status);
 
-  // Drag simulation (just buttons for now to be simpler/faster than dnd-kit setup for this temp page)
-  // Or actually, simple buttons "Move Forward" are easier for testing than DnD logic which can be finicky.
-  // Let's implement card with "Next Status" button.
+  const handleCancelClick = (order: Order) => {
+    setCancelModalOrder(order);
+  };
+
+  const handleConfirmCancel = () => {
+    if (cancelModalOrder) {
+      updateOrderStatus(cancelModalOrder.id, 'cancelled');
+      setCancelModalOrder(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -32,7 +101,7 @@ export default function OwnerKanbanPage() {
                 <h1 className="text-xl font-bold text-gray-900">BrewFlow <span className="text-gray-400 font-normal">Kitchen Display</span></h1>
             </div>
             <div className="text-sm font-medium text-gray-500">
-                {activeOrders.length} Active Orders
+                {visibleOrders.length} Active Orders
             </div>
         </div>
 
@@ -52,8 +121,25 @@ export default function OwnerKanbanPage() {
                              {getOrdersByStatus(col.id).map(order => (
                                  <div key={order.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
                                      <div className="flex justify-between items-start mb-2">
-                                         <span className="font-bold text-lg text-gray-900">{order.id}</span>
-                                         <span className="text-xs text-gray-500">{order.items.length} items</span>
+                                         <div className="flex items-center gap-2">
+                                           <span className="font-bold text-lg text-gray-900">{order.id}</span>
+                                           {/* Payment Method Badge */}
+                                           <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded-full uppercase">
+                                             <PaymentIcon method={order.paymentMethod} />
+                                             {order.paymentMethod}
+                                           </span>
+                                         </div>
+                                         <div className="flex items-center gap-2">
+                                           <span className="text-xs text-gray-500">{order.items.length} items</span>
+                                           {/* Cancel Button */}
+                                           <button 
+                                             onClick={() => handleCancelClick(order)}
+                                             className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition"
+                                             title="Cancel order"
+                                           >
+                                             <X size={16} />
+                                           </button>
+                                         </div>
                                      </div>
 
                                      {/* Special Instructions Badge */}
@@ -147,6 +233,14 @@ export default function OwnerKanbanPage() {
                 ))}
             </div>
         </div>
+
+        {/* Cancel Confirmation Modal */}
+        <CancelConfirmModal 
+          isOpen={cancelModalOrder !== null}
+          order={cancelModalOrder}
+          onConfirm={handleConfirmCancel}
+          onCancel={() => setCancelModalOrder(null)}
+        />
     </div>
   );
 }

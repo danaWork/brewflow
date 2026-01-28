@@ -8,6 +8,13 @@
       "when": 1769009025118,
       "tag": "0000_illegal_shiver_man",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1769620959995,
+      "tag": "0001_outstanding_cobalt_man",
+      "breakpoints": true
     }
   ]
 }
