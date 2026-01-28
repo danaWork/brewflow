@@ -62,10 +62,12 @@ async function main() {
         name: 'Thai Milk Tea',
         price: '175.00',
         description: 'Classic Thai milk tea.',
-        image: '/images/menu-items/thai-tea.png', // Assuming user added
+        image: '/images/menu-items/thai-milk-tea.jpg',
         isSignature: true,
         categoryId: milkTeaCat.id,
       });
+    } else {
+        await db.update(products).set({ image: '/images/menu-items/thai-milk-tea.jpg' }).where(eq(products.id, existingP.id));
     }
   }
 
@@ -78,9 +80,11 @@ async function main() {
         name: 'Hot Lemon Tea',
         price: '120.00',
         description: 'Hot refreshing tea.',
-        image: '/images/menu-items/lemon-tea.png',
+        image: '/images/menu-items/hot-lemon-tea.jpg',
         categoryId: teaCat.id,
       });
+    } else {
+        await db.update(products).set({ image: '/images/menu-items/hot-lemon-tea.jpg' }).where(eq(products.id, existingP.id));
     }
   }
 
@@ -94,10 +98,12 @@ async function main() {
         name: 'Spaghetti',
         price: '150.75',
         description: 'Classic tomato spaghetti.',
-        image: '/images/menu-items/spaghetti.png',
+        image: '/images/menu-items/spaghetti.jpg',
         isSignature: true, 
         categoryId: pastaCat.id,
       });
+    } else {
+        await db.update(products).set({ image: '/images/menu-items/spaghetti.jpg' }).where(eq(products.id, existingP.id));
     }
 
     const existingMac = await db.query.products.findFirst({
@@ -108,9 +114,11 @@ async function main() {
         name: 'Macaroni',
         price: '145.00',
         description: 'Creamy macaroni pasta.',
-        image: '/images/menu-items/macaroni.png',
+        image: '/images/menu-items/macaroni.jpg',
         categoryId: pastaCat.id,
       });
+    } else {
+        await db.update(products).set({ image: '/images/menu-items/macaroni.jpg' }).where(eq(products.id, existingMac.id));
     }
   }
 
@@ -124,9 +132,11 @@ async function main() {
         name: 'Croissant',
         price: '95.00',
         description: 'Buttery flaky pastry.',
-        image: '/images/menu-items/croissant.png',
+        image: '/images/menu-items/croissant.jpg',
         categoryId: pastryCat.id,
       });
+    } else {
+        await db.update(products).set({ image: '/images/menu-items/croissant.jpg' }).where(eq(products.id, existingCroissant.id));
     }
 
     const existingSandwich = await db.query.products.findFirst({
@@ -137,9 +147,11 @@ async function main() {
         name: 'Ham and Cheese Sandwich',
         price: '120.00',
         description: 'Classic sandwich with premium ham.',
-        image: '/images/menu-items/sandwich.png',
+        image: '/images/menu-items/ham-and-cheese-sandwitch.jpg',
         categoryId: pastryCat.id,
       });
+    } else {
+        await db.update(products).set({ image: '/images/menu-items/ham-and-cheese-sandwitch.jpg' }).where(eq(products.id, existingSandwich.id));
     }
   }
 
@@ -153,10 +165,12 @@ async function main() {
         name: 'Iced Caramel Macchiato',
         price: '180.00',
         description: 'Rich espresso with vanilla syrup, milk and caramel drizzle.',
-        image: '/placeholder-caramel-macchiato.png',
+        image: '/images/menu-items/iced-caramel-macchiato.jpg',
         isSignature: true,
         categoryId: icedCoffeeCat.id,
       });
+    } else {
+        await db.update(products).set({ image: '/images/menu-items/iced-caramel-macchiato.jpg' }).where(eq(products.id, existingP.id));
     }
   }
 
