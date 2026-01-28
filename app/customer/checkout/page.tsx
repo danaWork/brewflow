@@ -25,7 +25,7 @@ export default function CheckoutPage() {
 
   const handlePlaceOrder = async () => {
     // Create the order in context
-    const orderId = await createOrder(items, cartTotal, specialInstructions);
+    const orderId = await createOrder(items, cartTotal, paymentMethod, specialInstructions);
     
     if (orderId) {
         setLastOrderId(orderId);
@@ -282,7 +282,8 @@ export default function CheckoutPage() {
       <OrderConfirmation 
           isOpen={showConfirmation} 
           onClose={handleCloseConfirmation} 
-          orderId={lastOrderId} 
+          orderId={lastOrderId}
+          paymentMethod={paymentMethod}
       />
     </div>
   );

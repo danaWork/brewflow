@@ -8,9 +8,10 @@ interface OrderConfirmationProps {
   isOpen: boolean;
   onClose: () => void;
   orderId: string;
+  paymentMethod: string;
 }
 
-export default function OrderConfirmation({ isOpen, onClose, orderId }: OrderConfirmationProps) {
+export default function OrderConfirmation({ isOpen, onClose, orderId, paymentMethod }: OrderConfirmationProps) {
   const router = useRouter();
   const { tableId } = useTable();
 
@@ -34,7 +35,7 @@ export default function OrderConfirmation({ isOpen, onClose, orderId }: OrderCon
          <div className="bg-gray-100 rounded-2xl p-6 mb-8 border border-gray-200">
              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">ORDER NUMBER</p>
              <p className="text-3xl font-bold text-[#D95D1E] mb-2">{orderId}</p>
-             <p className="text-sm text-gray-400">Payment: Cash</p>
+             <p className="text-sm text-gray-400">Payment: {paymentMethod}</p>
              
              <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-center gap-2 text-gray-500 text-sm">
                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>

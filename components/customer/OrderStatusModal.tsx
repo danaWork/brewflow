@@ -1,16 +1,17 @@
 'use client';
 
 import { Order } from '@/context/OrderContext';
-import { Wallet, ChefHat, Bell, CheckCircle2, X } from 'lucide-react';
+import { Wallet, ChefHat, Bell, CheckCircle2, X, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 interface OrderStatusModalProps {
   isOpen: boolean;
   onClose: () => void;
   order: Order | null;
+  onDismiss?: (orderId: string) => void;
 }
 
-export default function OrderStatusModal({ isOpen, onClose, order }: OrderStatusModalProps) {
+export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: OrderStatusModalProps) {
   // No longer dependent on currentOrder context
   const [render, setRender] = useState(false);
 
@@ -31,23 +32,27 @@ export default function OrderStatusModal({ isOpen, onClose, order }: OrderStatus
   const currentStepIndex = statuses.indexOf(order.status);
 
   const getStepColor = (stepIndex: number) => {
+      if (order.status === 'cancelled') return 'text-gray-300';
       if (stepIndex < currentStepIndex) return 'text-[#00B050]'; // Completed steps
       if (stepIndex === currentStepIndex) return {
           'payment': 'text-yellow-500',
           'preparing': 'text-blue-500',
           'ready': 'text-[#00B050]',
-          'completed': 'text-[#D95D1E]'
+          'completed': 'text-[#D95D1E]',
+          'cancelled': 'text-gray-300'
       }[order.status];
       return 'text-gray-300';
   };
 
   const getStepBg = (stepIndex: number) => {
+    if (order.status === 'cancelled') return 'bg-gray-200';
     if (stepIndex < currentStepIndex) return 'bg-[#00B050]';
     if (stepIndex === currentStepIndex) return {
         'payment': 'bg-yellow-500',
         'preparing': 'bg-blue-500',
         'ready': 'bg-[#00B050]',
-        'completed': 'bg-[#D95D1E]'
+        'completed': 'bg-[#D95D1E]',
+        'cancelled': 'bg-gray-200'
     }[order.status];
     return 'bg-gray-200';
   };
@@ -82,6 +87,16 @@ export default function OrderStatusModal({ isOpen, onClose, order }: OrderStatus
                           <Bell className="mx-auto mb-2 w-12 h-12 animate-pulse" />
                           <h1 className="text-2xl font-bold mb-1">Ready for Pickup!</h1>
                           <p className="opacity-90 text-sm">Please head to the pickup counter.</p>
+                      </div>
+                  </div>
+              );
+          case 'cancelled':
+              return (
+                  <div className="bg-gray-500 text-white p-6 pt-10 relative overflow-hidden">
+                      <div className="relative z-10 text-center">
+                          <XCircle className="mx-auto mb-2 w-12 h-12" />
+                          <h1 className="text-2xl font-bold mb-1">Order Cancelled</h1>
+                          <p className="opacity-90 text-sm">This order has been cancelled.</p>
                       </div>
                   </div>
               );
@@ -157,7 +172,7 @@ export default function OrderStatusModal({ isOpen, onClose, order }: OrderStatus
                <div className="grid grid-cols-2 gap-4">
                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 text-center">
                        <p className="text-xs text-gray-400 font-bold uppercase mb-1">Payment</p>
-                       <p className="text-lg font-bold text-gray-900">CASH</p>
+                        <p className="text-lg font-bold text-gray-900">{order.paymentMethod?.toUpperCase() || 'CASH'}</p>
                    </div>
                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 text-center">
                        <p className="text-xs text-gray-400 font-bold uppercase mb-1">Type</p>
@@ -244,10 +259,22 @@ export default function OrderStatusModal({ isOpen, onClose, order }: OrderStatus
 
            {/* Pinned Total Footer */}
            <div className="p-5 bg-white border-t border-gray-100 z-10 shrink-0">
-                <div className="flex justify-between items-center">
-                     <span className="text-gray-500 font-medium text-lg">Total Amount</span>
-                     <span className="text-[#D95D1E] font-bold text-2xl">₱{order.total.toFixed(2)}</span>
-                </div>
+                {order.status === 'cancelled' && onDismiss ? (
+                    <button
+                        onClick={() => {
+                            onDismiss(order.id);
+                            onClose();
+                        }}
+                        className="w-full py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition"
+                    >
+                        Dismiss Order
+                    </button>
+                ) : (
+                    <div className="flex justify-between items-center">
+                         <span className="text-gray-500 font-medium text-lg">Total Amount</span>
+                         <span className="text-[#D95D1E] font-bold text-2xl">₱{order.total.toFixed(2)}</span>
+                    </div>
+                )}
            </div>
        </div>
     </div>

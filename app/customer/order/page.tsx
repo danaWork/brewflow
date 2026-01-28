@@ -1,7 +1,7 @@
 'use client';
 
 import { useOrder } from '@/context/OrderContext';
-import { ArrowLeft, Wallet, ChefHat, Bell, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Wallet, ChefHat, Bell, CheckCircle2, XCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useTable } from '@/context/TableContext';
@@ -27,23 +27,27 @@ export default function OrderStatusPage() {
   const currentStepIndex = statuses.indexOf(currentOrder.status);
 
   const getStepColor = (stepIndex: number) => {
+      if (currentOrder.status === 'cancelled') return 'text-gray-300';
       if (stepIndex < currentStepIndex) return 'text-[#00B050]'; // Completed steps
       if (stepIndex === currentStepIndex) return {
           'payment': 'text-yellow-500',
           'preparing': 'text-blue-500',
           'ready': 'text-[#00B050]',
-          'completed': 'text-[#D95D1E]'
+          'completed': 'text-[#D95D1E]',
+          'cancelled': 'text-gray-300'
       }[currentOrder.status];
       return 'text-gray-300';
   };
 
   const getStepBg = (stepIndex: number) => {
+    if (currentOrder.status === 'cancelled') return 'bg-gray-200';
     if (stepIndex < currentStepIndex) return 'bg-[#00B050]';
     if (stepIndex === currentStepIndex) return {
         'payment': 'bg-yellow-500',
         'preparing': 'bg-blue-500',
         'ready': 'bg-[#00B050]',
-        'completed': 'bg-[#D95D1E]'
+        'completed': 'bg-[#D95D1E]',
+        'cancelled': 'bg-gray-200'
     }[currentOrder.status];
     return 'bg-gray-200';
   };
@@ -78,6 +82,16 @@ export default function OrderStatusPage() {
                           <Bell className="mx-auto mb-2 w-12 h-12 animate-pulse" />
                           <h1 className="text-2xl font-bold mb-1">Ready for Pickup!</h1>
                           <p className="opacity-90 text-sm">Please head to the pickup counter.</p>
+                      </div>
+                  </div>
+              );
+          case 'cancelled':
+              return (
+                  <div className="bg-gray-500 text-white p-6 rounded-b-[2rem] pt-8 shadow-lg relative overflow-hidden">
+                      <div className="relative z-10 text-center">
+                          <XCircle className="mx-auto mb-2 w-12 h-12" />
+                          <h1 className="text-2xl font-bold mb-1">Order Cancelled</h1>
+                          <p className="opacity-90 text-sm">This order has been cancelled.</p>
                       </div>
                   </div>
               );
@@ -146,7 +160,7 @@ export default function OrderStatusPage() {
            <div className="grid grid-cols-2 gap-4">
                <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 text-center">
                    <p className="text-xs text-gray-400 font-bold uppercase mb-1">Payment</p>
-                   <p className="text-lg font-bold text-gray-900">CASH</p>
+                   <p className="text-lg font-bold text-gray-900">{currentOrder.paymentMethod?.toUpperCase() || 'CASH'}</p>
                </div>
                <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 text-center">
                    <p className="text-xs text-gray-400 font-bold uppercase mb-1">Type</p>

@@ -9,7 +9,7 @@ import { Order, OrderStatus } from '@/context/OrderContext';
 // Helper to confirm order structure matches what we store
 // We store items as JSONB, so we cast it when retrieving
 
-export async function createOrder(items: any[], total: number, tableId: string, specialInstructions?: string) {
+export async function createOrder(items: any[], total: number, tableId: string, paymentMethod: string, specialInstructions?: string) {
   try {
     // 1. Verify table exists (optional, but good practice)
     // We assume tableId passed from frontend is the QR code or ID
@@ -34,7 +34,8 @@ export async function createOrder(items: any[], total: number, tableId: string, 
         status: 'payment', // Default start status
         total: total.toString(), // Store as string for decimal type
         items: items, // JSONB
-        specialInstructions: specialInstructions, // Add special instructions
+        specialInstructions: specialInstructions,
+        paymentMethod: paymentMethod,
     }).returning();
 
     // 3. Revalidate Owner Dashboard
@@ -66,7 +67,8 @@ export async function getOrder(orderId: string) {
             total: parseFloat(order.total),
             table: order.table?.name || 'Unknown Table',
             timestamp: order.createdAt,
-            specialInstructions: order.specialInstructions // Add this
+            specialInstructions: order.specialInstructions,
+            paymentMethod: order.paymentMethod || 'Cash'
         };
     } catch (e) {
         console.error("Error fetching order", e);
@@ -93,7 +95,8 @@ export async function getActiveOrders() {
             total: parseFloat(o.total),
             table: o.table?.name || 'Unknown',
             timestamp: o.createdAt,
-            specialInstructions: o.specialInstructions
+            specialInstructions: o.specialInstructions,
+            paymentMethod: o.paymentMethod || 'Cash'
         }));
     } catch (e) {
         console.error("Error fetching active orders", e);

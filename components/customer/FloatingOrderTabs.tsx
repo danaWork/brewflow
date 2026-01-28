@@ -1,5 +1,5 @@
 import { useOrder, Order } from '@/context/OrderContext';
-import { Clock, ChefHat, Bell, CheckCircle2, X } from 'lucide-react';
+import { Clock, ChefHat, Bell, CheckCircle2, X, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import OrderStatusModal from './OrderStatusModal';
 
@@ -14,6 +14,7 @@ export default function FloatingOrderTabs() {
           case 'preparing': return ChefHat;
           case 'ready': return Bell;
           case 'completed': return CheckCircle2;
+          case 'cancelled': return XCircle;
           default: return Clock;
       }
   };
@@ -23,7 +24,8 @@ export default function FloatingOrderTabs() {
           case 'payment': return 'bg-yellow-500';
           case 'preparing': return 'bg-blue-500';
           case 'ready': return 'bg-[#00B050]';
-          case 'completed': return 'bg-gray-500'; // Less prominent
+          case 'completed': return 'bg-gray-500';
+          case 'cancelled': return 'bg-red-400';
           default: return 'bg-gray-400';
       }
   };
@@ -37,7 +39,7 @@ export default function FloatingOrderTabs() {
             <div className="flex gap-2 overflow-x-auto max-w-full pointer-events-auto no-scrollbar">
                 {userOrders.map((order) => {
                     const Icon = getStatusIcon(order.status);
-                    const isCompleted = order.status === 'completed';
+                    const canDismiss = order.status === 'completed' || order.status === 'cancelled';
                     
                     return (
                         <div key={order.id} className="relative group">
@@ -56,8 +58,8 @@ export default function FloatingOrderTabs() {
                                 </span>
                             </button>
                             
-                            {/* Dismiss Button for Completed Orders */}
-                            {isCompleted && (
+                            {/* Dismiss Button for Completed/Cancelled Orders */}
+                            {canDismiss && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -78,7 +80,11 @@ export default function FloatingOrderTabs() {
         <OrderStatusModal 
             order={selectedOrder} 
             isOpen={!!selectedOrder} 
-            onClose={() => setSelectedOrder(null)} 
+            onClose={() => setSelectedOrder(null)}
+            onDismiss={(orderId) => {
+                dismissOrder(orderId);
+                setSelectedOrder(null);
+            }}
         />
     </>
   );

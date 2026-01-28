@@ -5,7 +5,7 @@ import { CartItem } from './CartContext'; // Import reuse
 import { createOrder as createOrderAction } from '@/app/actions/order'; // Import real action
 import { supabase } from '@/lib/supabase';
 
-export type OrderStatus = 'payment' | 'preparing' | 'ready' | 'completed';
+export type OrderStatus = 'payment' | 'preparing' | 'ready' | 'completed' | 'cancelled';
 
 // Reuse CartItem as OrderItem structure to ensure fidelity
 export type OrderItem = CartItem;
@@ -17,13 +17,14 @@ export interface Order {
   total: number; // Stored as a snapshot
   table: string;
   timestamp: Date;
-  specialInstructions?: string; // Add this
+  specialInstructions?: string;
+  paymentMethod: string;
 }
 
 interface OrderContextType {
   userOrders: Order[]; // Multiple orders for the current user
   activeOrders: Order[]; // For owner view (global mock)
-  createOrder: (items: CartItem[], total: number, specialInstructions?: string) => Promise<string | null>;
+  createOrder: (items: CartItem[], total: number, paymentMethod: string, specialInstructions?: string) => Promise<string | null>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => void;
   dismissOrder: (orderId: string) => void;
 }
@@ -73,7 +74,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
             total: parseFloat(payload.new.total),
             table: 'Table 1', // In real app, fetch table name
             timestamp: new Date(payload.new.created_at),
-            specialInstructions: payload.new.special_instructions
+            specialInstructions: payload.new.special_instructions,
+            paymentMethod: payload.new.payment_method || 'Cash'
           } as Order;
 
           setActiveOrders(prev => [newOrder, ...prev]);
@@ -108,7 +110,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('coffee-shop-active-orders', JSON.stringify(activeOrders));
   }, [activeOrders]);
 
-  const createOrder = async (items: CartItem[], total: number, specialInstructions?: string) => {
+  const createOrder = async (items: CartItem[], total: number, paymentMethod: string, specialInstructions?: string) => {
     // Generate a shorter ID for display, e.g. #047
     const id = `#0${Math.floor(Math.random() * 89) + 10}`; 
     
@@ -119,12 +121,13 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         total,
         table: 'Table 1',
         timestamp: new Date(),
-        specialInstructions
+        specialInstructions,
+        paymentMethod
     };
     
     // Call Server Action (Fire and forget or await?)
     try {
-       const res = await createOrderAction(items, total, 'table-1', specialInstructions); 
+       const res = await createOrderAction(items, total, 'table-1', paymentMethod, specialInstructions); 
        if (res.success && res.orderId) {
            // In a real app we'd use the server ID
        }
