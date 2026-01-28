@@ -11,8 +11,8 @@ export default async function MenuPage({
   const { tableId } = await params;
 
   // Fetch data
-  let categoriesData = [];
-  let productsData = [];
+  let categoriesData: any[] = [];
+  let productsData: any[] = [];
   let currentTable = null;
 
   try {
