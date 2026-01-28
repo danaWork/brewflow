@@ -115,7 +115,9 @@ export default function OrderStatusModal({ isOpen, onClose, order }: OrderStatus
                {order.id}
            </div>
 
-           <Banner />
+           <div className="shrink-0">
+               <Banner />
+           </div>
 
            <div className="flex-1 p-6 space-y-6 overflow-y-auto">
                

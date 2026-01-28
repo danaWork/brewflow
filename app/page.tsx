@@ -64,7 +64,7 @@ export default function Home() {
 
             <div className="flex gap-3 text-sm text-stone-600">
                 <MonitorSmartphone className="w-4 h-4 mt-0.5 flex-shrink-0 text-stone-400" />
-                <p><strong className="text-stone-700">Realtime Sync:</strong> Unavailable in this stage</p>
+                <p><strong className="text-stone-700">Realtime Sync:</strong> Unavailable in this stage. Please refresh the page</p>
             </div>
         </div>
       </div>
