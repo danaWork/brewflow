@@ -84,7 +84,6 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         items: items, 
         total,
         table: 'Table 1',
-        table: 'Table 1',
         timestamp: new Date(),
         specialInstructions
     };

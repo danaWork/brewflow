@@ -1,8 +1,5 @@
-'use client';
-
-import { cn } from '@/lib/utils'; // Assuming there's a utils file, if not I'll stick to standard template or create it. 
-// Wait, I haven't checked for utils. I'll check lib structure.
-// If not present, I'll inline the class logic or create lib/utils.ts
+// Removed unused cn import since we are using template literals below
+// import { cn } from '@/lib/utils';
 
 interface Category {
   id: string;
