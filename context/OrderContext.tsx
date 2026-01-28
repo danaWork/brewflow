@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { CartItem } from './CartContext'; // Import reuse
 import { createOrder as createOrderAction } from '@/app/actions/order'; // Import real action
+import { supabase } from '@/lib/supabase';
 
 export type OrderStatus = 'payment' | 'preparing' | 'ready' | 'completed';
 
@@ -34,35 +35,68 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   const [activeOrders, setActiveOrders] = useState<Order[]>([]); // Mock owner view
 
   // Hydrate from local storage for persistence across refreshes
+  // Hydrate from local storage for persistence across refreshes
   useEffect(() => {
-    // Load User Orders
+    // Load local storage first (simulated history)
     const savedUserOrders = localStorage.getItem('coffee-shop-user-orders');
     if (savedUserOrders) {
         try {
             const parsed = JSON.parse(savedUserOrders);
-            // Fix date strings
-            const fixed = parsed.map((o: any) => ({
-                ...o,
-                timestamp: new Date(o.timestamp)
-            }));
+            const fixed = parsed.map((o: any) => ({ ...o, timestamp: new Date(o.timestamp) }));
             setUserOrders(fixed);
-        } catch (e) {
-            console.error("Failed to parse saved user orders", e);
-        }
+        } catch (e) {}
     }
-    
-    // Also load all active orders for owner view mock
     const savedActive = localStorage.getItem('coffee-shop-active-orders');
     if (savedActive) {
         try {
             const parsed = JSON.parse(savedActive);
-            const fixed = parsed.map((o: any) => ({
-                ...o,
-                timestamp: new Date(o.timestamp)
-            }));
+            const fixed = parsed.map((o: any) => ({ ...o, timestamp: new Date(o.timestamp) }));
             setActiveOrders(fixed);
         } catch (e) {}
     }
+
+    // REALTIME SUBSCRIPTION
+    // If supabase is not initialized (missing keys), skip subscription
+    if (!supabase) return;
+
+    const channel = supabase
+      .channel('orders-channel')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'orders' },
+        (payload) => {
+          console.log('Realtime INSERT:', payload);
+          const newOrder = {
+            id: payload.new.id,
+            status: payload.new.status,
+            items: payload.new.items, 
+            total: parseFloat(payload.new.total),
+            table: 'Table 1', // In real app, fetch table name
+            timestamp: new Date(payload.new.created_at),
+            specialInstructions: payload.new.special_instructions
+          } as Order;
+
+          setActiveOrders(prev => [newOrder, ...prev]);
+          // Note: In a real app we'd filter if this order belongs to current user
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders' },
+        (payload) => {
+          console.log('Realtime UPDATE:', payload);
+          const updatedStatus = payload.new.status;
+          const orderId = payload.new.id;
+
+          setActiveOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: updatedStatus } : o));
+          setUserOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: updatedStatus } : o));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase?.removeChannel(channel);
+    };
   }, []);
 
   // Persist changes
