@@ -37,7 +37,7 @@ function CancelConfirmModal({
         </div>
         
         <p className="text-gray-600 mb-2">
-          Are you sure you want to cancel order <span className="font-bold">{order.id}</span>?
+          Are you sure you want to cancel order <span className="font-bold">#{order.orderNumber ? String(order.orderNumber).padStart(4, '0') : order.id.slice(0, 8)}</span>?
         </p>
         <p className="text-sm text-gray-400 mb-6">
           This action cannot be undone.
@@ -122,7 +122,7 @@ export default function OwnerKanbanPage() {
                                  <div key={order.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
                                      <div className="flex justify-between items-start mb-2">
                                          <div className="flex items-center gap-2">
-                                           <span className="font-bold text-lg text-gray-900">{order.id}</span>
+                                           <span className="font-bold text-lg text-gray-900">#{order.orderNumber ? String(order.orderNumber).padStart(4, '0') : order.id.slice(0, 8)}</span>
                                            {/* Payment Method Badge */}
                                            <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded-full uppercase">
                                              <PaymentIcon method={order.paymentMethod} />

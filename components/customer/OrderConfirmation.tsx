@@ -7,15 +7,18 @@ import { useTable } from '@/context/TableContext';
 interface OrderConfirmationProps {
   isOpen: boolean;
   onClose: () => void;
-  orderId: string;
+  orderNumber: number;
   paymentMethod: string;
 }
 
-export default function OrderConfirmation({ isOpen, onClose, orderId, paymentMethod }: OrderConfirmationProps) {
+export default function OrderConfirmation({ isOpen, onClose, orderNumber, paymentMethod }: OrderConfirmationProps) {
   const router = useRouter();
   const { tableId } = useTable();
 
   if (!isOpen) return null;
+
+  // Format order number with leading zeros (e.g., #0001)
+  const formattedOrderNumber = `#${String(orderNumber).padStart(4, '0')}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
@@ -34,7 +37,7 @@ export default function OrderConfirmation({ isOpen, onClose, orderId, paymentMet
          {/* Receipt Card Look */}
          <div className="bg-gray-100 rounded-2xl p-6 mb-8 border border-gray-200">
              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">ORDER NUMBER</p>
-             <p className="text-3xl font-bold text-[#D95D1E] mb-2">{orderId}</p>
+             <p className="text-4xl font-bold text-[#D95D1E] mb-2">{formattedOrderNumber}</p>
              <p className="text-sm text-gray-400">Payment: {paymentMethod}</p>
              
              <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-center gap-2 text-gray-500 text-sm">
@@ -57,4 +60,3 @@ export default function OrderConfirmation({ isOpen, onClose, orderId, paymentMet
     </div>
   );
 }
-

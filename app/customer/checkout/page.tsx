@@ -19,16 +19,16 @@ export default function CheckoutPage() {
   const [isPaymentDropdownOpen, setIsPaymentDropdownOpen] = useState(false);
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [lastOrderId, setLastOrderId] = useState<string>('---');
+  const [lastOrderNumber, setLastOrderNumber] = useState<number>(0);
 
   const paymentMethods = ['Cash', 'GCash', 'Maya', 'Card'];
 
   const handlePlaceOrder = async () => {
     // Create the order in context
-    const orderId = await createOrder(items, cartTotal, paymentMethod, specialInstructions);
+    const result = await createOrder(items, cartTotal, paymentMethod, specialInstructions);
     
-    if (orderId) {
-        setLastOrderId(orderId);
+    if (result) {
+        setLastOrderNumber(result.orderNumber);
     }
     
     // Clear the cart
@@ -282,7 +282,7 @@ export default function CheckoutPage() {
       <OrderConfirmation 
           isOpen={showConfirmation} 
           onClose={handleCloseConfirmation} 
-          orderId={lastOrderId}
+          orderNumber={lastOrderNumber}
           paymentMethod={paymentMethod}
       />
     </div>

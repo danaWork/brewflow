@@ -1,7 +1,5 @@
-import { db } from '@/lib/db';
+import { createSupabaseServerClient } from '@/lib/supabase-server';
 import MenuClient from '@/components/customer/MenuClient';
-import { eq, desc } from 'drizzle-orm';
-import { products as productsSchema, tables as tablesSchema } from '@/db/schema';
 
 export default async function MenuPage({
   params,
@@ -9,46 +7,60 @@ export default async function MenuPage({
   params: Promise<{ tableId: string }>;
 }) {
   const { tableId } = await params;
+  const supabase = await createSupabaseServerClient();
 
-  // Fetch data
+  // Fetch data from Supabase
   let categoriesData: any[] = [];
   let productsData: any[] = [];
-  let currentTable = null;
+  let tableName = `Table ${tableId}`;
 
   try {
-    // Fetch Table
-    // Assuming tableId in URL matches qrCode in DB (or is a valid identifier)
-    // We try to find by qrCode first
-    currentTable = await db.query.tables.findFirst({
-        where: eq(tablesSchema.qrCode, tableId)
-    });
+    // Fetch Table by QR code
+    const { data: tableData } = await supabase
+      .from('tables')
+      .select('name')
+      .eq('qr_code', tableId)
+      .single();
+    
+    if (tableData) {
+      tableName = (tableData as any).name;
+    }
 
-    // If not found, maybe valid UUID? (Skipping for now, assuming QR code match)
+    // Fetch categories
+    const { data: categories } = await supabase
+      .from('categories')
+      .select('*');
     
-    // Drizzle Fetch
-    categoriesData = await db.query.categories.findMany();
-    
-    // Fetch products with ordering
-    const productsRaw = await db.query.products.findMany({
-      orderBy: [desc(productsSchema.isSignature)]
-    });
-    
-    // Transform decimal strings to numbers for serialization
-    productsData = productsRaw.map(p => ({
-      ...p,
-      price: parseFloat(p.price), // Drizzle returns decimal as string usually
-      createdAt: p.createdAt?.toISOString(),
-      // updatedAt was not in schema, ignoring
-    }));
+    categoriesData = (categories as any[]) || [];
+
+    // Fetch products ordered by signature first
+    const { data: products } = await supabase
+      .from('products')
+      .select('*')
+      .order('is_signature', { ascending: false });
+
+    // Transform to expected format
+    if (products) {
+      productsData = (products as any[]).map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        price: parseFloat(p.price),
+        description: p.description,
+        image: p.image,
+        isSignature: p.is_signature,
+        categoryId: p.category_id,
+        createdAt: p.created_at,
+      }));
+    }
 
   } catch (error) {
-    console.error("Failed to fetch menu data (Drizzle):", error);
+    console.error("Failed to fetch menu data:", error);
   }
 
   return (
-    <MenuClient 
+    <MenuClient
       tableId={tableId}
-      tableName={currentTable?.name || `Table ${tableId}`}
+      tableName={tableName}
       categories={categoriesData}
       products={productsData}
     />

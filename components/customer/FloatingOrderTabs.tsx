@@ -51,7 +51,7 @@ export default function FloatingOrderTabs() {
                                     <Icon size={14} className="text-white" />
                                 </div>
                                 <span>
-                                    {order.id}
+                                    #{order.orderNumber ? String(order.orderNumber).padStart(4, '0') : order.id.slice(0, 8).toUpperCase()}
                                     <span className="opacity-75 font-normal ml-1 capitalize text-xs">
                                         • {order.status}
                                     </span>

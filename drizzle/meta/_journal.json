@@ -15,6 +15,13 @@
       "when": 1769620959995,
       "tag": "0001_outstanding_cobalt_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1770017401854,
+      "tag": "0002_fresh_karen_page",
+      "breakpoints": true
     }
   ]
 }

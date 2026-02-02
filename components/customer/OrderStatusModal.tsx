@@ -125,9 +125,9 @@ export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: 
                <X size={20} />
            </button>
 
-           {/* ID Badge */}
+           {/* Order Number Badge */}
            <div className="absolute top-4 left-4 z-20 bg-white/20 backdrop-blur px-3 py-1 rounded-lg text-white text-xs font-bold">
-               {order.id}
+               #{order.orderNumber ? String(order.orderNumber).padStart(4, '0') : order.id.slice(0, 8).toUpperCase()}
            </div>
 
            <div className="shrink-0">
