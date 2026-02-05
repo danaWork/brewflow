@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { CartItem } from './CartContext';
+import { useTable } from './TableContext';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 export type OrderStatus = 'payment' | 'preparing' | 'ready' | 'completed' | 'cancelled';
@@ -15,6 +16,7 @@ export interface Order {
   items: OrderItem[];
   total: number;
   table: string;
+  tableId?: string;
   timestamp: Date;
   specialInstructions?: string;
   paymentMethod: string;
@@ -34,6 +36,9 @@ const OrderContext = createContext<OrderContextType | undefined>(undefined);
 export function OrderProvider({ children }: { children: React.ReactNode }) {
   const [userOrders, setUserOrders] = useState<Order[]>([]);
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
+  
+  // Get current table from TableContext
+  const { tableId: currentTableId, tableName: currentTableName } = useTable();
 
   // Fetch active orders from Supabase
   const refreshActiveOrders = useCallback(async () => {
@@ -42,7 +47,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     // @ts-ignore - Supabase types not correctly inferring
     const { data, error } = await supabase
       .from('orders')
-      .select('*, tables(name)')
+      .select('*')
       .in('status', ['payment', 'preparing', 'ready'])
       .order('created_at', { ascending: false });
 
@@ -52,13 +57,30 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     }
 
     const ordersData = data as any[] || [];
+    
+    // Fetch table names for orders that have a table_id
+    const tableIds = [...new Set(ordersData.filter(o => o.table_id).map(o => o.table_id))];
+    let tableMap: Record<string, string> = {};
+    
+    if (tableIds.length > 0) {
+      const { data: tablesData } = await supabase
+        .from('tables')
+        .select('id, name')
+        .in('id', tableIds);
+      
+      if (tablesData) {
+        tableMap = Object.fromEntries((tablesData as any[]).map(t => [t.id, t.name]));
+      }
+    }
+
     const orders: Order[] = ordersData.map((o: any) => ({
       id: o.id,
-      orderNumber: o.order_number, // Sequential order number
+      orderNumber: o.order_number,
       status: o.status as OrderStatus,
       items: o.items || [],
       total: parseFloat(o.total),
-      table: o.tables?.name || 'Unknown',
+      table: o.table_id ? (tableMap[o.table_id] || 'Unknown Table') : 'Unknown Table',
+      tableId: o.table_id,
       timestamp: new Date(o.created_at),
       specialInstructions: o.special_instructions,
       paymentMethod: o.payment_method || 'Cash'
@@ -90,14 +112,30 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'orders' },
-        (payload) => {
+        async (payload) => {
           console.log('Realtime INSERT:', payload);
+          
+          // Fetch the table name for this order
+          let tableName = 'Unknown Table';
+          if (payload.new.table_id) {
+            const { data: tableData } = await supabase
+              .from('tables')
+              .select('name')
+              .eq('id', payload.new.table_id)
+              .single();
+            if (tableData) {
+              tableName = (tableData as any).name;
+            }
+          }
+          
           const newOrder = {
             id: payload.new.id,
+            orderNumber: payload.new.order_number,
             status: payload.new.status,
             items: payload.new.items,
             total: parseFloat(payload.new.total),
-            table: 'Table 1',
+            table: tableName,
+            tableId: payload.new.table_id,
             timestamp: new Date(payload.new.created_at),
             specialInstructions: payload.new.special_instructions,
             paymentMethod: payload.new.payment_method || 'Cash'
@@ -147,15 +185,37 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      // @ts-ignore - Supabase types not correctly inferring
-      const tableResult = await supabase
-        .from('tables')
-        .select('id')
-        .eq('qr_code', 'table-1')
-        .single();
-
-      // @ts-ignore
-      const tableId = tableResult.data ? (tableResult.data as any).id : null;
+      // Use the current table from context
+      let tableId: string | null = null;
+      let tableName = currentTableName || 'Unknown Table';
+      
+      if (currentTableId) {
+        // Get the table ID from the qr_code
+        const { data: tableData } = await supabase
+          .from('tables')
+          .select('id, name')
+          .eq('qr_code', currentTableId)
+          .single();
+        
+        if (tableData) {
+          tableId = (tableData as any).id;
+          tableName = (tableData as any).name;
+        }
+      }
+      
+      // Fallback: if no table found, try table-1
+      if (!tableId) {
+        const { data: fallbackTable } = await supabase
+          .from('tables')
+          .select('id, name')
+          .eq('qr_code', 'table-1')
+          .single();
+        
+        if (fallbackTable) {
+          tableId = (fallbackTable as any).id;
+          tableName = (fallbackTable as any).name;
+        }
+      }
 
       // @ts-ignore - Supabase types not correctly inferring
       const { data, error } = await supabase
@@ -183,7 +243,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         status: 'payment',
         items: items,
         total,
-        table: 'Table 1',
+        table: tableName,
+        tableId: tableId || undefined,
         timestamp: new Date(),
         specialInstructions,
         paymentMethod

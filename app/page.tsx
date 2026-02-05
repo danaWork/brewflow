@@ -1,71 +1,88 @@
 import Link from "next/link";
-import { AlertCircle, Clock, MonitorSmartphone } from "lucide-react";
+import { QrCode, ShoppingBag, Zap, Users } from "lucide-react";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-stone-50 flex flex-col items-center justify-center p-4 sm:p-6 text-center font-sans">
-      <div className="max-w-2xl w-full bg-white shadow-xl rounded-2xl p-6 sm:p-8 border border-stone-200">
-        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-stone-900 mb-3 sm:mb-4">
-          BrewFlow Demo
-        </h1>
-        <p className="text-base sm:text-lg text-stone-600 mb-6 sm:mb-8">
-          Welcome to the Coffee Shop Demo. For the best experience, open these links in two separate tabs to simulate the realtime workflow.
-        </p>
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50 flex flex-col items-center justify-center p-4 sm:p-6 text-center font-sans">
+      <div className="max-w-2xl w-full">
+        {/* Hero Section */}
+        <div className="mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-orange-500 to-amber-600 rounded-2xl shadow-lg mb-4">
+            <ShoppingBag className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-gray-900 mb-3">
+            BrewFlow
+          </h1>
+          <p className="text-lg text-gray-600">
+            Modern coffee shop ordering system (demo)
+          </p>
+        </div>
 
+        {/* Cards */}
         <div className="grid gap-4 sm:gap-6 md:grid-cols-2 text-left mb-8">
           
           {/* Owner Card */}
-          <div className="bg-orange-50 p-5 sm:p-6 rounded-xl border border-orange-100 flex flex-col h-full shadow-sm hover:shadow-md transition-shadow">
-            <h2 className="text-lg sm:text-xl font-semibold text-orange-800 mb-2">
-              Step 1: Shop Owner
+          <div className="bg-white p-6 rounded-2xl border border-gray-100 flex flex-col h-full shadow-lg hover:shadow-xl transition-all hover:-translate-y-1">
+            <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-4">
+              <Users className="w-6 h-6 text-orange-600" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">
+              Shop Owner
             </h2>
-            <p className="text-sm text-stone-600 mb-4 flex-grow">
-              Open this to see incoming orders from customers.
+            <p className="text-sm text-gray-500 mb-5 flex-grow">
+              Manage incoming orders, update order statuses, and generate QR codes for tables.
             </p>
             <Link 
               href="/owner" 
               target="_blank"
-              className="inline-flex items-center justify-center w-full py-3 sm:py-2.5 px-4 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors text-sm sm:text-base active:scale-95 transform"
+              className="inline-flex items-center justify-center w-full py-3 px-4 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl font-semibold transition-all shadow-md hover:shadow-lg active:scale-[0.98] transform"
             >
-              Open Owner Dashboard
+              Open Dashboard
             </Link>
           </div>
 
-          {/* Customer Card */}
-          <div className="bg-blue-50 p-5 sm:p-6 rounded-xl border border-blue-100 flex flex-col h-full shadow-sm hover:shadow-md transition-shadow">
-            <h2 className="text-lg sm:text-xl font-semibold text-blue-800 mb-2">
-              Step 2: Customer
+          {/* Scan QR Card */}
+          <div className="bg-white p-6 rounded-2xl border border-gray-100 flex flex-col h-full shadow-lg hover:shadow-xl transition-all hover:-translate-y-1">
+            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4">
+              <QrCode className="w-6 h-6 text-blue-600" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">
+              Scan QR Code
             </h2>
-            <p className="text-sm text-stone-600 mb-4 flex-grow">
-              Simulate a customer ordering from Table 1.
+            <p className="text-sm text-gray-500 mb-5 flex-grow">
+              Customers scan the QR code at their table to browse the menu and place orders.
             </p>
             <Link 
-              href="/customer/table/1" 
+              href="/customer/table/table-1" 
               target="_blank"
-              className="inline-flex items-center justify-center w-full py-3 sm:py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-sm sm:text-base active:scale-95 transform"
+              className="inline-flex items-center justify-center w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl font-semibold transition-all shadow-md hover:shadow-lg active:scale-[0.98] transform"
             >
-              Open Menu (Table 1)
+              Demo Table 1 →
             </Link>
           </div>
 
         </div>
 
-        {/* Notes Section */}
-        <div className="bg-stone-50 rounded-lg p-4 border border-stone-200 text-left space-y-3">
-            <h3 className="text-sm font-semibold text-stone-900 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-600" />
-                Demo Limitations
-            </h3>
-            
-            <div className="flex gap-3 text-sm text-stone-600">
-                <Clock className="w-4 h-4 mt-0.5 flex-shrink-0 text-stone-400" />
-                <p><strong className="text-stone-700">Cold Start:</strong> The database may take a few seconds to wake up on the first request. Things might not load instantly!</p>
+        {/* Features */}
+        <div className="bg-white/80 backdrop-blur rounded-2xl p-6 border border-gray-100 shadow-sm">
+          <div className="flex items-center justify-center gap-2 text-sm text-gray-500 mb-4">
+            <Zap className="w-4 h-4 text-amber-500" />
+            <span className="font-medium text-gray-700">Realtime Updates Enabled</span>
+          </div>
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div>
+              <p className="text-2xl font-bold text-gray-900">50+</p>
+              <p className="text-xs text-gray-500">Tables Supported</p>
             </div>
-
-            <div className="flex gap-3 text-sm text-stone-600">
-                <MonitorSmartphone className="w-4 h-4 mt-0.5 flex-shrink-0 text-stone-400" />
-                <p><strong className="text-stone-700">Realtime Sync:</strong> Unavailable in this stage. Please refresh the page</p>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">⚡</p>
+              <p className="text-xs text-gray-500">Instant Sync</p>
             </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">📱</p>
+              <p className="text-xs text-gray-500">Mobile First</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>

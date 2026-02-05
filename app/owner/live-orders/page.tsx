@@ -128,26 +128,31 @@ export default function LiveOrdersPage() {
                 <div className="flex-1 px-4 pb-4 space-y-3 overflow-y-auto">
                   {getOrdersByStatus(col.id).map(order => (
                     <div key={order.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-lg text-gray-900">#{order.orderNumber ? String(order.orderNumber).padStart(4, '0') : order.id.slice(0, 8)}</span>
-                          {/* Payment Method Badge */}
-                          <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded-full uppercase">
-                            <PaymentIcon method={order.paymentMethod} />
-                            {order.paymentMethod}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-500">{order.items.length} items</span>
-                          {/* Cancel Button */}
-                          <button 
-                            onClick={() => handleCancelClick(order)}
-                            className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition"
-                            title="Cancel order"
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
+                      {/* Header Row - Order Number & Cancel */}
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="font-bold text-xl text-gray-900">#{order.orderNumber ? String(order.orderNumber).padStart(4, '0') : order.id.slice(0, 8)}</span>
+                        <button 
+                          onClick={() => handleCancelClick(order)}
+                          className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                          title="Cancel order"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+
+                      {/* Badges Row */}
+                      <div className="flex flex-wrap items-center gap-2 mb-3">
+                        {/* Table Badge */}
+                        <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-full">
+                          {order.table}
+                        </span>
+                        {/* Payment Method Badge */}
+                        <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-xs font-bold px-2.5 py-1 rounded-full uppercase">
+                          <PaymentIcon method={order.paymentMethod} />
+                          {order.paymentMethod}
+                        </span>
+                        {/* Items Count */}
+                        <span className="text-xs text-gray-500 ml-auto">{order.items.length} items</span>
                       </div>
 
                       {/* Special Instructions Badge */}
@@ -204,6 +209,16 @@ export default function LiveOrdersPage() {
                         ))}
                       </div>
                       
+                      {/* Total & Time */}
+                      <div className="flex justify-between items-center pt-3 border-t border-gray-100 mb-3">
+                        <div className="text-xs text-gray-500">
+                          {order.timestamp.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                        <div className="text-lg font-bold text-[#D95D1E]">
+                          ₱{order.total.toFixed(2)}
+                        </div>
+                      </div>
+
                       {/* Action Buttons */}
                       {col.id === 'payment' && (
                         <button 
