@@ -125,9 +125,9 @@ export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: 
                <X size={20} />
            </button>
 
-           {/* ID Badge */}
+           {/* Order Number Badge */}
            <div className="absolute top-4 left-4 z-20 bg-white/20 backdrop-blur px-3 py-1 rounded-lg text-white text-xs font-bold">
-               {order.id}
+               #{order.orderNumber ? String(order.orderNumber).padStart(4, '0') : order.id.slice(0, 8).toUpperCase()}
            </div>
 
            <div className="shrink-0">
@@ -175,7 +175,7 @@ export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: 
                         <p className="text-lg font-bold text-gray-900">{order.paymentMethod?.toUpperCase() || 'CASH'}</p>
                    </div>
                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 text-center">
-                       <p className="text-xs text-gray-400 font-bold uppercase mb-1">Type</p>
+                        <p className="text-xs text-gray-400 font-bold uppercase mb-1">Table</p>
                        <p className="text-lg font-bold text-gray-900">{order.table}</p>
                    </div>
                </div>

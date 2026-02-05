@@ -1,4 +1,4 @@
-import { pgTable, text, decimal, boolean, timestamp, uuid, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, text, decimal, boolean, timestamp, uuid, jsonb, serial } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 export const tables = pgTable('tables', {
@@ -32,6 +32,7 @@ export const products = pgTable('products', {
 
 export const orders = pgTable('orders', {
   id: uuid('id').defaultRandom().primaryKey(),
+  orderNumber: serial('order_number').notNull(), // Auto-incrementing order number
   tableId: uuid('table_id').references(() => tables.id),
   status: text('status').default('PENDING'), // PENDING, COMPLETED
   total: decimal('total', { precision: 10, scale: 2 }).notNull(),

@@ -43,6 +43,14 @@ CREATE POLICY "product_relations_public_read" ON product_relations
 CREATE POLICY "tables_public_read" ON tables 
   FOR SELECT USING (true);
 
+-- Tables: Anyone can insert (for QR code generation)
+CREATE POLICY "tables_public_insert" ON tables 
+  FOR INSERT WITH CHECK (true);
+
+-- Tables: Anyone can delete (for QR code management)
+CREATE POLICY "tables_public_delete" ON tables 
+  FOR DELETE USING (true);
+
 -- ==========================================
 -- ORDERS (Customers + Owners)
 -- TODO: Update these when auth is added
