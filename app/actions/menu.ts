@@ -5,6 +5,9 @@ import { categories as categoriesSchema, products as productsSchema, tables as t
 import { eq, asc, desc } from 'drizzle-orm';
 
 export async function getMenuData(qrIdentifier: string) {
+    if (process.env.DATABASE_URL?.includes('placeholder') || !process.env.DATABASE_URL) {
+        return { success: false, error: "Database not configured" };
+    }
     try {
         // Fetch Table by QR identifier
         const [tableData] = await db
@@ -61,6 +64,7 @@ export async function getMenuData(qrIdentifier: string) {
         return {
             success: true,
             tableName,
+            branchId: tableData.branchId,
             categories,
             products: transformedProducts,
         };

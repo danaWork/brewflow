@@ -1,11 +1,10 @@
 import MenuClient from '@/components/customer/MenuClient';
 import { getMenuData } from '@/app/actions/menu';
 
+export const dynamic = 'force-dynamic';
 export const dynamicParams = true;
 
 export default async function MenuPage({
-
-
   params,
 }: {
   params: Promise<{ tableId: string }>;
@@ -15,7 +14,6 @@ export default async function MenuPage({
   const result = await getMenuData(tableId);
 
   if (!result.success) {
-    // Basic error handling
     return (
       <div className="flex items-center justify-center min-h-screen">
         <p className="text-red-500">Failed to load menu data. Please try again later.</p>
@@ -27,9 +25,9 @@ export default async function MenuPage({
     <MenuClient
       tableId={tableId}
       tableName={result.tableName || `Table ${tableId}`}
+      branchId={result.branchId || ''}
       categories={result.categories || []}
       products={result.products || []}
     />
   );
 }
-

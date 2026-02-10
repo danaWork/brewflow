@@ -7,31 +7,26 @@ import {
   createOrderAction,
   getActiveOrdersAction,
   updateOrderStatusAction,
-  OrderData
 } from '@/app/actions/orders';
-import { getTables } from '@/app/actions/tables';
+import { getSessionAction } from '@/app/actions/auth';
 
-export type OrderStatus = 'payment' | 'preparing' | 'ready' | 'completed' | 'cancelled';
-
-export type OrderItem = CartItem;
+export type OrderStatus = 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
 
 export interface Order {
   id: string;
-  orderNumber?: number;
   status: OrderStatus;
-  items: OrderItem[];
+  items: CartItem[];
   total: number;
   table: string;
   tableId?: string;
   timestamp: Date;
-  specialInstructions?: string;
-  paymentMethod: string;
+  paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA';
 }
 
 interface OrderContextType {
   userOrders: Order[];
   activeOrders: Order[];
-  createOrder: (items: CartItem[], total: number, paymentMethod: string, specialInstructions?: string) => Promise<{ id: string; orderNumber: number } | null>;
+  createOrder: (items: CartItem[], total: number, paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA') => Promise<{ id: string } | null>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   dismissOrder: (orderId: string) => void;
   refreshActiveOrders: () => Promise<void>;
@@ -43,10 +38,19 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   const [userOrders, setUserOrders] = useState<Order[]>([]);
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
 
-  const { tableId: currentTableId, tableName: currentTableName } = useTable();
+  const { tableId: currentTableId, tableName: currentTableName, branchId: currentBranchId } = useTable();
 
   const refreshActiveOrders = useCallback(async () => {
-    const result = await getActiveOrdersAction();
+    // Both customers and staff might use this, but staff definitely need it for dashboard.
+    // Customers might use it to see their own active orders if we implemented that.
+
+    // For staff/owner dashboard, we get the branchId from session.
+    const session = await getSessionAction();
+    const branchId = session?.user?.branchId || currentBranchId;
+
+    if (!branchId) return;
+
+    const result = await getActiveOrdersAction(branchId);
 
     if (!result.success || !result.orders) {
       console.error('Error fetching orders:', result.error);
@@ -55,20 +59,17 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
 
     const orders: Order[] = result.orders.map((o) => ({
       id: o.id,
-      orderNumber: o.orderNumber,
       status: o.status as OrderStatus,
-      items: (o.items as OrderItem[]) || [],
-      total: typeof o.total === 'string' ? parseFloat(o.total) : o.total,
-      table: o.tableName || 'Unknown Table',
+      items: [], // Items are in a separate table now, would need a join/fetch if really needed here.
+      total: o.totalAmount,
+      table: o.tableNumber || 'Unknown Table',
       tableId: o.tableId || undefined,
       timestamp: o.createdAt ? new Date(o.createdAt) : new Date(),
-      specialInstructions: o.specialInstructions || undefined,
-      paymentMethod: o.paymentMethod || 'Cash'
+      paymentMethod: (o.paymentMethod as any) || 'CASH'
     }));
 
-
     setActiveOrders(orders);
-  }, []);
+  }, [currentBranchId]);
 
   useEffect(() => {
     const savedUserOrders = localStorage.getItem('coffee-shop-user-orders');
@@ -82,9 +83,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
 
     refreshActiveOrders();
 
-    // Note: Realtime removed for Cloudflare Pages/Neon DB simplification. 
-    // Could be implemented via polling or Cloudflare Pub/Sub if needed.
-    const interval = setInterval(refreshActiveOrders, 10000); // Simple polling fallback
+    const interval = setInterval(refreshActiveOrders, 10000);
     return () => clearInterval(interval);
   }, [refreshActiveOrders]);
 
@@ -92,26 +91,23 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('coffee-shop-user-orders', JSON.stringify(userOrders));
   }, [userOrders]);
 
-  const createOrder = async (items: CartItem[], total: number, paymentMethod: string, specialInstructions?: string) => {
+  const createOrder = async (items: CartItem[], total: number, paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA') => {
     try {
-      let tableId: string | null = null;
-      let tableName = currentTableName || 'Unknown Table';
-
-      if (currentTableId) {
-        const { tables } = await getTables();
-        const foundTable = tables.find(t => t.qrCode === currentTableId);
-        if (foundTable) {
-          tableId = foundTable.id;
-          tableName = foundTable.name;
-        }
+      if (!currentBranchId || !currentTableId) {
+        console.error('Missing branchId or tableId');
+        return null;
       }
 
       const result = await createOrderAction({
-        tableId,
-        items,
-        total,
+        branchId: currentBranchId,
+        tableId: currentTableId,
+        items: items.map(item => ({
+          productId: item.id,
+          quantity: item.quantity,
+          priceAtTime: item.price
+        })),
+        totalAmount: total,
         paymentMethod,
-        specialInstructions,
       });
 
       if (!result.success || !result.order) {
@@ -122,21 +118,19 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       const orderData = result.order;
       const newOrder: Order = {
         id: orderData.id,
-        orderNumber: orderData.orderNumber,
-        status: 'payment',
+        status: 'PENDING',
         items: items,
         total,
-        table: tableName,
-        tableId: tableId || undefined,
+        table: currentTableName || 'Unknown Table',
+        tableId: currentTableId,
         timestamp: new Date(),
-        specialInstructions,
         paymentMethod
       };
 
       setUserOrders(prev => [newOrder, ...prev]);
       refreshActiveOrders();
 
-      return { id: orderData.id, orderNumber: orderData.orderNumber };
+      return { id: orderData.id };
     } catch (e) {
       console.error('Failed to create order:', e);
       return null;

@@ -6,60 +6,44 @@ import { eq, asc } from 'drizzle-orm';
 
 export interface TableData {
   id: string;
-  name: string;
-  qrCode: string;
+  tableNumber: string;
+  qrIdentifier: string;
 }
 
-/**
- * Sync tables in database - ensures tables 1 to count exist
- */
-export async function syncTables(count: number): Promise<{ success: boolean; tables: TableData[]; error?: string }> {
+export async function syncTables(branchId: string, count: number): Promise<{ success: boolean; tables: TableData[]; error?: string }> {
   if (count < 1 || count > 50) {
     return { success: false, tables: [], error: 'Table count must be between 1 and 50' };
   }
 
   try {
-    // Get existing tables
-    const existingTables = await db.select().from(tablesSchema).orderBy(asc(tablesSchema.qrCode));
+    const existingTables = await db.select().from(tablesSchema).where(eq(tablesSchema.branchId, branchId)).orderBy(asc(tablesSchema.qrIdentifier));
 
-    const existingQrCodes = new Set(existingTables.map((t) => t.qrCode));
-    const tablesToCreate: { name: string; qrCode: string }[] = [];
+    const existingIdentifiers = new Set(existingTables.map((t) => t.qrIdentifier));
+    const tablesToCreate: { branchId: string; tableNumber: string; qrIdentifier: string }[] = [];
 
-    // Determine which tables need to be created
     for (let i = 1; i <= count; i++) {
-      const qrCode = `table-${i}`;
-      if (!existingQrCodes.has(qrCode)) {
+      const identifier = `table-${i}`;
+      if (!existingIdentifiers.has(identifier)) {
         tablesToCreate.push({
-          name: `Table ${i}`,
-          qrCode: qrCode,
+          branchId: branchId,
+          tableNumber: `Table ${i}`,
+          qrIdentifier: identifier,
         });
       }
     }
 
-    // Create missing tables
     if (tablesToCreate.length > 0) {
       await db.insert(tablesSchema).values(tablesToCreate);
     }
 
-    // Fetch all tables after sync
-    const allTables = await db.select().from(tablesSchema).orderBy(asc(tablesSchema.qrCode));
+    const allTables = await db.select().from(tablesSchema).where(eq(tablesSchema.branchId, branchId)).orderBy(asc(tablesSchema.qrIdentifier));
 
-    // Filter to only return tables 1-count and transform to our format
     const resultTables: TableData[] = allTables
-      .filter((t) => {
-        const num = parseInt(t.qrCode.replace('table-', ''), 10);
-        return !isNaN(num) && num >= 1 && num <= count;
-      })
       .map((t) => ({
         id: t.id,
-        name: t.name,
-        qrCode: t.qrCode,
-      }))
-      .sort((a, b) => {
-        const aNum = parseInt(a.qrCode.replace('table-', ''), 10);
-        const bNum = parseInt(b.qrCode.replace('table-', ''), 10);
-        return aNum - bNum;
-      });
+        tableNumber: t.tableNumber,
+        qrIdentifier: t.qrIdentifier,
+      }));
 
     return { success: true, tables: resultTables };
   } catch (e) {
@@ -68,35 +52,23 @@ export async function syncTables(count: number): Promise<{ success: boolean; tab
   }
 }
 
-/**
- * Get all tables from database
- */
-export async function getTables(): Promise<{ tables: TableData[]; error?: string }> {
+export async function getTables(branchId: string): Promise<{ success: boolean; tables: TableData[]; error?: string }> {
   try {
-    const data = await db.select().from(tablesSchema).orderBy(asc(tablesSchema.qrCode));
+    const data = await db.select().from(tablesSchema).where(eq(tablesSchema.branchId, branchId)).orderBy(asc(tablesSchema.qrIdentifier));
 
-    const tables: TableData[] = data
-      .map((t) => ({
-        id: t.id,
-        name: t.name,
-        qrCode: t.qrCode,
-      }))
-      .sort((a, b) => {
-        const aNum = parseInt(a.qrCode.replace('table-', ''), 10);
-        const bNum = parseInt(b.qrCode.replace('table-', ''), 10);
-        return aNum - bNum;
-      });
+    const tables: TableData[] = data.map((t) => ({
+      id: t.id,
+      tableNumber: t.tableNumber,
+      qrIdentifier: t.qrIdentifier,
+    }));
 
-    return { tables };
+    return { success: true, tables };
   } catch (e) {
     console.error('getTables error:', e);
-    return { tables: [], error: 'Failed to fetch tables' };
+    return { success: false, tables: [], error: 'Failed to fetch tables' };
   }
 }
 
-/**
- * Delete a table by ID
- */
 export async function deleteTable(tableId: string): Promise<{ success: boolean; error?: string }> {
   try {
     await db.delete(tablesSchema).where(eq(tablesSchema.id, tableId));
@@ -106,4 +78,3 @@ export async function deleteTable(tableId: string): Promise<{ success: boolean; 
     return { success: false, error: 'Failed to delete table' };
   }
 }
-

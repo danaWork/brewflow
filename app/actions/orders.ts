@@ -1,77 +1,96 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { orders as ordersSchema, tables as tablesSchema } from '@/db/schema';
-import { eq, inArray, desc } from 'drizzle-orm';
+import { orders as ordersSchema, tables as tablesSchema, orderItems as orderItemsSchema } from '@/db/schema';
+import { eq, inArray, desc, and } from 'drizzle-orm';
 
 export interface OrderData {
     id: string;
-    orderNumber: number;
-    status: string;
-    items: any;
-    total: number;
-    tableId: string | null;
-    tableName: string;
+    status: 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
+    totalAmount: number;
+    tableId: string;
+    tableNumber: string;
     createdAt: Date;
-    specialInstructions: string | null;
-    paymentMethod: string;
+    paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA' | null;
 }
 
 export async function createOrderAction(data: {
-    tableId: string | null;
-    items: any;
-    total: number;
-    paymentMethod: string;
-    specialInstructions?: string;
+    branchId: string;
+    tableId: string;
+    items: { productId: string; quantity: number; priceAtTime: number }[];
+    totalAmount: number;
+    paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA';
 }) {
     try {
-        const [inserted] = await db.insert(ordersSchema).values({
+        const [insertedOrder] = await db.insert(ordersSchema).values({
+            branchId: data.branchId,
             tableId: data.tableId,
-            status: 'payment',
-            total: data.total.toString(),
-            items: data.items,
-            specialInstructions: data.specialInstructions,
+            status: 'PENDING',
+            totalAmount: data.totalAmount.toString(),
             paymentMethod: data.paymentMethod,
         }).returning();
 
-        return { success: true, order: inserted };
+        if (data.items.length > 0) {
+            await db.insert(orderItemsSchema).values(
+                data.items.map(item => ({
+                    orderId: insertedOrder.id,
+                    productId: item.productId,
+                    quantity: item.quantity,
+                    priceAtTime: item.priceAtTime.toString(),
+                }))
+            );
+        }
+
+        return { success: true, order: insertedOrder };
     } catch (error) {
         console.error('createOrderAction error:', error);
         return { success: false, error: 'Failed to create order' };
     }
 }
 
-export async function getActiveOrdersAction() {
+export async function getActiveOrdersAction(branchId: string) {
     try {
         const activeOrders = await db
             .select({
                 id: ordersSchema.id,
-                orderNumber: ordersSchema.orderNumber,
                 status: ordersSchema.status,
-                items: ordersSchema.items,
-                total: ordersSchema.total,
+                totalAmount: ordersSchema.totalAmount,
                 tableId: ordersSchema.tableId,
-                tableName: tablesSchema.name,
+                tableNumber: tablesSchema.tableNumber,
                 createdAt: ordersSchema.createdAt,
-                specialInstructions: ordersSchema.specialInstructions,
                 paymentMethod: ordersSchema.paymentMethod,
             })
             .from(ordersSchema)
             .leftJoin(tablesSchema, eq(ordersSchema.tableId, tablesSchema.id))
-            .where(inArray(ordersSchema.status, ['payment', 'preparing', 'ready']))
+            .where(
+                and(
+                    eq(ordersSchema.branchId, branchId),
+                    inArray(ordersSchema.status, ['PENDING', 'PREPARING', 'READY'])
+                )
+            )
             .orderBy(desc(ordersSchema.createdAt));
 
-        return { success: true, orders: activeOrders };
+        return {
+            success: true,
+            orders: activeOrders.map(o => ({
+                ...o,
+                totalAmount: parseFloat(o.totalAmount as string)
+            }))
+        };
     } catch (error) {
         console.error('getActiveOrdersAction error:', error);
         return { success: false, error: 'Failed to fetch active orders' };
     }
 }
 
-export async function updateOrderStatusAction(orderId: string, status: string) {
+export async function updateOrderStatusAction(orderId: string, status: 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED') {
     try {
         await db.update(ordersSchema)
-            .set({ status })
+            .set({
+                status,
+                acceptedAt: status === 'PREPARING' ? new Date() : undefined,
+                readyAt: status === 'READY' ? new Date() : undefined,
+            })
             .where(eq(ordersSchema.id, orderId));
         return { success: true };
     } catch (error) {

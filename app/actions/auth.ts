@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 import { users, companies, branches } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
-import { login } from '@/lib/auth';
+import { login, getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 
 export async function loginAction(formData: FormData) {
@@ -83,4 +83,9 @@ export async function seedAction() {
     ]);
 
     return { message: 'Seeded successfully' };
+}
+
+export async function getSessionAction() {
+    const session = await getSession();
+    return session;
 }
