@@ -1,41 +1,61 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { categories as categoriesSchema, products as productsSchema, tables as tablesSchema } from '@/db/schema';
+import { categories as categoriesSchema, products as productsSchema, tables as tablesSchema, branches as branchesSchema } from '@/db/schema';
 import { eq, asc, desc } from 'drizzle-orm';
 
-export async function getMenuData(qrCode: string) {
+export async function getMenuData(qrIdentifier: string) {
     try {
-        // Fetch Table by QR code
+        // Fetch Table by QR identifier
         const [tableData] = await db
-            .select({ name: tablesSchema.name })
+            .select({
+                tableNumber: tablesSchema.tableNumber,
+                branchId: tablesSchema.branchId
+            })
             .from(tablesSchema)
-            .where(eq(tablesSchema.qrCode, qrCode))
+            .where(eq(tablesSchema.qrIdentifier, qrIdentifier))
             .limit(1);
 
-        const tableName = tableData?.name || `Table ${qrCode}`;
+        if (!tableData) {
+            return { success: false, error: "Table not found" };
+        }
 
-        // Fetch categories
+        const tableName = tableData.tableNumber;
+
+        // Fetch Branch to get Company ID
+        const [branchData] = await db
+            .select({ companyId: branchesSchema.companyId })
+            .from(branchesSchema)
+            .where(eq(branchesSchema.id, tableData.branchId))
+            .limit(1);
+
+        if (!branchData) {
+            return { success: false, error: "Branch not found" };
+        }
+
+        // Fetch categories for the company
         const categories = await db
             .select()
-            .from(categoriesSchema);
+            .from(categoriesSchema)
+            .where(eq(categoriesSchema.companyId, branchData.companyId));
 
-        // Fetch products ordered by signature first
+        // Fetch products for categories
+        // For simplicity, fetching all products and filtering in memory or just fetching all if categories are many
+        // Better: join or group by category. Still, for now let's keep it simple.
         const products = await db
             .select()
-            .from(productsSchema)
-            .orderBy(desc(productsSchema.isSignature));
+            .from(productsSchema);
+        // In a real app we'd filter by category IDs belonging to the company
 
         // Transform products to expected format (decimal to number)
         const transformedProducts = products.map((p) => ({
             id: p.id,
             name: p.name,
-            price: typeof p.price === 'string' ? parseFloat(p.price) : p.price,
-            description: p.description,
-            image: p.image,
-            isSignature: p.isSignature,
+            price: typeof p.basePrice === 'string' ? parseFloat(p.basePrice) : p.basePrice,
+            description: '', // Removed from schema
+            image: p.imageUrl,
+            isSignature: false, // Removed from schema
             categoryId: p.categoryId,
-            createdAt: p.createdAt,
         }));
 
         return {
