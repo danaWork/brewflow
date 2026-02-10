@@ -1,6 +1,8 @@
 'use server';
 
-import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { db } from '@/lib/db';
+import { tables as tablesSchema } from '@/db/schema';
+import { eq, asc } from 'drizzle-orm';
 
 export interface TableData {
   id: string;
@@ -16,21 +18,12 @@ export async function syncTables(count: number): Promise<{ success: boolean; tab
     return { success: false, tables: [], error: 'Table count must be between 1 and 50' };
   }
 
-  const supabase = await createSupabaseServerClient();
-
   try {
     // Get existing tables
-    const { data: existingTables, error: fetchError } = await supabase
-      .from('tables')
-      .select('*')
-      .order('name', { ascending: true });
+    const existingTables = await db.select().from(tablesSchema).orderBy(asc(tablesSchema.qrCode));
 
-    if (fetchError) {
-      return { success: false, tables: [], error: fetchError.message };
-    }
-
-    const existingQrCodes = new Set((existingTables || []).map((t: any) => t.qr_code));
-    const tablesToCreate: { name: string; qr_code: string }[] = [];
+    const existingQrCodes = new Set(existingTables.map((t) => t.qrCode));
+    const tablesToCreate: { name: string; qrCode: string }[] = [];
 
     // Determine which tables need to be created
     for (let i = 1; i <= count; i++) {
@@ -38,55 +31,37 @@ export async function syncTables(count: number): Promise<{ success: boolean; tab
       if (!existingQrCodes.has(qrCode)) {
         tablesToCreate.push({
           name: `Table ${i}`,
-          qr_code: qrCode,
+          qrCode: qrCode,
         });
       }
     }
 
     // Create missing tables
     if (tablesToCreate.length > 0) {
-      console.log('Creating tables:', tablesToCreate);
-      const { data: insertedData, error: insertError } = await supabase
-        .from('tables')
-        .insert(tablesToCreate)
-        .select();
-
-      console.log('Insert result:', { insertedData, insertError });
-
-      if (insertError) {
-        console.error('Insert error:', insertError);
-        return { success: false, tables: [], error: insertError.message };
-      }
+      await db.insert(tablesSchema).values(tablesToCreate);
     }
 
     // Fetch all tables after sync
-    const { data: allTables, error: finalFetchError } = await supabase
-      .from('tables')
-      .select('*')
-      .order('qr_code', { ascending: true });
-
-    if (finalFetchError) {
-      return { success: false, tables: [], error: finalFetchError.message };
-    }
+    const allTables = await db.select().from(tablesSchema).orderBy(asc(tablesSchema.qrCode));
 
     // Filter to only return tables 1-count and transform to our format
-    const tables: TableData[] = (allTables || [])
-      .filter((t: any) => {
-        const num = parseInt(t.qr_code.replace('table-', ''), 10);
+    const resultTables: TableData[] = allTables
+      .filter((t) => {
+        const num = parseInt(t.qrCode.replace('table-', ''), 10);
         return !isNaN(num) && num >= 1 && num <= count;
       })
-      .map((t: any) => ({
+      .map((t) => ({
         id: t.id,
         name: t.name,
-        qrCode: t.qr_code,
+        qrCode: t.qrCode,
       }))
-      .sort((a: TableData, b: TableData) => {
+      .sort((a, b) => {
         const aNum = parseInt(a.qrCode.replace('table-', ''), 10);
         const bNum = parseInt(b.qrCode.replace('table-', ''), 10);
         return aNum - bNum;
       });
 
-    return { success: true, tables };
+    return { success: true, tables: resultTables };
   } catch (e) {
     console.error('syncTables error:', e);
     return { success: false, tables: [], error: 'Failed to sync tables' };
@@ -97,25 +72,16 @@ export async function syncTables(count: number): Promise<{ success: boolean; tab
  * Get all tables from database
  */
 export async function getTables(): Promise<{ tables: TableData[]; error?: string }> {
-  const supabase = await createSupabaseServerClient();
-
   try {
-    const { data, error } = await supabase
-      .from('tables')
-      .select('*')
-      .order('qr_code', { ascending: true });
+    const data = await db.select().from(tablesSchema).orderBy(asc(tablesSchema.qrCode));
 
-    if (error) {
-      return { tables: [], error: error.message };
-    }
-
-    const tables: TableData[] = (data || [])
-      .map((t: any) => ({
+    const tables: TableData[] = data
+      .map((t) => ({
         id: t.id,
         name: t.name,
-        qrCode: t.qr_code,
+        qrCode: t.qrCode,
       }))
-      .sort((a: TableData, b: TableData) => {
+      .sort((a, b) => {
         const aNum = parseInt(a.qrCode.replace('table-', ''), 10);
         const bNum = parseInt(b.qrCode.replace('table-', ''), 10);
         return aNum - bNum;
@@ -132,21 +98,12 @@ export async function getTables(): Promise<{ tables: TableData[]; error?: string
  * Delete a table by ID
  */
 export async function deleteTable(tableId: string): Promise<{ success: boolean; error?: string }> {
-  const supabase = await createSupabaseServerClient();
-
   try {
-    const { error } = await supabase
-      .from('tables')
-      .delete()
-      .eq('id', tableId);
-
-    if (error) {
-      return { success: false, error: error.message };
-    }
-
+    await db.delete(tablesSchema).where(eq(tablesSchema.id, tableId));
     return { success: true };
   } catch (e) {
     console.error('deleteTable error:', e);
     return { success: false, error: 'Failed to delete table' };
   }
 }
+
