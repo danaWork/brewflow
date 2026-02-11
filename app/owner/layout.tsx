@@ -1,4 +1,9 @@
+import { Metadata } from 'next';
 import OwnerSidebar from '@/components/owner/OwnerSidebar';
+
+export const metadata: Metadata = {
+  title: 'Shop Dashboard',
+};
 
 export default function OwnerLayout({
   children,

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { QrCode, ShoppingBag, Zap, Users } from "lucide-react";
+import { QrCode, Coffee, Zap, Users } from "lucide-react";
 
 export default function Home() {
   return (
@@ -8,7 +8,7 @@ export default function Home() {
         {/* Hero Section */}
         <div className="mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-orange-500 to-amber-600 rounded-2xl shadow-lg mb-4">
-            <ShoppingBag className="w-8 h-8 text-white" />
+            <Coffee className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-gray-900 mb-3">
             BrewFlow

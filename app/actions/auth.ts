@@ -89,3 +89,9 @@ export async function getSessionAction() {
     const session = await getSession();
     return session;
 }
+
+import { logout as authLogout } from '@/lib/auth';
+
+export async function logout() {
+    return await authLogout();
+}
