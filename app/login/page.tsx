@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { loginAction, seedAction } from '@/app/actions/auth';
-import { Coffee, ArrowRight, Loader2 } from 'lucide-react';
+import { loginAction } from '@/app/actions/auth';
+import { Coffee, ArrowLeft, Loader2 } from 'lucide-react';
+import Link from 'next/link';
 
 export default function LoginPage() {
     const [loading, setLoading] = useState(false);
@@ -21,90 +22,77 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4 selection:bg-orange-500/30">
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-orange-500/10 blur-[120px] rounded-full" />
-                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-orange-600/10 blur-[120px] rounded-full" />
-            </div>
+        <div className="min-h-screen bg-white flex flex-col">
+            {/* Header */}
+            <header className="p-4 sm:p-6 flex items-center gap-4 relative z-10">
+                <Link href="/" className="text-gray-400 hover:text-gray-600 transition-colors p-2 -ml-2">
+                    <ArrowLeft size={20} />
+                </Link>
+                <a href='/'><span className="text-xl font-bold text-[#D46215] tracking-tight">BrewFlow</span></a>
+            </header>
 
-            <div className="w-full max-w-md relative">
-                <div className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl overflow-hidden group">
-                    <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-                    <div className="relative">
-                        <div className="flex justify-center mb-8">
-                            <div className="bg-orange-500/10 p-4 rounded-2xl border border-orange-500/20 group-hover:scale-110 transition-transform duration-500">
-                                <Coffee className="w-8 h-8 text-orange-500" />
-                            </div>
+            <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 -mt-12 sm:-mt-20">
+                <div className="w-full max-w-[440px] bg-[#F9FAFB]/50 border border-gray-100 rounded-[24px] sm:rounded-[32px] p-6 sm:p-10 shadow-sm transition-all">
+                    <div className="flex flex-col items-center text-center">
+                        <div className="w-12 h-12 bg-orange-50 rounded-full flex items-center justify-center mb-4 sm:mb-6">
+                            <Coffee className="text-[#D46215]" size={24} />
                         </div>
 
-                        <div className="text-center mb-10">
-                            <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">BrewFlow</h1>
-                            <p className="text-white/40 font-medium">Internal Management Access</p>
-                        </div>
+                        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Welcome back</h1>
+                        <p className="text-gray-500 text-xs sm:text-sm mb-6 sm:mb-10">
+                            Enter your credentials to access your shop dashboard
+                        </p>
 
-                        <form onSubmit={handleSubmit} className="space-y-5">
-                            <div className="space-y-2">
-                                <label className="text-xs font-semibold text-white/50 uppercase tracking-widest pl-1">Email Address</label>
+                        <form onSubmit={handleSubmit} className="w-full space-y-4 sm:space-y-6">
+                            <div className="space-y-1.5 text-left">
+                                <label className="text-xs sm:text-sm font-semibold text-gray-700 ml-1">Username</label>
                                 <input
                                     name="email"
                                     type="email"
                                     required
-                                    placeholder="name@brewflow.com"
-                                    className="w-full bg-white/[0.05] border border-white/10 rounded-2xl px-5 py-4 text-white placeholder-white/20 focus:outline-none focus:border-orange-500/50 focus:bg-white/[0.08] transition-all duration-300"
+                                    placeholder="Enter username"
+                                    className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 sm:py-3 text-sm sm:text-base text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[#D46215] transition-all"
                                 />
                             </div>
 
-                            <div className="space-y-2">
-                                <label className="text-xs font-semibold text-white/50 uppercase tracking-widest pl-1">Password</label>
+                            <div className="space-y-1.5 text-left">
+                                <label className="text-xs sm:text-sm font-semibold text-gray-700 ml-1">Password</label>
                                 <input
                                     name="password"
                                     type="password"
                                     required
-                                    placeholder="••••••••"
-                                    className="w-full bg-white/[0.05] border border-white/10 rounded-2xl px-5 py-4 text-white placeholder-white/20 focus:outline-none focus:border-orange-500/50 focus:bg-white/[0.08] transition-all duration-300"
+                                    placeholder="Enter password"
+                                    className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 sm:py-3 text-sm sm:text-base text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[#D46215] transition-all"
                                 />
                             </div>
 
                             {error && (
-                                <div className="bg-red-500/10 border border-red-500/20 text-red-500 text-sm py-3 px-4 rounded-xl animate-shake">
+                                <div className="text-red-500 text-[10px] sm:text-xs font-medium text-center bg-red-50 py-2 rounded-lg">
                                     {error}
                                 </div>
                             )}
 
                             <button
                                 disabled={loading}
-                                className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-900/50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2 group/btn transition-all duration-300"
+                                className="w-full bg-[#D46215] hover:bg-[#B75311] text-white font-bold py-3 sm:py-3.5 rounded-xl shadow-sm transition-all flex items-center justify-center active:scale-[0.98]"
                             >
                                 {loading ? (
                                     <Loader2 className="w-5 h-5 animate-spin" />
                                 ) : (
-                                    <>
-                                        Sign In
-                                        <ArrowRight className="w-5 h-5 group-hover/btn:translate-x-1 transition-transform" />
-                                    </>
+                                    'Login'
                                 )}
                             </button>
                         </form>
 
-                        <div className="mt-8 pt-6 border-t border-white/5 text-center">
-                            <button
-                                onClick={async () => {
-                                    const res = await seedAction();
-                                    alert(res.message);
-                                }}
-                                className="text-white/30 hover:text-orange-500/50 text-xs font-medium transition-colors"
-                            >
-                                Initialize Database (Seed)
+                        <div className="mt-6 sm:mt-8 text-xs sm:text-sm">
+                            <span className="text-gray-400">Don't have a shop yet? </span>
+                            <button className="text-[#D46215] font-semibold hover:underline">
+                                Start Trial
                             </button>
                         </div>
                     </div>
                 </div>
-
-                <p className="text-center mt-8 text-white/20 text-xs tracking-widest uppercase">
-                    &copy; 2026 Brewflow Systems
-                </p>
-            </div>
+            </main>
         </div>
     );
 }
