@@ -33,7 +33,6 @@ export default function MenuClient({ tableId, tableName, branchId, categories, p
   const [activeCategory, setActiveCategory] = useState('all');
   const [activeType, setActiveType] = useState<'drinks' | 'snacks'>('drinks');
 
-  // Drawer State
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
 
@@ -44,34 +43,26 @@ export default function MenuClient({ tableId, tableName, branchId, categories, p
 
   const handleCloseDrawer = () => {
     setIsDrawerOpen(false);
-    // Optional: wait for animation to clear before clearing data, 
-    // but clearing immediately hides content during slide-down. 
-    // Usually better to keep data until close.
   };
 
-  // Determine available categories based on activeType
   const filteredCategories = useMemo(() => {
     return categories.filter(c => {
-      // If type exists check it, otherwise assume everything is a 'drink' (fallback)
       const cType = c.type || 'drink';
-      // Match simple plural/singular logic or strict match if seeded correctly
-      // Our seed uses 'drink' and 'snack' (singular). Toggle uses 'drinks'/'snacks' (plural).
       return activeType.startsWith(cType);
     });
   }, [categories, activeType]);
 
-  // Reset activeCategory when activeType changes if current activeCategory is not in the new list
-  const activeCatExists = filteredCategories.find(c => c.id === activeCategory);
-  if (activeCategory !== 'all' && !activeCatExists) {
-    setActiveCategory('all');
-  }
+  useEffect(() => {
+    const activeCatExists = filteredCategories.find(c => c.id === activeCategory);
+    if (activeCategory !== 'all' && !activeCatExists) {
+      setActiveCategory('all');
+    }
+  }, [activeCategory, filteredCategories]);
 
   const filteredProducts = useMemo(() => {
-    // 1. Filter products that belong to the visible categories
     const visibleCategoryIds = filteredCategories.map(c => c.id);
     const productsInType = products.filter(p => visibleCategoryIds.includes(p.categoryId));
 
-    // 2. Filter by specific category selection
     if (activeCategory === 'all') {
       return productsInType;
     }
@@ -116,7 +107,6 @@ export default function MenuClient({ tableId, tableName, branchId, categories, p
       <Drawer
         isOpen={isDrawerOpen}
         onClose={handleCloseDrawer}
-        // title={selectedProduct?.name} // Custom header in content instead
         showCloseButton={false}
       >
         {selectedProduct && (

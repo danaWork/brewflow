@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { CartItem } from './CartContext';
 import { useTable } from './TableContext';
 import {
@@ -48,62 +48,115 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     }
   });
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
+  const userOrdersRef = useRef<Order[]>([]);
+  const sessionRef = useRef<{ branchId: string | null; timestamp: number } | null>(null);
+  const isRefreshingRef = useRef(false);
 
   const { tableId: currentTableId, tableName: currentTableName, branchId: currentBranchId } = useTable();
 
+  // Keep ref in sync with state
+  useEffect(() => {
+    userOrdersRef.current = userOrders;
+  }, [userOrders]);
+
   const refreshActiveOrders = useCallback(async () => {
-    // Both customers and staff might use this, but staff definitely need it for dashboard.
-    // Customers might use it to see their own active orders if we implemented that.
+    // Prevent concurrent calls
+    if (isRefreshingRef.current) return;
+    isRefreshingRef.current = true;
 
-    // For staff/owner dashboard, we get the branchId from session.
-    const session = await getSessionAction();
-    const branchId = session?.user?.branchId || currentBranchId;
+    try {
+      // Both customers and staff might use this, but staff definitely need it for dashboard.
+      // Customers might use it to see their own active orders if we implemented that.
 
-    if (!branchId) return;
+      // First, try to use currentBranchId from TableContext (for customer pages)
+      let branchId = currentBranchId;
 
-    const result = await getActiveOrdersAction(branchId);
-
-    if (!result.success || !result.orders) {
-      console.error('Error fetching orders:', result.error);
-      return;
-    }
-
-    const orders: Order[] = result.orders.map((o) => ({
-      id: o.id,
-      status: o.status as OrderStatus,
-      items: [], // Items are in a separate table now, would need a join/fetch if really needed here.
-      total: o.totalAmount,
-      table: o.tableNumber || 'Unknown Table',
-      tableId: o.tableId || undefined,
-      timestamp: o.createdAt ? new Date(o.createdAt) : new Date(),
-      paymentMethod: (o.paymentMethod as any) || 'CASH'
-    }));
-
-    setActiveOrders(orders);
-
-    // Individually sync userOrders statuses, especially for those that might have been COMPLETED
-    if (userOrders.length > 0) {
-      const userOrderIds = userOrders.map(o => o.id);
-      const statusResult = await getOrdersStatusAction(userOrderIds);
-      
-      if (statusResult.success && statusResult.orders) {
-        setUserOrders(prev => prev.map(userOrder => {
-          const match = statusResult.orders?.find(so => so.id === userOrder.id);
-          if (match && match.status !== userOrder.status) {
-            return { ...userOrder, status: match.status as OrderStatus };
-          }
-          return userOrder;
-        }));
+      // Only fetch session if we don't have branchId and session cache is stale (> 30 seconds)
+      if (!branchId) {
+        const now = Date.now();
+        const cachedSession = sessionRef.current;
+        
+        // Use cached session if it's fresh (less than 30 seconds old)
+        if (cachedSession && (now - cachedSession.timestamp) < 30000) {
+          branchId = cachedSession.branchId;
+        } else {
+          // Fetch session only if needed
+          const session = await getSessionAction();
+          branchId = session?.user?.branchId || null;
+          sessionRef.current = { branchId, timestamp: now };
+        }
       }
+
+      if (!branchId) {
+        isRefreshingRef.current = false;
+        return;
+      }
+
+      const result = await getActiveOrdersAction(branchId);
+
+      if (!result.success || !result.orders) {
+        console.error('Error fetching orders:', result.error);
+        isRefreshingRef.current = false;
+        return;
+      }
+
+      const orders: Order[] = result.orders.map((o) => ({
+        id: o.id,
+        status: o.status as OrderStatus,
+        items: [], // Items are in a separate table now, would need a join/fetch if really needed here.
+        total: o.totalAmount,
+        table: o.tableNumber || 'Unknown Table',
+        tableId: o.tableId || undefined,
+        timestamp: o.createdAt ? new Date(o.createdAt) : new Date(),
+        paymentMethod: (o.paymentMethod as any) || 'CASH'
+      }));
+
+      setActiveOrders(orders);
+
+      // Individually sync userOrders statuses, especially for those that might have been COMPLETED
+      // Use ref to avoid dependency on userOrders which would cause infinite loop
+      const currentUserOrders = userOrdersRef.current;
+      if (currentUserOrders.length > 0) {
+        const userOrderIds = currentUserOrders.map(o => o.id);
+        const statusResult = await getOrdersStatusAction(userOrderIds);
+        
+        if (statusResult.success && statusResult.orders) {
+          setUserOrders(prev => prev.map(userOrder => {
+            const match = statusResult.orders?.find(so => so.id === userOrder.id);
+            if (match && match.status !== userOrder.status) {
+              return { ...userOrder, status: match.status as OrderStatus };
+            }
+            return userOrder;
+          }));
+        }
+      }
+    } finally {
+      isRefreshingRef.current = false;
     }
-  }, [currentBranchId, userOrders]);
+  }, [currentBranchId]);
 
   useEffect(() => {
-    refreshActiveOrders();
+    let intervalId: NodeJS.Timeout | null = null;
+    let isMounted = true;
 
-    const interval = setInterval(refreshActiveOrders, 10000);
-    return () => clearInterval(interval);
-  }, [refreshActiveOrders]);
+    // Initial refresh
+    refreshActiveOrders().then(() => {
+      // Only set up interval if we have a branchId (either from table context or session)
+      if (isMounted) {
+        const hasBranchId = sessionRef.current?.branchId || currentBranchId;
+        if (hasBranchId) {
+          intervalId = setInterval(refreshActiveOrders, 10000);
+        }
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [refreshActiveOrders, currentBranchId]);
 
   useEffect(() => {
     localStorage.setItem('coffee-shop-user-orders', JSON.stringify(userOrders));
