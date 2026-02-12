@@ -2,21 +2,30 @@
 
 import { db } from '@/lib/db';
 import { categories as categoriesSchema, products as productsSchema, tables as tablesSchema, branches as branchesSchema } from '@/db/schema';
-import { eq, asc, desc } from 'drizzle-orm';
+import { eq, asc, desc, and, or, isNull } from 'drizzle-orm';
+import { branchProductAvailability } from '@/db/schema';
 
 export async function getMenuData(qrIdentifier: string) {
     if (process.env.DATABASE_URL?.includes('placeholder') || !process.env.DATABASE_URL) {
         return { success: false, error: "Database not configured" };
     }
     try {
-        // Fetch Table by QR identifier
+        // Fetch Table by QR identifier or ID (only if valid UUID)
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(qrIdentifier);
+        
+        const conditions = [eq(tablesSchema.qrIdentifier, qrIdentifier)];
+        if (isUuid) {
+            conditions.push(eq(tablesSchema.id, qrIdentifier));
+        }
+
         const [tableData] = await db
             .select({
+                id: tablesSchema.id,
                 tableNumber: tablesSchema.tableNumber,
                 branchId: tablesSchema.branchId
             })
             .from(tablesSchema)
-            .where(eq(tablesSchema.qrIdentifier, qrIdentifier))
+            .where(or(...conditions))
             .limit(1);
 
         if (!tableData) {
@@ -24,7 +33,6 @@ export async function getMenuData(qrIdentifier: string) {
         }
 
         const tableName = tableData.tableNumber;
-
         // Fetch Branch to get Company ID
         const [branchData] = await db
             .select({ companyId: branchesSchema.companyId })
@@ -38,34 +46,67 @@ export async function getMenuData(qrIdentifier: string) {
 
         // Fetch categories for the company
         const categories = await db
-            .select()
+            .select({
+                id: categoriesSchema.id,
+                name: categoriesSchema.name,
+                type: categoriesSchema.type,
+                companyId: categoriesSchema.companyId,
+            })
             .from(categoriesSchema)
             .where(eq(categoriesSchema.companyId, branchData.companyId));
 
-        // Fetch products for categories
-        // For simplicity, fetching all products and filtering in memory or just fetching all if categories are many
-        // Better: join or group by category. Still, for now let's keep it simple.
-        const products = await db
-            .select()
-            .from(productsSchema);
-        // In a real app we'd filter by category IDs belonging to the company
+        // Fetch products for categories belonging to this company AND available at this branch
+        const productsWithAvailability = await db
+            .select({
+                id: productsSchema.id,
+                name: productsSchema.name,
+                basePrice: productsSchema.basePrice,
+                imageUrl: productsSchema.imageUrl,
+                categoryId: productsSchema.categoryId,
+                isHidden: productsSchema.isHidden,
+                isInStock: branchProductAvailability.isInStock,
+                branchPriceOverride: branchProductAvailability.branchPriceOverride,
+            })
+            .from(productsSchema)
+            .innerJoin(categoriesSchema, eq(productsSchema.categoryId, categoriesSchema.id))
+            .leftJoin(
+                branchProductAvailability, 
+                and(
+                    eq(productsSchema.id, branchProductAvailability.productId),
+                    eq(branchProductAvailability.branchId, tableData.branchId)
+                )
+            )
+            .where(
+                and(
+                    eq(categoriesSchema.companyId, branchData.companyId),
+                    eq(productsSchema.isHidden, false)
+                )
+            );
 
-        // Transform products to expected format (decimal to number)
-        const transformedProducts = products.map((p) => ({
-            id: p.id,
-            name: p.name,
-            price: typeof p.basePrice === 'string' ? parseFloat(p.basePrice) : p.basePrice,
-            description: '', // Removed from schema
-            image: p.imageUrl,
-            isSignature: false, // Removed from schema
-            categoryId: p.categoryId,
+        // Transform data
+        const transformedCategories = categories.map(c => ({
+            ...c,
+            type: (c.type || 'drink').toLowerCase()
         }));
 
+        const transformedProducts = productsWithAvailability
+            .filter(p => p.isInStock !== false)
+            .map((p) => ({
+                id: p.id,
+                name: p.name,
+                price: parseFloat((p.branchPriceOverride || p.basePrice).toString()),
+                description: '', 
+                image: p.imageUrl,
+                isSignature: false, 
+                categoryId: p.categoryId,
+                isInStock: p.isInStock ?? true,
+            }));
         return {
             success: true,
+            tableId: tableData.id,
             tableName,
             branchId: tableData.branchId,
-            categories,
+            categories: transformedCategories,
             products: transformedProducts,
         };
     } catch (error) {

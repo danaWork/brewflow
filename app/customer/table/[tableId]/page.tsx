@@ -23,7 +23,7 @@ export default async function MenuPage({
 
   return (
     <MenuClient
-      tableId={tableId}
+      tableId={result.tableId || tableId}
       tableName={result.tableName || `Table ${tableId}`}
       branchId={result.branchId || ''}
       categories={result.categories || []}

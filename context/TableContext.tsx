@@ -12,18 +12,17 @@ interface TableContextType {
 const TableContext = createContext<TableContextType | undefined>(undefined);
 
 export function TableProvider({ children }: { children: React.ReactNode }) {
-  const [tableId, setTableId] = useState<string | null>(null);
-  const [tableName, setTableName] = useState<string | null>(null);
-  const [branchId, setBranchId] = useState<string | null>(null);
+  const [tableId, setTableId] = useState<string | null>(() => 
+    typeof window !== 'undefined' ? localStorage.getItem('coffee-shop-table-id') : null
+  );
+  const [tableName, setTableName] = useState<string | null>(() => 
+    typeof window !== 'undefined' ? localStorage.getItem('coffee-shop-table-name') : null
+  );
+  const [branchId, setBranchId] = useState<string | null>(() => 
+    typeof window !== 'undefined' ? localStorage.getItem('coffee-shop-branch-id') : null
+  );
 
-  useEffect(() => {
-    const savedId = localStorage.getItem('coffee-shop-table-id');
-    const savedName = localStorage.getItem('coffee-shop-table-name');
-    const savedBranchId = localStorage.getItem('coffee-shop-branch-id');
-    if (savedId) setTableId(savedId);
-    if (savedName) setTableName(savedName);
-    if (savedBranchId) setBranchId(savedBranchId);
-  }, []);
+  // Removed redundant load effect as we now initialize synchronously
 
   const setTableInfo = (id: string, name: string, bId: string) => {
     setTableId(id);

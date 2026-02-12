@@ -42,8 +42,13 @@ export async function createOrderAction(data: {
         }
 
         return { success: true, order: insertedOrder };
-    } catch (error) {
-        console.error('createOrderAction error:', error);
+    } catch (error: any) {
+        console.error('createOrderAction error details:', {
+            message: error.message,
+            stack: error.stack,
+            detail: error.detail,
+            hint: error.hint
+        });
         return { success: false, error: 'Failed to create order' };
     }
 }
@@ -96,5 +101,27 @@ export async function updateOrderStatusAction(orderId: string, status: 'PENDING'
     } catch (error) {
         console.error('updateOrderStatusAction error:', error);
         return { success: false, error: 'Failed to update order status' };
+    }
+}
+
+export async function getOrdersStatusAction(orderIds: string[]) {
+    try {
+        if (orderIds.length === 0) return { success: true, orders: [] };
+
+        const result = await db
+            .select({
+                id: ordersSchema.id,
+                status: ordersSchema.status,
+            })
+            .from(ordersSchema)
+            .where(inArray(ordersSchema.id, orderIds));
+
+        return {
+            success: true,
+            orders: result
+        };
+    } catch (error) {
+        console.error('getOrdersStatusAction error:', error);
+        return { success: false, error: 'Failed to fetch order statuses' };
     }
 }

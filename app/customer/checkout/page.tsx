@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import OrderConfirmation from '@/components/customer/OrderConfirmation';
 import { useTable } from '@/context/TableContext';
+import FloatingOrderTabs from '@/components/customer/FloatingOrderTabs';
 
 export default function CheckoutPage() {
     const { items, cartTotal, clearCart } = useCart();
@@ -236,6 +237,7 @@ export default function CheckoutPage() {
                 </div>
             </div>
 
+            <FloatingOrderTabs />
             <OrderConfirmation
                 isOpen={showConfirmation}
                 onClose={handleCloseConfirmation}

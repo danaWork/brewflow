@@ -44,6 +44,7 @@ export const categories = pgTable('categories', {
   id: uuid('id').defaultRandom().primaryKey(),
   companyId: uuid('company_id').references(() => companies.id).notNull(),
   name: text('name').notNull(),
+  type: text('type').default('drink').notNull(), // 'drink' or 'snack'
 });
 
 export const products = pgTable('products', {

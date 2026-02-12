@@ -120,7 +120,7 @@ export default function ProductDrawerContent({ product, onClose }: ProductDrawer
 
   const handleUpsellAndAdd = () => {
       const croissantItem = {
-          productId: 'chocolate-croissant',
+          productId: '51b69945-b6c8-4ea0-9d23-4f9ef963a55d',
           name: 'Chocolate Croissant',
           price: 85.50,
           quantity: 1,
@@ -135,8 +135,8 @@ export default function ProductDrawerContent({ product, onClose }: ProductDrawer
   const handleAddWithExtras = () => {
     // Collect selected extras
      const frequentlyBoughtItems = [
-          { id: 'taro-milk-tea', name: 'Taro Milk Tea', price: 120, originalPrice: 150, image: 'https://images.unsplash.com/photo-1541658016709-82535e94bc69?q=80&w=400&fit=crop' },
-          { id: 'bottled-water', name: 'Bottled Water', price: 40, originalPrice: 50, image: 'https://images.unsplash.com/photo-1563806950-c8f77341fc68?q=80&w=400&fit=crop' }
+          { id: '6fde4e55-adb0-4c06-919f-5816ae3da79d', name: 'Taro Milk Tea', price: 120, originalPrice: 150, image: 'https://images.unsplash.com/photo-1541658016709-82535e94bc69?q=80&w=400&fit=crop' },
+          { id: 'cd613151-eb4d-4a8a-90ce-2615e44c7239', name: 'Bottled Water', price: 40, originalPrice: 50, image: 'https://images.unsplash.com/photo-1563806950-c8f77341fc68?q=80&w=400&fit=crop' }
     ];
 
     const extrasToAdd = selectedExtras.map(id => {

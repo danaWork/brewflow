@@ -7,6 +7,7 @@ import {
   createOrderAction,
   getActiveOrdersAction,
   updateOrderStatusAction,
+  getOrdersStatusAction,
 } from '@/app/actions/orders';
 import { getSessionAction } from '@/app/actions/auth';
 
@@ -35,7 +36,17 @@ interface OrderContextType {
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
 export function OrderProvider({ children }: { children: React.ReactNode }) {
-  const [userOrders, setUserOrders] = useState<Order[]>([]);
+  const [userOrders, setUserOrders] = useState<Order[]>(() => {
+    if (typeof window === 'undefined') return [];
+    const saved = localStorage.getItem('coffee-shop-user-orders');
+    if (!saved) return [];
+    try {
+      const parsed = JSON.parse(saved);
+      return parsed.map((o: any) => ({ ...o, timestamp: new Date(o.timestamp) }));
+    } catch (e) {
+      return [];
+    }
+  });
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
 
   const { tableId: currentTableId, tableName: currentTableName, branchId: currentBranchId } = useTable();
@@ -69,18 +80,25 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     }));
 
     setActiveOrders(orders);
-  }, [currentBranchId]);
+
+    // Individually sync userOrders statuses, especially for those that might have been COMPLETED
+    if (userOrders.length > 0) {
+      const userOrderIds = userOrders.map(o => o.id);
+      const statusResult = await getOrdersStatusAction(userOrderIds);
+      
+      if (statusResult.success && statusResult.orders) {
+        setUserOrders(prev => prev.map(userOrder => {
+          const match = statusResult.orders?.find(so => so.id === userOrder.id);
+          if (match && match.status !== userOrder.status) {
+            return { ...userOrder, status: match.status as OrderStatus };
+          }
+          return userOrder;
+        }));
+      }
+    }
+  }, [currentBranchId, userOrders]);
 
   useEffect(() => {
-    const savedUserOrders = localStorage.getItem('coffee-shop-user-orders');
-    if (savedUserOrders) {
-      try {
-        const parsed = JSON.parse(savedUserOrders);
-        const fixed = parsed.map((o: any) => ({ ...o, timestamp: new Date(o.timestamp) }));
-        setUserOrders(fixed);
-      } catch (e) { }
-    }
-
     refreshActiveOrders();
 
     const interval = setInterval(refreshActiveOrders, 10000);
@@ -102,7 +120,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         branchId: currentBranchId,
         tableId: currentTableId,
         items: items.map(item => ({
-          productId: item.id,
+          productId: item.productId,
           quantity: item.quantity,
           priceAtTime: item.price
         })),
