@@ -126,7 +126,7 @@ export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: 
                 </button>
 
                 <div className="absolute top-4 left-4 z-20 bg-white/20 backdrop-blur px-3 py-1 rounded-lg text-white text-xs font-bold border border-white/30">
-                    #{order.id.slice(0, 8).toUpperCase()}
+                    #{order.orderNumber}
                 </div>
 
                 <div className="shrink-0">

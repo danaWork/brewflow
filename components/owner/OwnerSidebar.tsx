@@ -67,7 +67,7 @@ export default function OwnerSidebar() {
       </div>
 
       {/* Navigation Groups */}
-      <nav className="flex-1 p-4 space-y-6">
+      <nav className="flex-1 p-4 space-y-6 overflow-y-auto custom-scrollbar">
         {navGroups.map((group) => (
           <div key={group.title}>
             <h2 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">

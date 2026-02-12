@@ -2,10 +2,11 @@
 
 import { db } from '@/lib/db';
 import { orders as ordersSchema, tables as tablesSchema, orderItems as orderItemsSchema } from '@/db/schema';
-import { eq, inArray, desc, and } from 'drizzle-orm';
+import { eq, inArray, desc, and, sql, gt, or } from 'drizzle-orm';
 
 export interface OrderData {
     id: string;
+    orderNumber: number;
     status: 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
     totalAmount: number;
     tableId: string;
@@ -58,6 +59,7 @@ export async function getActiveOrdersAction(branchId: string) {
         const activeOrders = await db
             .select({
                 id: ordersSchema.id,
+                orderNumber: ordersSchema.orderNumber,
                 status: ordersSchema.status,
                 totalAmount: ordersSchema.totalAmount,
                 tableId: ordersSchema.tableId,
@@ -70,7 +72,13 @@ export async function getActiveOrdersAction(branchId: string) {
             .where(
                 and(
                     eq(ordersSchema.branchId, branchId),
-                    inArray(ordersSchema.status, ['PENDING', 'PREPARING', 'READY'])
+                    or(
+                        inArray(ordersSchema.status, ['PENDING', 'PREPARING', 'READY']),
+                        and(
+                            eq(ordersSchema.status, 'COMPLETED'),
+                            sql`${ordersSchema.completedAt} > NOW() - INTERVAL '5 minutes'`
+                        )
+                    )
                 )
             )
             .orderBy(desc(ordersSchema.createdAt));
@@ -95,6 +103,7 @@ export async function updateOrderStatusAction(orderId: string, status: 'PENDING'
                 status,
                 acceptedAt: status === 'PREPARING' ? new Date() : undefined,
                 readyAt: status === 'READY' ? new Date() : undefined,
+                completedAt: status === 'COMPLETED' ? new Date() : undefined,
             })
             .where(eq(ordersSchema.id, orderId));
         return { success: true };

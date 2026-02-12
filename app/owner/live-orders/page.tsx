@@ -35,7 +35,7 @@ function CancelConfirmModal({
         </div>
 
         <p className="text-gray-600 mb-2">
-          Are you sure you want to cancel order <span className="font-bold">#{order.id.slice(0, 8).toUpperCase()}</span>?
+          Are you sure you want to cancel order <span className="font-bold">#{order.orderNumber}</span>?
         </p>
         <p className="text-sm text-gray-400 mb-6">
           This action cannot be undone.
@@ -70,6 +70,7 @@ export default function LiveOrdersPage() {
     { id: 'PENDING', title: 'Pending', bgColor: 'bg-[#FFF9E6]', borderColor: 'border-[#E6C84A]', icon: Clock },
     { id: 'PREPARING', title: 'Preparing', bgColor: 'bg-[#FFF5EB]', borderColor: 'border-[#E6894A]', icon: ChefHat },
     { id: 'READY', title: 'Ready', bgColor: 'bg-[#E8F5E9]', borderColor: 'border-[#4CAF50]', icon: CheckCircle },
+    { id: 'COMPLETED', title: 'Completed', bgColor: 'bg-gray-50', borderColor: 'border-gray-200', icon: CheckCircle },
   ];
 
   const getOrdersByStatus = (status: OrderStatus) => visibleOrders.filter(o => o.status === status);
@@ -112,18 +113,26 @@ export default function LiveOrdersPage() {
                   </span>
                 </div>
 
-                <div className="flex-1 px-4 pb-4 space-y-3 overflow-y-auto">
+                <div className="flex-1 px-4 pb-4 space-y-3 overflow-y-auto custom-scrollbar">
                   {getOrdersByStatus(col.id).map(order => (
-                    <div key={order.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                    <div key={order.id} className={`p-4 rounded-xl shadow-sm border transition-shadow ${order.status === 'COMPLETED'
+                        ? 'bg-gray-50 border-gray-200 opacity-75 hover:opacity-100'
+                        : 'bg-white border-gray-100 hover:shadow-md'
+                      }`}>
                       <div className="flex justify-between items-center mb-3">
-                        <span className="font-bold text-xl text-gray-900">#{order.id.slice(0, 8).toUpperCase()}</span>
-                        <button
-                          onClick={() => handleCancelClick(order)}
-                          className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
-                          title="Cancel order"
-                        >
-                          <X size={18} />
-                        </button>
+                        <span className="font-bold text-xl text-gray-900">
+                          #{order.orderNumber}
+                        </span>
+                        {/* Only show cancel button if NOT completed */}
+                        {order.status !== 'COMPLETED' && (
+                          <button
+                            onClick={() => handleCancelClick(order)}
+                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                            title="Cancel order"
+                          >
+                            <X size={18} />
+                          </button>
+                        )}
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -186,6 +195,7 @@ export default function LiveOrdersPage() {
                           Complete Order ✓
                         </button>
                       )}
+                      {/* No buttons for COMPLETED */}
                     </div>
                   ))}
 

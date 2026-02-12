@@ -118,7 +118,7 @@ export default function OrderStatusPage() {
                     <ArrowLeft size={24} />
                 </button>
                 <div className="bg-white/20 backdrop-blur px-3 py-1 rounded-lg text-white text-xs font-bold flex items-center border border-white/30">
-                    #{currentOrder.id.slice(0, 8).toUpperCase()}
+                    #{currentOrder.orderNumber}
                 </div>
             </div>
 

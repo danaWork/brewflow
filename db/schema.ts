@@ -93,12 +93,14 @@ export const orders = pgTable('orders', {
   id: uuid('id').defaultRandom().primaryKey(),
   branchId: uuid('branch_id').references(() => branches.id).notNull(),
   tableId: uuid('table_id').references(() => tables.id).notNull(),
+  orderNumber: integer('order_number').generatedAlwaysAsIdentity().notNull(), // Changed to generatedAlwaysAsIdentity for safer auto-increment
   status: orderStatusEnum('status').default('PENDING').notNull(),
   paymentMethod: paymentMethodEnum('payment_method'),
   totalAmount: decimal('total_amount', { precision: 10, scale: 2 }).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   acceptedAt: timestamp('accepted_at'),
   readyAt: timestamp('ready_at'),
+  completedAt: timestamp('completed_at'),
 });
 
 export const orderItems = pgTable('order_items', {

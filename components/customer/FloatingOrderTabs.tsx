@@ -40,7 +40,7 @@ export default function FloatingOrderTabs() {
                         const canDismiss = order.status === 'COMPLETED' || order.status === 'CANCELLED';
 
                         return (
-                            <div key={order.id} className="relative group">
+                            <div key={order.id} className="relative group  overflow-x-hidden">
                                 <button
                                     onClick={() => setSelectedOrder(order)}
                                     className={`${getStatusColor(order.status)} text-white shadow-lg rounded-full pl-3 pr-4 py-2 flex items-center gap-2 transform active:scale-95 transition-all text-sm font-bold animate-in slide-in-from-bottom-4 fade-in duration-300`}
@@ -49,7 +49,7 @@ export default function FloatingOrderTabs() {
                                         <Icon size={14} className="text-white" />
                                     </div>
                                     <span>
-                                        #{order.id.slice(0, 8).toUpperCase()}
+                                        #{order.orderNumber}
                                         <span className="opacity-75 font-normal ml-1 capitalize text-xs">
                                             • {order.status.toLowerCase()}
                                         </span>

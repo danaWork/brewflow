@@ -4,7 +4,8 @@ import { StatCards } from '@/components/admin/StatCards';
 import { ShopList } from '@/components/admin/ShopList';
 import { UsersTab } from '@/components/admin/UsersTab';
 import { AdminActionButtons } from '@/components/admin/AdminActionButtons';
-import { getAdminOverviewStats, getAllShops, getAdminUsers } from '@/app/actions/admin';
+import { UpsellAnalytics } from '@/components/admin/UpsellAnalytics';
+import { getAdminOverviewStats, getAllShops, getAdminUsers, getUpsellAnalytics } from '@/app/actions/admin';
 import { Metadata } from 'next';
 
 export async function generateMetadata({
@@ -34,6 +35,7 @@ export default async function AdminDashboard({
   const stats = await getAdminOverviewStats();
   const shops = await getAllShops();
   const adminUsers = await getAdminUsers();
+  const upsellStats = await getUpsellAnalytics();
 
   return (
     <div className="min-h-screen bg-neutral-50 p-6 md:p-10">
@@ -57,7 +59,11 @@ export default async function AdminDashboard({
           </>
         )}
 
-        {(tab === 'analytics' || tab === 'activity') && (
+        {(tab === 'analytics') && (
+          <UpsellAnalytics stats={upsellStats} />
+        )}
+
+        {tab === 'activity' && (
           <div className="bg-white rounded-[32px] p-20 text-center border border-gray-100 shadow-sm">
             <p className="text-gray-400 font-medium italic">Tab content under construction...</p>
           </div>

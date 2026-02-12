@@ -15,6 +15,7 @@ export type OrderStatus = 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CAN
 
 export interface Order {
   id: string;
+  orderNumber: number;
   status: OrderStatus;
   items: CartItem[];
   total: number;
@@ -75,7 +76,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       if (!branchId) {
         const now = Date.now();
         const cachedSession = sessionRef.current;
-        
+
         // Use cached session if it's fresh (less than 30 seconds old)
         if (cachedSession && (now - cachedSession.timestamp) < 30000) {
           branchId = cachedSession.branchId;
@@ -102,6 +103,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
 
       const orders: Order[] = result.orders.map((o) => ({
         id: o.id,
+        orderNumber: o.orderNumber,
         status: o.status as OrderStatus,
         items: [], // Items are in a separate table now, would need a join/fetch if really needed here.
         total: o.totalAmount,
@@ -119,7 +121,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       if (currentUserOrders.length > 0) {
         const userOrderIds = currentUserOrders.map(o => o.id);
         const statusResult = await getOrdersStatusAction(userOrderIds);
-        
+
         if (statusResult.success && statusResult.orders) {
           setUserOrders(prev => prev.map(userOrder => {
             const match = statusResult.orders?.find(so => so.id === userOrder.id);
@@ -189,6 +191,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       const orderData = result.order;
       const newOrder: Order = {
         id: orderData.id,
+        orderNumber: orderData.orderNumber,
         status: 'PENDING',
         items: items,
         total,
