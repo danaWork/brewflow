@@ -12,7 +12,7 @@ export async function middleware(request: NextRequest) {
     if (session && path === '/login') {
         const role = session.user.role;
         if (role === 'SUPERADMIN') return NextResponse.redirect(new URL('/admin/dashboard', request.url));
-        if (role === 'BRANCH_MANAGER') return NextResponse.redirect(new URL('/owner/dashboard', request.url));
+        if (role === 'BRANCH_MANAGER') return NextResponse.redirect(new URL('/owner/analytics', request.url));
         if (role === 'KITCHEN_STAFF') return NextResponse.redirect(new URL('/staff/orders', request.url));
     }
 

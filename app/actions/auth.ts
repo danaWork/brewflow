@@ -31,7 +31,7 @@ export async function loginAction(formData: FormData) {
 
     const role = user.role;
     if (role === 'SUPERADMIN') redirect('/admin/dashboard');
-    if (role === 'BRANCH_MANAGER') redirect('/owner/dashboard');
+    if (role === 'BRANCH_MANAGER') redirect('/owner/analytics');
     if (role === 'KITCHEN_STAFF') redirect('/staff/orders');
 
     redirect('/');
@@ -98,13 +98,13 @@ export async function logout() {
 
 export async function getUserSession() {
     const session = await getSession();
-    if (!session) return null;
+    if (!session || !session.user) return null;
 
     return {
-        userId: session.id,
-        email: session.email,
-        role: session.role,
-        branchId: session.branchId,
-        companyId: session.companyId,
+        userId: session.user.id,
+        email: session.user.email,
+        role: session.user.role,
+        branchId: session.user.branchId,
+        companyId: session.user.companyId,
     };
 }
