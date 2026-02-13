@@ -95,3 +95,16 @@ import { logout as authLogout } from '@/lib/auth';
 export async function logout() {
     return await authLogout();
 }
+
+export async function getUserSession() {
+    const session = await getSession();
+    if (!session) return null;
+
+    return {
+        userId: session.id,
+        email: session.email,
+        role: session.role,
+        branchId: session.branchId,
+        companyId: session.companyId,
+    };
+}

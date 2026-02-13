@@ -185,3 +185,17 @@ export const orderItemModifiersRelations = relations(orderItemModifiers, ({ one 
   orderItem: one(orderItems, { fields: [orderItemModifiers.orderItemId], references: [orderItems.id] }),
   modifierOption: one(modifierOptions, { fields: [orderItemModifiers.modifierOptionId], references: [modifierOptions.id] }),
 }));
+
+export const activityLogs = pgTable('activity_logs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  shopId: uuid('shop_id').references(() => branches.id),
+  userId: uuid('user_id').references(() => users.id),
+  action: text('action').notNull(),
+  details: text('details'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const activityLogsRelations = relations(activityLogs, ({ one }) => ({
+  shop: one(branches, { fields: [activityLogs.shopId], references: [branches.id] }),
+  user: one(users, { fields: [activityLogs.userId], references: [users.id] }),
+}));

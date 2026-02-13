@@ -1,9 +1,11 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { companies, branches, orders, users, orderItems, orderItemModifiers, categories, products } from '@/db/schema';
-import { count, eq, sql } from 'drizzle-orm';
+import { companies, branches, orders, users, orderItems, orderItemModifiers, categories, products, activityLogs } from '@/db/schema';
+import { count, eq, sql, desc, like, and, gte, lte } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
+import { logActivity } from '@/lib/activity';
+import { getUserSession } from './auth';
 
 export async function getAdminOverviewStats() {
     try {
@@ -63,9 +65,30 @@ export async function getAllShops() {
 
 export async function toggleShopStatus(companyId: string, currentStatus: boolean) {
     try {
+        const session = await getUserSession();
+
+        // Get company name for logging
+        const [company] = await db.select({ name: companies.name })
+            .from(companies)
+            .where(eq(companies.id, companyId))
+            .limit(1);
+
         await db.update(branches)
             .set({ isActive: !currentStatus })
             .where(eq(branches.companyId, companyId));
+
+        // Log activity (null shopId for admin actions)
+        if (session) {
+            await logActivity(
+                null,
+                session.userId,
+                currentStatus ? 'Shop Deactivated' : 'Shop Activated',
+                {
+                    shopName: company?.name || 'Unknown',
+                    companyId,
+                }
+            );
+        }
 
         revalidatePath('/admin/dashboard');
         return { success: true };
@@ -77,7 +100,29 @@ export async function toggleShopStatus(companyId: string, currentStatus: boolean
 
 export async function deleteShop(companyId: string) {
     try {
+        const session = await getUserSession();
+
+        // Get company name before deletion
+        const [company] = await db.select({ name: companies.name })
+            .from(companies)
+            .where(eq(companies.id, companyId))
+            .limit(1);
+
         await db.delete(companies).where(eq(companies.id, companyId));
+
+        // Log activity
+        if (session) {
+            await logActivity(
+                null,
+                session.userId,
+                'Shop Deleted',
+                {
+                    shopName: company?.name || 'Unknown',
+                    companyId,
+                }
+            );
+        }
+
         revalidatePath('/admin/dashboard');
         return { success: true };
     } catch (error) {
@@ -134,6 +179,7 @@ export async function createManagerAccount(email: string, passwordPlain: string,
 
 export async function createShop(name: string, managerEmail: string, passwordPlain: string) {
     try {
+        const session = await getUserSession();
         const passwordHash = bcrypt.hashSync(passwordPlain, 10);
         const [company] = await db.insert(companies).values({ name }).returning();
         const [branch] = await db.insert(branches).values({
@@ -148,6 +194,20 @@ export async function createShop(name: string, managerEmail: string, passwordPla
             companyId: company.id,
             branchId: branch.id,
         });
+
+        // Log activity
+        if (session) {
+            await logActivity(
+                null,
+                session.userId,
+                'Shop Created',
+                {
+                    shopName: name,
+                    managerEmail,
+                    companyId: company.id,
+                }
+            );
+        }
 
         revalidatePath('/admin/dashboard');
         return { success: true };
@@ -370,4 +430,81 @@ export async function getUpsellAnalytics(): Promise<UpsellStats> {
             shopRankings: []
         };
     }
+}
+
+
+export async function getActivityLogs(filters?: {
+    shopId?: string;
+    action?: string;
+    startDate?: Date;
+    endDate?: Date;
+    page?: number;
+    limit?: number;
+}) {
+    try {
+        const page = filters?.page || 1;
+        const limit = filters?.limit || 50;
+        const offset = (page - 1) * limit;
+
+        const conditions = [];
+
+        if (filters?.shopId && filters.shopId !== 'all') {
+            conditions.push(eq(activityLogs.shopId, filters.shopId));
+        }
+
+        if (filters?.action) {
+            conditions.push(like(activityLogs.action, `%${filters.action}%`));
+        }
+
+        if (filters?.startDate) {
+            conditions.push(gte(activityLogs.createdAt, filters.startDate));
+        }
+
+        if (filters?.endDate) {
+            conditions.push(lte(activityLogs.createdAt, filters.endDate));
+        }
+
+        const logs = await db.select({
+            id: activityLogs.id,
+            action: activityLogs.action,
+            details: activityLogs.details,
+            createdAt: activityLogs.createdAt,
+            shopName: companies.name,
+            branchName: branches.branchName,
+            userEmail: users.email,
+        })
+            .from(activityLogs)
+            .leftJoin(branches, eq(activityLogs.shopId, branches.id))
+            .leftJoin(companies, eq(branches.companyId, companies.id))
+            .leftJoin(users, eq(activityLogs.userId, users.id))
+            // Spread operator on empty array is valid in ES6 but typescript might complain if not handled or drizzle expects at least one
+            // and(...[]) returns undefined? Let's check drizzle behavior or just filter undefined out
+            .where(conditions.length > 0 ? and(...conditions) : undefined)
+            .orderBy(desc(activityLogs.createdAt))
+            .limit(limit)
+            .offset(offset);
+
+        return logs.map(log => ({
+            ...log,
+            formattedDate: log.createdAt.toLocaleDateString(),
+            formattedTime: log.createdAt.toLocaleTimeString(),
+            relativeTime: getRelativeTime(log.createdAt),
+            shopDisplayName: log.shopName || log.branchName || 'Unknown Shop'
+        }));
+
+    } catch (error) {
+        console.error('Error fetching activity logs:', error);
+        return [];
+    }
+}
+
+function getRelativeTime(date: Date) {
+    const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+    const now = new Date();
+    const diffInSeconds = (date.getTime() - now.getTime()) / 1000;
+
+    if (Math.abs(diffInSeconds) < 60) return rtf.format(Math.round(diffInSeconds), 'second');
+    if (Math.abs(diffInSeconds) < 3600) return rtf.format(Math.round(diffInSeconds / 60), 'minute');
+    if (Math.abs(diffInSeconds) < 86400) return rtf.format(Math.round(diffInSeconds / 3600), 'hour');
+    return rtf.format(Math.round(diffInSeconds / 86400), 'day');
 }

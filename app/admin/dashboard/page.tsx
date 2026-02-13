@@ -8,6 +8,9 @@ import { UpsellAnalytics } from '@/components/admin/UpsellAnalytics';
 import { getAdminOverviewStats, getAllShops, getAdminUsers, getUpsellAnalytics } from '@/app/actions/admin';
 import { Metadata } from 'next';
 
+import { getActivityLogs } from '@/app/actions/admin';
+import { ActivityLog } from '@/components/admin/ActivityLog';
+
 export async function generateMetadata({
   searchParams,
 }: {
@@ -28,14 +31,23 @@ export const revalidate = 0;
 export default async function AdminDashboard({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; shopId?: string; action?: string; date?: string }>;
 }) {
-  const { tab = 'overview' } = await searchParams;
+  const { tab = 'overview', shopId, action, date } = await searchParams;
 
   const stats = await getAdminOverviewStats();
   const shops = await getAllShops();
   const adminUsers = await getAdminUsers();
   const upsellStats = await getUpsellAnalytics();
+
+  const activityLogs = tab === 'activity'
+    ? await getActivityLogs({
+      shopId,
+      action,
+      startDate: date ? new Date(date) : undefined,
+      endDate: date ? new Date(new Date(date).setHours(23, 59, 59, 999)) : undefined
+    })
+    : [];
 
   return (
     <div className="min-h-screen bg-neutral-50 p-6 md:p-10">
@@ -64,9 +76,7 @@ export default async function AdminDashboard({
         )}
 
         {tab === 'activity' && (
-          <div className="bg-white rounded-[32px] p-20 text-center border border-gray-100 shadow-sm">
-            <p className="text-gray-400 font-medium italic">Tab content under construction...</p>
-          </div>
+          <ActivityLog logs={activityLogs} shops={shops} />
         )}
       </div>
     </div>
