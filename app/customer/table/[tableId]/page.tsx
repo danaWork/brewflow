@@ -28,6 +28,7 @@ export default async function MenuPage({
       branchId={result.branchId || ''}
       categories={result.categories || []}
       products={result.products || []}
+      promotions={result.promotions || []}
     />
   );
 }

@@ -1,7 +1,14 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { categories as categoriesSchema, products as productsSchema, tables as tablesSchema, branches as branchesSchema } from '@/db/schema';
+import {
+    categories as categoriesSchema,
+    products as productsSchema,
+    tables as tablesSchema,
+    branches as branchesSchema,
+    promotions as promotionsSchema,
+    promotionItems as promotionItemsSchema
+} from '@/db/schema';
 import { eq, asc, desc, and, or, isNull } from 'drizzle-orm';
 import { branchProductAvailability } from '@/db/schema';
 
@@ -12,7 +19,7 @@ export async function getMenuData(qrIdentifier: string) {
     try {
         // Fetch Table by QR identifier or ID (only if valid UUID)
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(qrIdentifier);
-        
+
         const conditions = [eq(tablesSchema.qrIdentifier, qrIdentifier)];
         if (isUuid) {
             conditions.push(eq(tablesSchema.id, qrIdentifier));
@@ -70,7 +77,7 @@ export async function getMenuData(qrIdentifier: string) {
             .from(productsSchema)
             .innerJoin(categoriesSchema, eq(productsSchema.categoryId, categoriesSchema.id))
             .leftJoin(
-                branchProductAvailability, 
+                branchProductAvailability,
                 and(
                     eq(productsSchema.id, branchProductAvailability.productId),
                     eq(branchProductAvailability.branchId, tableData.branchId)
@@ -95,12 +102,43 @@ export async function getMenuData(qrIdentifier: string) {
                 id: p.id,
                 name: p.name,
                 price: parseFloat((p.branchPriceOverride || p.basePrice).toString()),
-                description: '', 
+                description: '',
                 image: p.imageUrl,
-                isSignature: false, 
+                isSignature: false,
                 categoryId: p.categoryId,
+                categoryType: transformedCategories.find(c => c.id === p.categoryId)?.type || 'drink',
                 isInStock: p.isInStock ?? true,
             }));
+        // Fetch promotions and their items
+        const promotionsData = await db
+            .select({
+                id: promotionsSchema.id,
+                name: promotionsSchema.name,
+                type: promotionsSchema.type,
+                discountType: promotionsSchema.discountType,
+                discountValue: promotionsSchema.discountValue,
+                triggerType: promotionsSchema.triggerType,
+                triggerValue: promotionsSchema.triggerValue,
+            })
+            .from(promotionsSchema)
+            .where(eq(promotionsSchema.branchId, tableData.branchId));
+
+        const promotionIds = promotionsData.map(p => p.id);
+        const linkedItems = promotionIds.length > 0
+            ? await db
+                .select({
+                    promotionId: promotionItemsSchema.promotionId,
+                    productId: promotionItemsSchema.productId,
+                })
+                .from(promotionItemsSchema)
+                .where(or(...promotionIds.map(id => eq(promotionItemsSchema.promotionId, id))))
+            : [];
+
+        const transformedPromotions = promotionsData.map(p => ({
+            ...p,
+            items: linkedItems.filter(li => li.promotionId === p.id)
+        }));
+
         return {
             success: true,
             tableId: tableData.id,
@@ -108,6 +146,7 @@ export async function getMenuData(qrIdentifier: string) {
             branchId: tableData.branchId,
             categories: transformedCategories,
             products: transformedProducts,
+            promotions: transformedPromotions,
         };
     } catch (error) {
         console.error("Failed to fetch menu data:", error);
