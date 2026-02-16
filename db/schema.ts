@@ -45,6 +45,7 @@ export const categories = pgTable('categories', {
   companyId: uuid('company_id').references(() => companies.id).notNull(),
   name: text('name').notNull(),
   type: text('type').default('drink').notNull(), // 'drink' or 'snack'
+  config: text('config'), // JSON string for UI configuration/steps
 });
 
 export const products = pgTable('products', {
@@ -153,10 +154,20 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   branchAvailability: many(branchProductAvailability),
 }));
 
+export const branchProductAvailabilityRelations = relations(branchProductAvailability, ({ one }) => ({
+  branch: one(branches, { fields: [branchProductAvailability.branchId], references: [branches.id] }),
+  product: one(products, { fields: [branchProductAvailability.productId], references: [products.id] }),
+}));
+
 export const modifierGroupsRelations = relations(modifierGroups, ({ one, many }) => ({
   company: one(companies, { fields: [modifierGroups.companyId], references: [companies.id] }),
   options: many(modifierOptions),
   productLinks: many(productModifierLinks),
+}));
+
+export const productModifierLinksRelations = relations(productModifierLinks, ({ one }) => ({
+  product: one(products, { fields: [productModifierLinks.productId], references: [products.id] }),
+  modifierGroup: one(modifierGroups, { fields: [productModifierLinks.modifierGroupId], references: [modifierGroups.id] }),
 }));
 
 export const modifierOptionsRelations = relations(modifierOptions, ({ one, many }) => ({

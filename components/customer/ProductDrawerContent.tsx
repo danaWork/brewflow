@@ -8,16 +8,22 @@ import InfoPopup from '@/components/ui/InfoPopup';
 
 interface ProductDrawerContentProps {
   product: any;
+  category?: any;
   onClose: () => void;
 }
 
-type Step = 'size' | 'customization' | 'toppings' | 'upsell' | 'frequentlyBought';
+type Step = 'size' | 'customization' | 'toppings' | 'upsell' | 'frequentlyBought' | 'dynamic_options';
 
 
 
-export default function ProductDrawerContent({ product, onClose }: ProductDrawerContentProps) {
+export default function ProductDrawerContent({ product, category, onClose }: ProductDrawerContentProps) {
   const { addItem } = useCart();
-  const [step, setStep] = useState<Step>('size');
+  
+  const flow = category?.config ? JSON.parse(category.config).flow : 'drink_full';
+  
+  // Set initial step based on flow
+  const initialStep = (flow === 'simple_choice' || flow === 'fixed_meal') ? 'dynamic_options' : 'size';
+  const [step, setStep] = useState<Step>(initialStep);
   
   // Form State
   const [size, setSize] = useState('medium');
@@ -606,6 +612,45 @@ export default function ProductDrawerContent({ product, onClose }: ProductDrawer
             </div>
         </div>
       );
+   }
+
+   // --- STEP: DYNAMIC OPTIONS (New) ---
+   if (step === 'dynamic_options') {
+       return (
+           <div className="flex flex-col h-full bg-white">
+               <HeaderImage />
+               <div className="p-6 flex-1 overflow-y-auto">
+                   <h3 className="font-semibold text-gray-900 mb-4 text-lg">Customize your order</h3>
+                   <div className="space-y-8">
+                       {(product.modifiers || []).map((group: any) => (
+                           <div key={group.id} className="space-y-4">
+                               <label className="block text-sm font-bold uppercase tracking-widest text-gray-400">{group.name}</label>
+                               <div className="grid grid-cols-1 gap-2">
+                                   {group.options.map((opt: any) => (
+                                       <button
+                                           key={opt.id}
+                                           className="w-full flex justify-between items-center p-4 rounded-xl border-2 border-gray-100 bg-gray-50 text-gray-600 hover:border-[#D95D1E]/30 transition-all font-medium"
+                                       >
+                                           <span className="capitalize">{opt.name}</span>
+                                           {opt.price > 0 && <span className="text-sm font-bold text-[#D95D1E]">₱{opt.price}</span>}
+                                       </button>
+                                   ))}
+                               </div>
+                           </div>
+                       ))}
+                       {product.modifiers?.length === 0 && (
+                           <div className="text-center py-12">
+                               <div className="bg-gray-50 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                                   <Check size={20} className="text-gray-300" />
+                               </div>
+                               <p className="text-gray-400 text-sm">No extra customizations for this item.</p>
+                           </div>
+                       )}
+                   </div>
+               </div>
+               <StickyFooter label="Add to Cart" onClick={() => handleAddToCart()} />
+           </div>
+       );
    }
 
    return null;

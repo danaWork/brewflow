@@ -44,70 +44,71 @@ export async function getMenuData(qrIdentifier: string) {
             return { success: false, error: "Branch not found" };
         }
 
-        // Fetch categories for the company
-        const categories = await db
-            .select({
-                id: categoriesSchema.id,
-                name: categoriesSchema.name,
-                type: categoriesSchema.type,
-                companyId: categoriesSchema.companyId,
-            })
-            .from(categoriesSchema)
-            .where(eq(categoriesSchema.companyId, branchData.companyId));
-
-        // Fetch products for categories belonging to this company AND available at this branch
-        const productsWithAvailability = await db
-            .select({
-                id: productsSchema.id,
-                name: productsSchema.name,
-                basePrice: productsSchema.basePrice,
-                imageUrl: productsSchema.imageUrl,
-                categoryId: productsSchema.categoryId,
-                isHidden: productsSchema.isHidden,
-                isInStock: branchProductAvailability.isInStock,
-                branchPriceOverride: branchProductAvailability.branchPriceOverride,
-            })
-            .from(productsSchema)
-            .innerJoin(categoriesSchema, eq(productsSchema.categoryId, categoriesSchema.id))
-            .leftJoin(
-                branchProductAvailability, 
-                and(
-                    eq(productsSchema.id, branchProductAvailability.productId),
-                    eq(branchProductAvailability.branchId, tableData.branchId)
-                )
-            )
-            .where(
-                and(
-                    eq(categoriesSchema.companyId, branchData.companyId),
-                    eq(productsSchema.isHidden, false)
-                )
-            );
+        // Fetch categories with products and modifiers using relational queries
+        const categoriesData = await db.query.categories.findMany({
+            where: eq(categoriesSchema.companyId, branchData.companyId),
+            with: {
+                products: {
+                    where: eq(productsSchema.isHidden, false),
+                    with: {
+                        modifierLinks: {
+                            with: {
+                                modifierGroup: {
+                                    with: {
+                                        options: true
+                                    }
+                                }
+                            }
+                        },
+                        branchAvailability: {
+                            where: eq(branchProductAvailability.branchId, tableData.branchId)
+                        }
+                    }
+                }
+            }
+        });
 
         // Transform data
-        const transformedCategories = categories.map(c => ({
-            ...c,
-            type: (c.type || 'drink').toLowerCase()
+        const transformedCategories = categoriesData.map(c => ({
+            id: c.id,
+            name: c.name,
+            type: (c.type || 'drink').toLowerCase(),
+            companyId: c.companyId
         }));
 
-        const transformedProducts = productsWithAvailability
-            .filter(p => p.isInStock !== false)
-            .map((p) => ({
-                id: p.id,
-                name: p.name,
-                price: parseFloat((p.branchPriceOverride || p.basePrice).toString()),
-                description: '', 
-                image: p.imageUrl,
-                isSignature: false, 
-                categoryId: p.categoryId,
-                isInStock: p.isInStock ?? true,
-            }));
+        const transformedProducts: any[] = [];
+        categoriesData.forEach(c => {
+            c.products.forEach(p => {
+                const availability = p.branchAvailability[0];
+                if (availability?.isInStock === false) return;
+
+                transformedProducts.push({
+                    id: p.id,
+                    name: p.name,
+                    price: parseFloat((availability?.branchPriceOverride || p.basePrice).toString()),
+                    image: p.imageUrl,
+                    categoryId: p.id, // Wait, fix: p.categoryId
+                    categoryIdReal: c.id, 
+                    modifiers: p.modifierLinks.map(ml => ({
+                        id: ml.modifierGroup.id,
+                        name: ml.modifierGroup.name,
+                        options: ml.modifierGroup.options.map(o => ({
+                            id: o.id,
+                            name: o.name,
+                            price: 0 // TODO: Add price to options later
+                        }))
+                    }))
+                });
+            });
+        });
+
         return {
             success: true,
             tableId: tableData.id,
             tableName,
             branchId: tableData.branchId,
             categories: transformedCategories,
-            products: transformedProducts,
+            products: transformedProducts.map(p => ({...p, categoryId: p.categoryIdReal})),
         };
     } catch (error) {
         console.error("Failed to fetch menu data:", error);

@@ -112,6 +112,7 @@ export default function MenuClient({ tableId, tableName, branchId, categories, p
         {selectedProduct && (
           <ProductDrawerContent
             product={selectedProduct}
+            category={categories.find(c => c.id === selectedProduct.categoryId)}
             onClose={handleCloseDrawer}
           />
         )}
