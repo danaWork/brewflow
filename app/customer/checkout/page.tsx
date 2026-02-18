@@ -19,7 +19,7 @@ export default function CheckoutPage() {
     const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'GCASH' | 'PAYMAYA'>('CASH');
     const [isPaymentDropdownOpen, setIsPaymentDropdownOpen] = useState(false);
     const [showConfirmation, setShowConfirmation] = useState(false);
-    const [lastOrderId, setLastOrderId] = useState<string>('');
+    const [lastOrderNumber, setLastOrderNumber] = useState<number>(0);
 
     const paymentMethods: { label: string; value: 'CASH' | 'GCASH' | 'PAYMAYA' }[] = [
         { label: 'Cash', value: 'CASH' },
@@ -32,7 +32,7 @@ export default function CheckoutPage() {
         console.log(result);
 
         if (result) {
-            setLastOrderId(result.id);
+            setLastOrderNumber(result.orderNumber);
             clearCart();
             setShowConfirmation(true);
         }
@@ -242,7 +242,7 @@ export default function CheckoutPage() {
             <OrderConfirmation
                 isOpen={showConfirmation}
                 onClose={handleCloseConfirmation}
-                orderNumber={parseInt(lastOrderId.slice(0, 4), 16) % 1000} // Mock order number from UUID
+                orderNumber={lastOrderNumber}
                 paymentMethod={paymentMethod}
             />
         </div>

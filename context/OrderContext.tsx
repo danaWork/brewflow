@@ -28,7 +28,7 @@ export interface Order {
 interface OrderContextType {
   userOrders: Order[];
   activeOrders: Order[];
-  createOrder: (items: CartItem[], total: number, paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA') => Promise<{ id: string } | null>;
+  createOrder: (items: CartItem[], total: number, paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA') => Promise<{ id: string; orderNumber: number } | null>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   dismissOrder: (orderId: string) => void;
   refreshActiveOrders: () => Promise<void>;
@@ -240,7 +240,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       setUserOrders(prev => [newOrder, ...prev]);
       refreshActiveOrders();
 
-      return { id: orderData.id };
+      return { id: orderData.id, orderNumber: orderData.orderNumber };
     } catch (e) {
       console.error('Failed to create order:', e);
       return null;
