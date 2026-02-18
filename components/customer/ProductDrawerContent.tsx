@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowLeft, Star, Calculator, Check, Flame, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Star, Calculator, Check, Flame, X, ChevronDown, ChevronUp, Minus, Plus } from 'lucide-react';
 import Image from 'next/image';
 import { useCart } from '@/context/CartContext';
 import InfoPopup from '@/components/ui/InfoPopup';
@@ -14,17 +14,21 @@ interface ProductDrawerContentProps {
   onClose: () => void;
 }
 
-type Step = 'size' | 'customization' | 'toppings' | 'upsell' | 'frequentlyBought' | 'dynamic_options' | 'cart';
+type Step = 'size' | 'customization' | 'toppings' | 'upsell' | 'frequentlyBought' | 'dynamic_options' | 'cart' | 'quantity';
 
 export default function ProductDrawerContent({ product, category, promotions, allProducts, onClose }: ProductDrawerContentProps) {
   const { addItem } = useCart();
   
   const flow = category?.config ? JSON.parse(category.config).flow : 'drink_full';
   
+  // Identify if item is a snack
+  const isSnack = category?.type === 'snack' || product.categoryType === 'snack' || category?.name?.toLowerCase() === 'snacks';
+  
   // Set initial step based on flow
-  const initialStep = (flow === 'simple_choice' || flow === 'fixed_meal') ? 'dynamic_options' : 'size';
+  const initialStep = isSnack ? 'quantity' : (flow === 'simple_choice' || flow === 'fixed_meal') ? 'dynamic_options' : 'size';
   const [step, setStep] = useState<Step>(initialStep);
   // Form State
+  const [quantity, setQuantity] = useState(1);
   const [size, setSize] = useState('medium');
   const [milk, setMilk] = useState('regular');
   const [sweetness, setSweetness] = useState('75%');
@@ -124,10 +128,10 @@ export default function ProductDrawerContent({ product, category, promotions, al
     addItem({
       productId: product.id,
       name: product.name,
-      price: currentPrice,
-      quantity: 1,
+      price: currentPrice, // Unit price
+      quantity: quantity,
       image: product.image,
-      options: { size, milk, sweetness, ice, toppings: resolvedToppings },
+      options: isSnack ? {} : { size, milk, sweetness, ice, toppings: resolvedToppings },
       bundleLabel: overrideLabel,
       extras: overrideExtras
     });
@@ -210,6 +214,14 @@ export default function ProductDrawerContent({ product, category, promotions, al
     }
   };
 
+  const handleQuantityContinue = () => {
+    if (bundlePromo) {
+      setStep('upsell');
+    } else {
+      setStep('frequentlyBought');
+    }
+  };
+
   const handleUpsellSkip = () => {
       setStep('frequentlyBought');
   };
@@ -232,7 +244,7 @@ export default function ProductDrawerContent({ product, category, promotions, al
 
       {/* Navigation Buttons */}
       <div className="absolute top-4 left-4 right-4 flex justify-between z-20">
-        {step !== 'size' ? (
+        {(step !== 'size' && step !== 'quantity' && step !== 'dynamic_options') ? (
           <button
             onClick={() => {
               if (step === 'customization') setStep('size');
@@ -268,12 +280,11 @@ export default function ProductDrawerContent({ product, category, promotions, al
         className="w-full bg-[#D95D1E] text-white font-bold py-4 rounded-xl text-lg flex justify-between px-6 shadow-lg shadow-orange-200 hover:bg-[#c4531b] transition-colors border border-black"
       >
         <span>{label}</span>
-        <span>₱{currentPrice.toFixed(2)}</span>
+        <span>₱{(currentPrice * quantity).toFixed(2)}</span>
       </button>
     </div>
   );
 
-  // --- STEP 1: SIZE ---
   if (step === 'size') {
     return (
       <>
@@ -304,6 +315,43 @@ export default function ProductDrawerContent({ product, category, promotions, al
           <StickyFooter onClick={() => setStep('customization')} />
         </div>
       </>
+    );
+  }
+
+  // --- STEP: QUANTITY (For Snacks) ---
+  if (step === 'quantity') {
+    return (
+      <div className="flex flex-col h-full bg-white">
+        <HeaderImage />
+        <div className="p-6 flex-1 overflow-y-auto pt-2 flex flex-col items-center justify-center">
+          <h3 className="font-semibold text-gray-900 mb-8 text-xl">How many would you like?</h3>
+          
+          <div className="flex items-center gap-8 mb-12">
+            <button 
+              onClick={() => setQuantity(Math.max(1, quantity - 1))}
+              className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors active:scale-95"
+            >
+              <Minus size={32} />
+            </button>
+            
+            <span className="text-5xl font-bold text-gray-900 overflow-hidden w-24 text-center">
+              {quantity}
+            </span>
+            
+            <button 
+              onClick={() => setQuantity(quantity + 1)}
+              className="w-16 h-16 rounded-full bg-[#D95D1E] flex items-center justify-center text-white hover:bg-[#c4531b] transition-colors active:scale-95 shadow-lg shadow-orange-200"
+            >
+              <Plus size={32} />
+            </button>
+          </div>
+          
+          <p className="text-gray-500 font-medium">
+            Total Price: <span className="text-[#D95D1E] font-bold">₱{(currentPrice * quantity).toFixed(2)}</span>
+          </p>
+        </div>
+        <StickyFooter onClick={handleQuantityContinue} />
+      </div>
     );
   }
 
@@ -510,7 +558,7 @@ export default function ProductDrawerContent({ product, category, promotions, al
         <div className="flex flex-col h-full bg-gray-50">
           <div className="p-4 bg-white relative">
             <div className="flex items-center justify-between mb-2">
-              <button onClick={() => setStep('toppings')} className="text-gray-500 hover:text-gray-900 p-2">
+              <button onClick={() => setStep(isSnack ? 'quantity' : 'toppings')} className="text-gray-500 hover:text-gray-900 p-2">
                 <ArrowLeft size={20} />
               </button>
               <button onClick={handleUpsellSkip} className="text-gray-400 font-medium text-sm px-2">Skip</button>
@@ -604,13 +652,13 @@ export default function ProductDrawerContent({ product, category, promotions, al
       }
     }, 0);
 
-    const finalTotalPrice = currentPrice + extrasTotal;
+    const finalTotalPrice = (isSnack ? currentPrice * quantity : currentPrice) + extrasTotal;
 
     return (
       <div className="flex flex-col h-full bg-white">
         <div className="p-4 bg-white relative border-b border-gray-50">
           <div className="flex items-center justify-between mb-2">
-            <button onClick={() => bundlePromo ? setStep('upsell') : setStep('toppings')} className="text-gray-500 hover:text-gray-900 p-2">
+            <button onClick={() => bundlePromo ? setStep('upsell') : setStep(isSnack ? 'quantity' : 'toppings')} className="text-gray-500 hover:text-gray-900 p-2">
               <ArrowLeft size={20} />
             </button>
             <button onClick={() => handleAddToCart()} className="text-gray-400 font-medium text-sm px-2">Skip</button>

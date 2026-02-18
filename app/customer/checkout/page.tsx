@@ -108,9 +108,9 @@ export default function CheckoutPage() {
                                     {hasExtras && <div className="my-4 border-t border-dashed border-orange-200/50" />}
 
                                     {item.extras?.map((extra, idx) => (
-                                        <div key={idx} className="flex justify-between items-start mt-4">
+                                            <div key={idx} className="flex justify-between items-start mt-4">
                                             <div className="flex gap-4">
-                                                <span className="text-lg font-bold text-gray-900">{item.quantity * extra.quantity}x</span>
+                                                <span className="text-lg font-bold text-gray-900">{extra.quantity}x</span>
                                                 <h4 className="font-bold text-gray-900 text-lg">{extra.name}</h4>
                                             </div>
                                             <div className="text-right leading-none">
@@ -164,7 +164,7 @@ export default function CheckoutPage() {
                                                     <span className="bg-[#D95D1E] text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
                                                         TOGETHER
                                                     </span>
-                                                    <span className="text-lg font-bold text-gray-900">{item.quantity * extra.quantity}x</span>
+                                                    <span className="text-lg font-bold text-gray-900">{extra.quantity}x</span>
                                                     <h4 className="font-bold text-gray-900 text-lg">{extra.name}</h4>
                                                 </div>
                                                 <div className="text-right leading-none">

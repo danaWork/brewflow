@@ -9,7 +9,7 @@ interface CartItemProps {
 }
 
 export default function CartItem({ item }: CartItemProps) {
-  const { updateQuantity, removeItem, addItem } = useCart();
+  const { updateQuantity, updateExtraQuantity, removeItem, addItem } = useCart();
 
   const isBundle = item.extras && item.extras.length > 0;
   
@@ -22,29 +22,23 @@ export default function CartItem({ item }: CartItemProps) {
   };
 
   const removeExtra = (extraIndex: number) => {
-      removeItem(item.id);
-      const newExtras = [...(item.extras || [])];
-      newExtras.splice(extraIndex, 1);
-      
-      addItem({
-          ...item,
-          bundleLabel: item.bundleLabel, // Explicitly preserve bundle label
-          extras: newExtras
-      });
+      // Use the context function to handle removal logic (qty 0)
+      // We pass a large negative delta to ensure it hits 0
+      updateExtraQuantity(item.id, extraIndex, -9999);
   };
 
   // Helper for Quantity Controls
-  const QuantityControls = ({ id, qty, isSmall = false }: { id: string, qty: number, isSmall?: boolean }) => (
+  const QuantityControls = ({ id, qty, isSmall = false, onUpdate }: { id: string, qty: number, isSmall?: boolean, onUpdate?: (delta: number) => void }) => (
     <div className="flex items-center gap-3">
         <button 
-           onClick={() => updateQuantity(id, -1)}
+           onClick={() => onUpdate ? onUpdate(-1) : updateQuantity(id, -1)}
            className={`flex items-center justify-center bg-gray-50 border border-gray-200 rounded-full text-gray-600 hover:bg-gray-100 active:scale-95 transition-all ${isSmall ? 'w-8 h-8' : 'w-10 h-10'}`}
         >
            <Minus size={isSmall ? 14 : 16} />
         </button>
         <span className={`font-bold text-gray-900 text-center ${isSmall ? 'w-4 text-base' : 'w-6 text-lg'}`}>{qty}</span>
         <button 
-           onClick={() => updateQuantity(id, 1)}
+           onClick={() => onUpdate ? onUpdate(1) : updateQuantity(id, 1)}
            className={`flex items-center justify-center bg-white border border-gray-200 rounded-full text-gray-900 hover:bg-gray-50 active:scale-95 transition-all ${isSmall ? 'w-8 h-8' : 'w-10 h-10'}`}
         >
             <Plus size={isSmall ? 14 : 16} />
@@ -106,7 +100,7 @@ export default function CartItem({ item }: CartItemProps) {
                      <div className="flex justify-between items-end mt-2">
                          <QuantityControls id={item.id} qty={item.quantity} />
                          <span className="font-bold text-gray-900 text-xl">
-                            ₱{item.price.toFixed(2)}
+                            ₱{(item.price * item.quantity).toFixed(2)}
                          </span>
                      </div>
                 </div>
@@ -134,14 +128,20 @@ export default function CartItem({ item }: CartItemProps) {
                           </div>
 
                           <div className="flex justify-between items-end mt-2">
-                              <QuantityControls id={item.id} qty={item.quantity * extra.quantity} isSmall />
+                              {/* Decoupled Quantity Control for Extra */}
+                              <QuantityControls 
+                                  id={item.id} 
+                                  qty={extra.quantity || 1} 
+                                  isSmall 
+                                  onUpdate={(delta) => updateExtraQuantity(item.id, idx, delta)}
+                              />
                               
                               <div className="text-right leading-none">
                                   <div className="text-gray-300 line-through text-xs mb-1">
-                                      ₱{(extra.price * 1.25).toFixed(2)}
+                                      ₱{(extra.price * 1.25 * (extra.quantity || 1)).toFixed(2)}
                                   </div>
                                   <div className="text-[#00B050] font-bold text-lg">
-                                      ₱{extra.price.toFixed(2)}
+                                      ₱{(extra.price * (extra.quantity || 1)).toFixed(2)}
                                   </div>
                               </div>
                           </div>
@@ -194,7 +194,7 @@ export default function CartItem({ item }: CartItemProps) {
                  <div className="flex justify-between items-end mt-2">
                      <QuantityControls id={item.id} qty={item.quantity} />
                      <span className="font-bold text-gray-900 text-xl">
-                        ₱{item.price.toFixed(2)}
+                        ₱{(item.price * item.quantity).toFixed(2)}
                      </span>
                  </div>
             </div>
@@ -229,14 +229,20 @@ export default function CartItem({ item }: CartItemProps) {
                           </div>
 
                           <div className="flex justify-between items-end mt-2">
-                              <span className="text-sm font-medium text-gray-600">Qty: {item.quantity * extra.quantity}</span>
+                              {/* Decoupled Quantity Control for Extra */}
+                              <QuantityControls 
+                                  id={item.id} 
+                                  qty={extra.quantity || 1} 
+                                  isSmall={false} /* Larger controls for split layout? or keep small? Original had just text Qty. Let's use controls */ 
+                                  onUpdate={(delta) => updateExtraQuantity(item.id, idx, delta)}
+                              />
                               
                               <div className="text-right leading-none">
                                   <div className="text-gray-300 line-through text-xs mb-1">
-                                      ₱{(extra.price * 1.25).toFixed(2)}
+                                      ₱{(extra.price * 1.25 * (extra.quantity || 1)).toFixed(2)}
                                   </div>
                                   <div className="text-[#00B050] font-bold text-lg">
-                                      ₱{extra.price.toFixed(2)}
+                                      ₱{(extra.price * (extra.quantity || 1)).toFixed(2)}
                                   </div>
                               </div>
                           </div>
