@@ -149,10 +149,14 @@ export async function getMenuData(qrIdentifier: string) {
                     modifiers: p.modifierLinks.map(ml => ({
                         id: ml.modifierGroup.id,
                         name: ml.modifierGroup.name,
+                        displayMode: ml.modifierGroup.displayMode,
                         options: ml.modifierGroup.options.map(o => ({
                             id: o.id,
                             name: o.name,
-                            price: 0 
+                            // @ts-ignore - Schema updated but types might lag
+                            price: parseFloat(o.price || '0'), 
+                            // @ts-ignore
+                            image: o.imageUrl
                         }))
                     }))
                 });

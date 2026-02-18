@@ -22,6 +22,20 @@
       "when": 1771408977427,
       "tag": "0002_goofy_rhodey",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1771442407207,
+      "tag": "0003_silly_meteorite",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1771442469457,
+      "tag": "0004_dazzling_franklin_richards",
+      "breakpoints": true
     }
   ]
 }

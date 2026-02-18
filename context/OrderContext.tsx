@@ -23,12 +23,13 @@ export interface Order {
   tableId?: string;
   timestamp: Date;
   paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA';
+  note?: string;
 }
 
 interface OrderContextType {
   userOrders: Order[];
   activeOrders: Order[];
-  createOrder: (items: CartItem[], total: number, paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA') => Promise<{ id: string } | null>;
+  createOrder: (items: CartItem[], total: number, paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA', note?: string) => Promise<{ id: string } | null>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   dismissOrder: (orderId: string) => void;
   refreshActiveOrders: () => Promise<void>;
@@ -164,7 +165,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('coffee-shop-user-orders', JSON.stringify(userOrders));
   }, [userOrders]);
 
-  const createOrder = async (items: CartItem[], total: number, paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA') => {
+  const createOrder = async (items: CartItem[], total: number, paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA', note?: string) => {
     try {
       if (!currentBranchId || !currentTableId) {
         console.error('Missing branchId or tableId');
@@ -211,6 +212,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         items: itemsToPrepare,
         totalAmount: total,
         paymentMethod,
+        note,
       });
 
       if (!result.success || !result.order) {
@@ -237,7 +239,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         table: currentTableName || 'Unknown Table',
         tableId: currentTableId,
         timestamp: new Date(),
-        paymentMethod
+        paymentMethod,
+        note
       };
 
       setUserOrders(prev => [newOrder, ...prev]);

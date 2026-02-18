@@ -72,20 +72,13 @@ export default function CartItem({ item }: CartItemProps) {
                      <div className="flex justify-between items-start">
                         <div>
                             <h3 className="font-bold text-gray-900 text-lg leading-tight mb-1">{item.name}</h3>
-                            <div className="text-xs text-gray-400 font-medium line-clamp-2">
-                                {[
-                                item.options?.size && `${item.options.size},`,
-                                item.options?.milk && `${item.options.milk} Milk,`,
-                                item.options?.sweetness && `${item.options.sweetness},`,
-                                item.options?.ice && `${item.options.ice} Ice`
-                                ].filter(Boolean).join(' ')}
+                            <div className="text-xs text-gray-400 font-medium flex flex-wrap gap-1">
+                                {Object.entries(item.options || {}).map(([key, value]) => (
+                                    <span key={key} className="bg-gray-50 px-1.5 py-0.5 rounded text-gray-600">
+                                        {key}: {String(value)}
+                                    </span>
+                                ))}
                             </div>
-                            {/* Toppings Display */}
-                            {item.options?.toppings && Array.isArray(item.options.toppings) && item.options.toppings.length > 0 && (
-                                <div className="text-xs text-[#D95D1E] font-medium mt-0.5">
-                                    + {item.options.toppings.map((t: any) => t.name).join(', ')}
-                                </div>
-                            )}
                         </div>
                         
                         {/* Remove Bundle Button (Top Right) */}
@@ -167,20 +160,13 @@ export default function CartItem({ item }: CartItemProps) {
                  <div className="flex justify-between items-start">
                     <div>
                         <h3 className="font-bold text-gray-900 text-lg leading-tight mb-1">{item.name}</h3>
-                        <div className="text-xs text-gray-400 font-medium line-clamp-2">
-                            {[
-                            item.options?.size && `${item.options.size},`,
-                            item.options?.milk && `${item.options.milk} Milk,`,
-                            item.options?.sweetness && `${item.options.sweetness},`,
-                            item.options?.ice && `${item.options.ice} Ice`
-                            ].filter(Boolean).join(' ')}
-                        </div>
-                        {/* Toppings Display */}
-                        {item.options?.toppings && Array.isArray(item.options.toppings) && item.options.toppings.length > 0 && (
-                            <div className="text-xs text-[#D95D1E] font-medium mt-0.5">
-                                + {item.options.toppings.map((t: any) => t.name).join(', ')}
+                            <div className="text-xs text-gray-400 font-medium flex flex-wrap gap-1">
+                                {Object.entries(item.options || {}).map(([key, value]) => (
+                                    <span key={key} className="bg-gray-50 px-1.5 py-0.5 rounded text-gray-600">
+                                        {key}: {String(value)}
+                                    </span>
+                                ))}
                             </div>
-                        )}
                     </div>
                     
                     <button 

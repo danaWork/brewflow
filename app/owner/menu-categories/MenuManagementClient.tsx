@@ -5,7 +5,7 @@ import { Plus, ChevronDown, ChevronRight, Edit2, Trash2, Image as ImageIcon, Set
 import { 
     createCategory, updateCategory, deleteCategory, 
     createProduct, updateProduct, deleteProduct,
-    createModifierGroup, deleteModifierGroup 
+    createModifierGroup, updateModifierGroup, deleteModifierGroup 
 } from '@/app/actions/menu-management';
 import { InventoryItem, linkProductToIngredientsAction } from '@/app/actions/inventory';
 
@@ -31,7 +31,8 @@ type Category = {
 type ModifierGroup = {
     id: string;
     name: string;
-    options: { id: string; name: string }[];
+    displayMode: 'list' | 'buttons' | 'cards';
+    options: { id: string; name: string; price: string; imageUrl?: string | null }[];
 };
 
 interface Props {
@@ -42,7 +43,7 @@ interface Props {
 }
 
 export default function MenuManagementClient({ initialCategories, modifierGroups, inventoryItems, branchId }: Props) {
-    const [activeTab, setActiveTab] = useState<'menu' | 'modifiers'>('menu');
+    const [activeTab, setActiveTab] = useState<'menu' | 'modifiers' | 'toppings'>('menu');
     const [categories, setCategories] = useState<Category[]>(initialCategories);
     const [expandedCategories, setExpandedCategories] = useState<string[]>(initialCategories.map(c => c.id));
     
@@ -56,6 +57,12 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
     const [editingIngredients, setEditingIngredients] = useState<{ inventoryItemId: string; quantityRequired: number }[]>([]);
+    const [editingModifierGroup, setEditingModifierGroup] = useState<{
+        id?: string;
+        name: string;
+        displayMode: 'list' | 'buttons' | 'cards';
+        options: { id?: string; name: string; price: number; imageUrl?: string }[];
+    } | null>(null);
 
     const toggleCategory = (id: string) => {
         setExpandedCategories(prev =>
@@ -161,14 +168,31 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
         setEditingIngredients(editingIngredients.filter((_, i) => i !== index));
     };
 
-    const handleSaveModifier = async (e: React.FormEvent<HTMLFormElement>) => {
+    const handleSaveModifier = async (e: React.FormEvent) => {
         e.preventDefault();
-        const formData = new FormData(e.currentTarget);
-        const name = formData.get('name') as string;
-        const optionsRaw = formData.get('options') as string;
-        const options = optionsRaw.split(',').map(s => s.trim()).filter(s => s !== '');
+        if (!editingModifierGroup) return;
+        
+        if (!editingModifierGroup.name.trim()) {
+            alert("Please enter a group name");
+            return;
+        }
 
-        await createModifierGroup(name, options);
+        const validOptions = editingModifierGroup.options.filter(o => o.name.trim() !== '');
+        
+        if (editingModifierGroup.id) {
+            await updateModifierGroup(
+                editingModifierGroup.id,
+                editingModifierGroup.name,
+                validOptions,
+                editingModifierGroup.displayMode
+            );
+        } else {
+            await createModifierGroup(
+                editingModifierGroup.name, 
+                validOptions, 
+                editingModifierGroup.displayMode
+            );
+        }
         window.location.reload();
     };
 
@@ -202,6 +226,12 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'modifiers' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
                     >
                         Modifiers
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('toppings')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'toppings' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Toppings
                     </button>
                 </div>
             </div>
@@ -342,11 +372,24 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                     <div className="flex justify-between items-center">
                         <div>
-                            <h2 className="text-lg font-semibold text-gray-800">Modifier Groups</h2>
-                            <p className="text-sm text-gray-500">Create global options like "Size", "Sugar Level", or "Add-ons".</p>
+                            <h2 className="text-lg font-semibold text-gray-800">
+                                {activeTab === 'toppings' ? 'Visual Toppings' : 'Standard Modifiers'}
+                            </h2>
+                            <p className="text-sm text-gray-500">
+                                {activeTab === 'toppings' 
+                                    ? 'Create rich visual options with images (e.g., Toppings, Add-ons).' 
+                                    : 'Create standard list or button options (e.g., Size, Sugar, Milk).'}
+                            </p>
                         </div>
                         <button
-                            onClick={() => setIsModifierModalOpen(true)}
+                            onClick={() => {
+                                setEditingModifierGroup({ 
+                                    name: '', 
+                                    displayMode: activeTab === 'toppings' ? 'cards' : 'list', 
+                                    options: [{ name: '', price: 0 }] 
+                                });
+                                setIsModifierModalOpen(true);
+                            }}
                             className="bg-[#D95D1E] text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-[#bf4f18] transition-all shadow-md active:scale-95"
                         >
                             <Plus size={20} />
@@ -355,37 +398,74 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {modifierGroups.length === 0 ? (
+                        {modifierGroups.filter(g => activeTab === 'toppings' ? g.displayMode === 'cards' : g.displayMode !== 'cards').length === 0 ? (
                             <div className="col-span-full bg-white rounded-2xl border border-dashed border-gray-300 p-20 text-center">
                                 <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                                     <Settings2 size={32} className="text-gray-300" />
                                 </div>
-                                <h3 className="text-gray-900 font-bold mb-1">No Modifiers Yet</h3>
-                                <p className="text-gray-500 text-sm max-w-xs mx-auto">Create modifier groups to allow customers to customize their orders.</p>
+                                <h3 className="text-gray-900 font-bold mb-1">No {activeTab === 'toppings' ? 'Toppings' : 'Modifiers'} Yet</h3>
+                                <p className="text-gray-500 text-sm max-w-xs mx-auto">Create a group to start customization.</p>
                             </div>
                         ) : (
-                            modifierGroups.map((group) => (
-                                <div key={group.id} className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm relative group">
+                            modifierGroups
+                                .filter(g => activeTab === 'toppings' ? g.displayMode === 'cards' : g.displayMode !== 'cards')
+                                .map((group) => (
+                                <div key={group.id} className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm relative group hover:border-[#D95D1E]/30 transition-all">
                                     <div className="flex justify-between items-start mb-4">
                                         <div>
-                                            <h3 className="font-bold text-gray-900 truncate pr-10">{group.name}</h3>
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="font-bold text-gray-900 truncate pr-2">{group.name}</h3>
+                                                <span className="text-[10px] uppercase font-bold bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
+                                                    {group.displayMode}
+                                                </span>
+                                            </div>
                                             <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest mt-1">
                                                 {group.options.length} OPTIONS
                                             </p>
                                         </div>
-                                        <button 
-                                            onClick={() => handleDeleteModifier(group.id)}
-                                            className="absolute top-4 right-4 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
+                                        <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={() => {
+                                                    setEditingModifierGroup({
+                                                        id: group.id,
+                                                        name: group.name,
+                                                        displayMode: group.displayMode,
+                                                        options: group.options.map(o => ({
+                                                            id: o.id,
+                                                            name: o.name,
+                                                            price: parseFloat(o.price),
+                                                            imageUrl: o.imageUrl || undefined
+                                                        }))
+                                                    });
+                                                    setIsModifierModalOpen(true);
+                                                }}
+                                                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                            >
+                                                <Edit2 size={16} />
+                                            </button>
+                                            <button 
+                                                onClick={() => handleDeleteModifier(group.id)}
+                                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
                                     </div>
                                     <div className="flex flex-wrap gap-2">
-                                        {group.options.map((opt) => (
-                                            <span key={opt.id} className="px-2.5 py-1 bg-gray-50 text-gray-600 text-xs font-medium rounded-full border border-gray-100">
+                                        {group.options.slice(0, 5).map((opt) => (
+                                            <span key={opt.id} className="px-2.5 py-1 bg-gray-50 text-gray-600 text-xs font-medium rounded-full border border-gray-100 flex items-center gap-1">
+                                                {activeTab === 'toppings' && opt.imageUrl && (
+                                                    <img src={opt.imageUrl} className="w-4 h-4 rounded-full object-cover" />
+                                                )}
                                                 {opt.name}
+                                                {parseFloat(opt.price) > 0 && <span className="text-[#D95D1E] font-bold">+{opt.price}</span>}
                                             </span>
                                         ))}
+                                        {group.options.length > 5 && (
+                                            <span className="px-2.5 py-1 bg-gray-50 text-gray-400 text-xs font-medium rounded-full border border-gray-100">
+                                                +{group.options.length - 5} more
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                             ))
@@ -675,36 +755,123 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
             )}
 
             {/* Modifier Modal */}
-            {isModifierModalOpen && (
+            {isModifierModalOpen && editingModifierGroup && (
                 <div className="fixed inset-0 flex items-center justify-center z-[110] p-4 animate-in zoom-in-95 duration-200">
-                    <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
-                        <div className="p-8 border-b border-gray-50 flex justify-between items-center">
-                            <h2 className="text-2xl font-bold text-gray-900 tracking-tight">New Modifier Group</h2>
+                    <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+                        <div className="p-6 border-b border-gray-50 flex justify-between items-center">
+                            <h2 className="text-xl font-bold text-gray-900 tracking-tight">
+                                {editingModifierGroup.id 
+                                    ? (activeTab === 'toppings' ? 'Edit Toppings Group' : 'Edit Modifier Group')
+                                    : (activeTab === 'toppings' ? 'New Toppings Group' : 'New Modifier Group')}
+                            </h2>
                             <button onClick={() => setIsModifierModalOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
                         </div>
-                        <form onSubmit={handleSaveModifier} className="p-8 space-y-6">
-                            <div>
-                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Group Name</label>
-                                <input
-                                    name="name"
-                                    type="text"
-                                    required
-                                    className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-[#D95D1E] transition-all text-lg font-bold"
-                                    placeholder="e.g. Milk Options"
-                                />
+                        <form onSubmit={handleSaveModifier} className="flex-1 flex flex-col overflow-hidden">
+                            <div className="p-6 overflow-y-auto space-y-6 custom-scrollbar">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Group Name</label>
+                                        <input
+                                            value={editingModifierGroup.name}
+                                            onChange={(e) => setEditingModifierGroup({ ...editingModifierGroup, name: e.target.value })}
+                                            required
+                                            autoFocus
+                                            className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-[#D95D1E] transition-all font-bold"
+                                            placeholder={activeTab === 'toppings' ? "e.g. Premium Toppings" : "e.g. Milk Choice"}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Display Mode</label>
+                                        <div className="flex bg-gray-50 rounded-xl p-1">
+                                            {[
+                                                { id: 'list', label: 'List' },
+                                                { id: 'buttons', label: 'Buttons' },
+                                                { id: 'cards', label: 'Cards (Images)' }
+                                            ].map((mode: any) => (
+                                                <button
+                                                    type="button"
+                                                    key={mode.id}
+                                                    onClick={() => setEditingModifierGroup({ ...editingModifierGroup, displayMode: mode.id })}
+                                                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${editingModifierGroup.displayMode === mode.id ? 'bg-white shadow text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                                                >
+                                                    {mode.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-4">Options</label>
+                                    <div className="space-y-3">
+                                        {editingModifierGroup.options.map((opt, idx) => (
+                                            <div key={idx} className="flex gap-3 items-start animate-in slide-in-from-left-2 duration-200">
+                                                <div className="flex-1 space-y-2">
+                                                    <div className="flex gap-3">
+                                                        <input
+                                                            value={opt.name}
+                                                            onChange={(e) => {
+                                                                const newOpts = [...editingModifierGroup.options];
+                                                                newOpts[idx].name = e.target.value;
+                                                                setEditingModifierGroup({ ...editingModifierGroup, options: newOpts });
+                                                            }}
+                                                            placeholder="Option Name"
+                                                            className="flex-1 px-4 py-2 bg-gray-50 border-none rounded-xl text-sm font-medium focus:ring-2 focus:ring-[#D95D1E]"
+                                                        />
+                                                        <div className="relative w-24">
+                                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">₱</span>
+                                                            <input
+                                                                type="number"
+                                                                value={opt.price}
+                                                                onChange={(e) => {
+                                                                    const newOpts = [...editingModifierGroup.options];
+                                                                    newOpts[idx].price = parseFloat(e.target.value);
+                                                                    setEditingModifierGroup({ ...editingModifierGroup, options: newOpts });
+                                                                }}
+                                                                className="w-full pl-6 pr-3 py-2 bg-gray-50 border-none rounded-xl text-sm font-bold focus:ring-2 focus:ring-[#D95D1E]"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    {editingModifierGroup.displayMode === 'cards' && (
+                                                        <input
+                                                            value={opt.imageUrl || ''}
+                                                            onChange={(e) => {
+                                                                const newOpts = [...editingModifierGroup.options];
+                                                                newOpts[idx].imageUrl = e.target.value;
+                                                                setEditingModifierGroup({ ...editingModifierGroup, options: newOpts });
+                                                            }}
+                                                            placeholder="Image URL (https://...)"
+                                                            className="w-full px-4 py-2 bg-gray-50 border-none rounded-xl text-xs font-medium text-gray-500 focus:ring-2 focus:ring-[#D95D1E]"
+                                                        />
+                                                    )}
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const newOpts = editingModifierGroup.options.filter((_, i) => i !== idx);
+                                                        setEditingModifierGroup({ ...editingModifierGroup, options: newOpts });
+                                                    }}
+                                                    className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                                >
+                                                    <Trash size={16} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditingModifierGroup({
+                                            ...editingModifierGroup,
+                                            options: [...editingModifierGroup.options, { name: '', price: 0 }]
+                                        })}
+                                        className="mt-4 flex items-center gap-2 text-sm font-bold text-[#D95D1E] hover:bg-orange-50 px-3 py-2 rounded-lg transition-all"
+                                    >
+                                        <Plus size={16} />
+                                        Add Option
+                                    </button>
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Options (Comma separated)</label>
-                                <textarea
-                                    name="options"
-                                    required
-                                    rows={3}
-                                    className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-[#D95D1E] transition-all font-medium resize-none"
-                                    placeholder="Whole Milk, Oat Milk, Soy Milk, No Milk"
-                                />
-                                <p className="text-[10px] text-gray-400 mt-2 font-bold uppercase tracking-tighter">Tip: Separation is done by commas.</p>
-                            </div>
-                            <div className="flex justify-end gap-3 pt-4">
+                            <div className="p-6 border-t border-gray-50 flex justify-end gap-3 bg-white">
                                 <button
                                     type="button"
                                     onClick={() => setIsModifierModalOpen(false)}
@@ -716,7 +883,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                     type="submit"
                                     className="px-8 py-3 bg-[#D95D1E] text-white rounded-2xl font-bold shadow-lg shadow-orange-100 hover:bg-[#bf4f18] transition-all active:scale-95"
                                 >
-                                    Create Group
+                                    {editingModifierGroup.id ? 'Save Changes' : 'Create Group'}
                                 </button>
                             </div>
                         </form>
