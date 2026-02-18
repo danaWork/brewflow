@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, ChevronDown, ChevronRight, Edit2, Trash2, Image as ImageIcon, Settings2, X } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, Edit2, Trash2, Image as ImageIcon, Settings2, X, Trash } from 'lucide-react';
 import { 
     createCategory, updateCategory, deleteCategory, 
     createProduct, updateProduct, deleteProduct,
     createModifierGroup, deleteModifierGroup 
 } from '@/app/actions/menu-management';
+import { InventoryItem, linkProductToIngredientsAction } from '@/app/actions/inventory';
 
 type Product = {
     id: string;
@@ -16,13 +17,14 @@ type Product = {
     categoryId: string;
     isHidden?: boolean;
     modifierLinks?: { modifierGroupId: string }[];
+    productIngredients?: { inventoryItemId: string; quantityRequired: string }[];
 };
 
 type Category = {
     id: string;
     name: string;
     type: string;
-    config?: string;
+    config?: string | null;
     products: Product[];
 };
 
@@ -35,9 +37,11 @@ type ModifierGroup = {
 interface Props {
     initialCategories: Category[];
     modifierGroups: ModifierGroup[];
+    inventoryItems: InventoryItem[];
+    branchId: string;
 }
 
-export default function MenuManagementClient({ initialCategories, modifierGroups }: Props) {
+export default function MenuManagementClient({ initialCategories, modifierGroups, inventoryItems, branchId }: Props) {
     const [activeTab, setActiveTab] = useState<'menu' | 'modifiers'>('menu');
     const [categories, setCategories] = useState<Category[]>(initialCategories);
     const [expandedCategories, setExpandedCategories] = useState<string[]>(initialCategories.map(c => c.id));
@@ -51,11 +55,26 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
+    const [editingIngredients, setEditingIngredients] = useState<{ inventoryItemId: string; quantityRequired: number }[]>([]);
 
     const toggleCategory = (id: string) => {
         setExpandedCategories(prev =>
             prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
         );
+    };
+
+    const openProductModal = (product: Product | null, categoryId: string | null) => {
+        setEditingProduct(product);
+        setActiveCategoryId(categoryId);
+        if (product && product.productIngredients) {
+            setEditingIngredients(product.productIngredients.map(pi => ({
+                inventoryItemId: pi.inventoryItemId,
+                quantityRequired: parseFloat(pi.quantityRequired)
+            })));
+        } else {
+            setEditingIngredients([]);
+        }
+        setIsProductModalOpen(true);
     };
 
     const handleSaveCategory = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -103,11 +122,21 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
             isHidden,
         };
 
+        let productId = editingProduct?.id;
+
         if (editingProduct) {
             await updateProduct(editingProduct.id, data);
         } else {
-            await createProduct(data);
+            const newProduct = await createProduct(data);
+            productId = newProduct.id;
         }
+
+        // Save Ingredients
+        const validIngredients = editingIngredients.filter(i => i.inventoryItemId && i.quantityRequired > 0);
+        if (productId) {
+            await linkProductToIngredientsAction(branchId, productId, validIngredients);
+        }
+
         window.location.reload();
     };
 
@@ -116,6 +145,20 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
             await deleteProduct(id);
             window.location.reload();
         }
+    };
+    
+    // ... helpers for ingredients ...
+    const addIngredient = () => {
+        setEditingIngredients([...editingIngredients, { inventoryItemId: '', quantityRequired: 0 }]);
+    };
+    const updateIngredient = (index: number, field: 'inventoryItemId' | 'quantityRequired', value: string | number) => {
+        const newIngs = [...editingIngredients];
+        // @ts-ignore
+        newIngs[index][field] = value;
+        setEditingIngredients(newIngs);
+    };
+    const removeIngredient = (index: number) => {
+        setEditingIngredients(editingIngredients.filter((_, i) => i !== index));
     };
 
     const handleSaveModifier = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -205,11 +248,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                     </div>
                                     <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                         <button
-                                            onClick={() => {
-                                                setActiveCategoryId(category.id);
-                                                setEditingProduct(null);
-                                                setIsProductModalOpen(true);
-                                            }}
+                                            onClick={() => openProductModal(null, category.id)}
                                             className="p-2.5 text-gray-500 hover:text-[#D95D1E] hover:bg-orange-50 rounded-xl transition-all"
                                             title="Add Product"
                                         >
@@ -239,11 +278,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                             <div className="p-10 text-center">
                                                 <p className="text-gray-400 italic text-sm mb-4">No products in this category yet.</p>
                                                 <button 
-                                                    onClick={() => {
-                                                        setActiveCategoryId(category.id);
-                                                        setEditingProduct(null);
-                                                        setIsProductModalOpen(true);
-                                                    }}
+                                                    onClick={() => openProductModal(null, category.id)}
                                                     className="inline-flex items-center gap-2 text-[#D95D1E] font-medium hover:underline text-sm"
                                                 >
                                                     <Plus size={16} />
@@ -281,11 +316,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                                         </div>
                                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
                                                             <button
-                                                                onClick={() => {
-                                                                    setEditingProduct(product);
-                                                                    setActiveCategoryId(category.id);
-                                                                    setIsProductModalOpen(true);
-                                                                }}
+                                                                onClick={() => openProductModal(product, category.id)}
                                                                 className="p-2.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
                                                             >
                                                                 <Edit2 size={18} />
@@ -571,6 +602,55 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                             );
                                         })
                                     )}
+                                </div>
+                            </div>
+
+                            <div className="border-t border-gray-100 pt-6">
+                                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-4">Recipe / Ingredients</label>
+                                <div className="space-y-3">
+                                    {editingIngredients.map((ing, index) => (
+                                        <div key={index} className="flex gap-3 items-center">
+                                            <div className="flex-1">
+                                                <select
+                                                    className="w-full px-4 py-2 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-[#D95D1E] text-sm font-medium"
+                                                    value={ing.inventoryItemId}
+                                                    onChange={e => updateIngredient(index, 'inventoryItemId', e.target.value)}
+                                                >
+                                                    <option value="">Select Ingredient</option>
+                                                    {inventoryItems.map(item => (
+                                                        <option key={item.id} value={item.id}>
+                                                            {item.name} ({item.unit})
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="w-24">
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    placeholder="Qty"
+                                                    className="w-full px-4 py-2 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-[#D95D1E] text-sm font-medium"
+                                                    value={ing.quantityRequired}
+                                                    onChange={e => updateIngredient(index, 'quantityRequired', parseFloat(e.target.value))}
+                                                />
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeIngredient(index)}
+                                                className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                            >
+                                                <Trash size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={addIngredient}
+                                        className="flex items-center gap-2 text-sm font-bold text-[#D95D1E] hover:underline px-2 py-1"
+                                    >
+                                        <Plus size={16} />
+                                        Add Ingredient
+                                    </button>
                                 </div>
                             </div>
 

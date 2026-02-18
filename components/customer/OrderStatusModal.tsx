@@ -188,18 +188,64 @@ export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: 
                                                     <span className="font-bold text-gray-900">{item.name}</span>
                                                 </div>
 
-                                                <div className="text-xs text-gray-400 font-medium mt-0.5">
-                                                    {[
-                                                        item.options?.size && `${item.options.size},`,
-                                                        item.options?.milk && `${item.options.milk} Milk,`,
-                                                        item.options?.sweetness && `${item.options.sweetness},`,
-                                                        item.options?.ice && `${item.options.ice} Ice`
-                                                    ].filter(Boolean).join(' ')}
+                                                <div className="text-xs text-gray-400 font-medium mt-0.5 space-y-0.5">
+                                                    {(item.options?.bundleLabel || item.options?.tag) && (
+                                                        <div className="flex flex-wrap gap-2 mb-1">
+                                                            {item.options.bundleLabel && (
+                                                                <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-bold uppercase brightness-95">
+                                                                    {item.options.bundleLabel}
+                                                                </span>
+                                                            )}
+                                                            {item.options.tag && (
+                                                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                                                                    item.options.tag === 'TOGETHER' ? 'bg-purple-50 text-purple-600' : 
+                                                                    item.options.tag === 'EXTRA' ? 'bg-pink-50 text-pink-600' : 'bg-gray-50 text-gray-600'
+                                                                }`}>
+                                                                    {item.options.tag}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                    <div>
+                                                        {[
+                                                            item.options?.size && `${item.options.size}`,
+                                                            item.options?.milk && `${item.options.milk} Milk`,
+                                                            item.options?.sweetness && `${item.options.sweetness}`,
+                                                            item.options?.ice && `${item.options.ice} Ice`
+                                                        ].filter(Boolean).join(' • ')}
+                                                    </div>
+                                                    {item.options?.toppings && item.options.toppings.length > 0 && (
+                                                        <div className="text-[10px] text-green-600 font-bold uppercase tracking-wider">
+                                                            + {item.options.toppings.map((t: any) => t.name).join(', ')}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
                                         <span className="text-gray-900 font-bold">₱{item.price.toFixed(2)}</span>
                                     </div>
+
+                                    {/* Secondary check for nested extras in legacy data */}
+                                    {item.extras && item.extras.length > 0 && (
+                                        <div className="ml-8 border-l-2 border-gray-100 pl-3 space-y-3 mt-1">
+                                            {item.extras.map((extra, eidx) => (
+                                                <div key={eidx} className="flex justify-between items-start text-xs">
+                                                    <div className="flex gap-2">
+                                                        <span className="text-gray-400 font-bold">{extra.quantity}x</span>
+                                                        <div>
+                                                            <div className="font-bold text-gray-700">{extra.name}</div>
+                                                            {extra.tag && (
+                                                                <span className="text-[9px] bg-pink-50 text-pink-600 px-1 py-0.5 rounded font-bold uppercase mt-1 inline-block">
+                                                                    {extra.tag}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <span className="text-gray-600 font-medium">₱{extra.price.toFixed(2)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>

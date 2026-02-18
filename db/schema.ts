@@ -112,6 +112,7 @@ export const orderItems = pgTable('order_items', {
   productId: uuid('product_id').references(() => products.id).notNull(),
   quantity: integer('quantity').notNull(),
   priceAtTime: decimal('price_at_time', { precision: 10, scale: 2 }).notNull(),
+  customizations: text('customizations'), // Store as JSON string for ad-hoc options
 });
 
 export const orderItemModifiers = pgTable('order_item_modifiers', {
@@ -138,6 +139,27 @@ export const promotionItems = pgTable('promotion_items', {
   id: uuid('id').defaultRandom().primaryKey(),
   promotionId: uuid('promotion_id').references(() => promotions.id).notNull(),
   productId: uuid('product_id').references(() => products.id).notNull(),
+});
+
+
+// Inventory System Tables
+
+export const inventoryItems = pgTable('inventory_items', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  branchId: uuid('branch_id').references(() => branches.id).notNull(),
+  name: text('name').notNull(),
+  quantity: decimal('quantity', { precision: 10, scale: 2 }).notNull().default('0'), // Changed to decimal for flexible units
+  unit: text('unit').notNull(), // e.g., 'kg', 'g', 'pcs', 'L', 'ml'
+  lowStockThreshold: decimal('low_stock_threshold', { precision: 10, scale: 2 }).default('10'),
+  costPerUnit: decimal('cost_per_unit', { precision: 10, scale: 2 }),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const productIngredients = pgTable('product_ingredients', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  productId: uuid('product_id').references(() => products.id).notNull(),
+  inventoryItemId: uuid('inventory_item_id').references(() => inventoryItems.id).notNull(),
+  quantityRequired: decimal('quantity_required', { precision: 10, scale: 2 }).notNull(),
 });
 
 // Relations
@@ -175,6 +197,7 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   orderItems: many(orderItems),
   branchAvailability: many(branchProductAvailability),
   promotionItems: many(promotionItems),
+  productIngredients: many(productIngredients),
 }));
 
 export const branchProductAvailabilityRelations = relations(branchProductAvailability, ({ one }) => ({
@@ -242,4 +265,18 @@ export const promotionsRelations = relations(promotions, ({ one, many }) => ({
 export const promotionItemsRelations = relations(promotionItems, ({ one }) => ({
   promotion: one(promotions, { fields: [promotionItems.promotionId], references: [promotions.id] }),
   product: one(products, { fields: [promotionItems.productId], references: [products.id] }),
+}));
+
+
+
+// Inventory Relations
+
+export const inventoryItemsRelations = relations(inventoryItems, ({ one, many }) => ({
+  branch: one(branches, { fields: [inventoryItems.branchId], references: [branches.id] }),
+  productIngredients: many(productIngredients),
+}));
+
+export const productIngredientsRelations = relations(productIngredients, ({ one }) => ({
+  product: one(products, { fields: [productIngredients.productId], references: [products.id] }),
+  inventoryItem: one(inventoryItems, { fields: [productIngredients.inventoryItemId], references: [inventoryItems.id] }),
 }));

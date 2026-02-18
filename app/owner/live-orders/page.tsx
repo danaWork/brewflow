@@ -153,6 +153,54 @@ export default function LiveOrdersPage() {
                                 <span className="font-bold text-gray-900">{item.quantity}x</span>
                                 <div className="flex flex-col">
                                   <span className="text-gray-800 font-medium">{item.name}</span>
+                                  {item.options && (
+                                    <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1">
+                                      {item.options.size && (
+                                        <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight">
+                                          {item.options.size}
+                                        </span>
+                                      )}
+                                      {item.options.milk && (
+                                        <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight">
+                                          {item.options.milk}
+                                        </span>
+                                      )}
+                                      {item.options.sweetness && (
+                                        <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight">
+                                          {item.options.sweetness}
+                                        </span>
+                                      )}
+                                      {item.options.ice && (
+                                        <span className="text-[10px] bg-cyan-50 text-cyan-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight">
+                                          {item.options.ice}
+                                        </span>
+                                      )}
+                                      {item.options.toppings && item.options.toppings.length > 0 && (
+                                        <div className="w-full flex flex-wrap gap-1 mt-1">
+                                          {item.options.toppings.map((t: any, tidx: number) => (
+                                            <span key={tidx} className="text-[9px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-tighter">
+                                              + {t.name}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {item.options.tag === 'TOGETHER' && (
+                                        <span className="text-[10px] bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight">
+                                          Together
+                                        </span>
+                                      )}
+                                      {item.options.bundleLabel && (
+                                        <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight">
+                                          {item.options.bundleLabel}
+                                        </span>
+                                      )}
+                                      {item.options.tag === 'EXTRA' && (
+                                        <span className="text-[10px] bg-pink-50 text-pink-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight">
+                                          + Extra
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </div>

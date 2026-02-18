@@ -29,6 +29,7 @@ export default function CheckoutPage() {
 
     const handlePlaceOrder = async () => {
         const result = await createOrder(items, cartTotal, paymentMethod);
+        console.log(result);
 
         if (result) {
             setLastOrderId(result.id);

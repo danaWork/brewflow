@@ -13,7 +13,7 @@ interface OrderConfirmationProps {
 
 export default function OrderConfirmation({ isOpen, onClose, orderNumber, paymentMethod }: OrderConfirmationProps) {
   const router = useRouter();
-  const { tableId } = useTable();
+  const { tableId , tableName } = useTable();
 
   if (!isOpen) return null;
 
@@ -42,7 +42,7 @@ export default function OrderConfirmation({ isOpen, onClose, orderNumber, paymen
              
              <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-center gap-2 text-gray-500 text-sm">
                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-                 You ordered from table {tableId || '1'}
+                 You ordered from {tableName?.toLowerCase() || '1'}
              </div>
          </div>
 

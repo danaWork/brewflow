@@ -101,11 +101,11 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const orders: Order[] = result.orders.map((o) => ({
+      const orders: Order[] = (result.orders as any[]).map((o) => ({
         id: o.id,
         orderNumber: o.orderNumber,
         status: o.status as OrderStatus,
-        items: [], // Items are in a separate table now, would need a join/fetch if really needed here.
+        items: o.items || [],
         total: o.totalAmount,
         table: o.tableNumber || 'Unknown Table',
         tableId: o.tableId || undefined,
@@ -171,14 +171,41 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         return null;
       }
 
+      // Flatten items and their extras for the database
+      const orderItemsToSave: any[] = [];
+      items.forEach(item => {
+        // Add main item
+        orderItemsToSave.push({
+          productId: item.productId,
+          quantity: item.quantity,
+          priceAtTime: item.price,
+          customizations: {
+             ...item.options,
+             bundleLabel: item.bundleLabel,
+             tag: item.tag
+          }
+        });
+
+        // Add extras if any
+        if (item.extras && item.extras.length > 0) {
+          item.extras.forEach(extra => {
+            orderItemsToSave.push({
+              productId: extra.productId,
+              quantity: extra.quantity * item.quantity,
+              priceAtTime: extra.price,
+              customizations: {
+                ...extra.options,
+                tag: extra.tag || 'EXTRA'
+              }
+            });
+          });
+        }
+      });
+
       const result = await createOrderAction({
         branchId: currentBranchId,
         tableId: currentTableId,
-        items: items.map(item => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          priceAtTime: item.price
-        })),
+        items: orderItemsToSave,
         totalAmount: total,
         paymentMethod,
       });
@@ -193,7 +220,16 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         id: orderData.id,
         orderNumber: orderData.orderNumber,
         status: 'PENDING',
-        items: items,
+        items: orderItemsToSave.map(item => ({
+          id: `${item.productId}-${Date.now()}`,
+          productId: item.productId,
+          name: item.name || items.find(i => i.productId === item.productId)?.name || 'Unknown Product',
+          price: item.priceAtTime,
+          quantity: item.quantity,
+          options: item.customizations,
+          bundleLabel: item.customizations?.bundleLabel,
+          tag: item.customizations?.tag
+        })),
         total,
         table: currentTableName || 'Unknown Table',
         tableId: currentTableId,

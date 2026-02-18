@@ -15,6 +15,13 @@
       "when": 1770983308540,
       "tag": "0001_old_glorian",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1771408977427,
+      "tag": "0002_goofy_rhodey",
+      "breakpoints": true
     }
   ]
 }

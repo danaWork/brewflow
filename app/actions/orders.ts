@@ -18,7 +18,7 @@ export interface OrderData {
 export async function createOrderAction(data: {
     branchId: string;
     tableId: string;
-    items: { productId: string; quantity: number; priceAtTime: number }[];
+    items: { productId: string; quantity: number; priceAtTime: number; customizations?: any }[];
     totalAmount: number;
     paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA';
 }) {
@@ -38,6 +38,7 @@ export async function createOrderAction(data: {
                     productId: item.productId,
                     quantity: item.quantity,
                     priceAtTime: item.priceAtTime.toString(),
+                    customizations: item.customizations ? JSON.stringify(item.customizations) : null,
                 }))
             );
         }
@@ -56,38 +57,46 @@ export async function createOrderAction(data: {
 
 export async function getActiveOrdersAction(branchId: string) {
     try {
-        const activeOrders = await db
-            .select({
-                id: ordersSchema.id,
-                orderNumber: ordersSchema.orderNumber,
-                status: ordersSchema.status,
-                totalAmount: ordersSchema.totalAmount,
-                tableId: ordersSchema.tableId,
-                tableNumber: tablesSchema.tableNumber,
-                createdAt: ordersSchema.createdAt,
-                paymentMethod: ordersSchema.paymentMethod,
-            })
-            .from(ordersSchema)
-            .leftJoin(tablesSchema, eq(ordersSchema.tableId, tablesSchema.id))
-            .where(
-                and(
-                    eq(ordersSchema.branchId, branchId),
-                    or(
-                        inArray(ordersSchema.status, ['PENDING', 'PREPARING', 'READY']),
-                        and(
-                            eq(ordersSchema.status, 'COMPLETED'),
-                            sql`${ordersSchema.completedAt} > NOW() - INTERVAL '5 minutes'`
-                        )
+        const activeOrders = await db.query.orders.findMany({
+            where: and(
+                eq(ordersSchema.branchId, branchId),
+                or(
+                    inArray(ordersSchema.status, ['PENDING', 'PREPARING', 'READY']),
+                    and(
+                        eq(ordersSchema.status, 'COMPLETED'),
+                        sql`DATE(${ordersSchema.completedAt}) = CURRENT_DATE`
                     )
                 )
-            )
-            .orderBy(desc(ordersSchema.createdAt));
+            ),
+            with: {
+                table: true,
+                items: {
+                    with: {
+                        product: true
+                    }
+                }
+            },
+            orderBy: [desc(ordersSchema.createdAt)]
+        });
 
         return {
             success: true,
             orders: activeOrders.map(o => ({
-                ...o,
-                totalAmount: parseFloat(o.totalAmount as string)
+                id: o.id,
+                orderNumber: o.orderNumber,
+                status: o.status as 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED',
+                totalAmount: parseFloat(o.totalAmount as string),
+                tableId: o.tableId,
+                tableNumber: o.table?.tableNumber || 'Unknown Table',
+                createdAt: o.createdAt,
+                paymentMethod: o.paymentMethod,
+                items: o.items.map(item => ({
+                    productId: item.productId,
+                    name: item.product?.name || 'Unknown Product',
+                    quantity: item.quantity,
+                    price: parseFloat(item.priceAtTime as string),
+                    options: item.customizations ? JSON.parse(item.customizations) : undefined
+                }))
             }))
         };
     } catch (error) {
@@ -96,8 +105,21 @@ export async function getActiveOrdersAction(branchId: string) {
     }
 }
 
+import { deductInventoryForOrder } from './inventory';
+
 export async function updateOrderStatusAction(orderId: string, status: 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED') {
     try {
+        if (status === 'PREPARING') {
+            const deductionResult = await deductInventoryForOrder(orderId);
+            if (!deductionResult.success) {
+                console.error('Inventory deduction failed:', deductionResult.error);
+                // Optionally return error or proceed with warning.
+                // For now, we proceed but log it, or we could block.
+                // Let's block to ensure data consistency.
+                return { success: false, error: 'Failed to deduct inventory: ' + deductionResult.error };
+            }
+        }
+
         await db.update(ordersSchema)
             .set({
                 status,

@@ -15,7 +15,8 @@ export async function getMenuCategories() {
         with: {
             products: {
                 with: {
-                    modifierLinks: true
+                    modifierLinks: true,
+                    productIngredients: true
                 }
             },
         },

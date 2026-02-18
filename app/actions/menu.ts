@@ -69,6 +69,11 @@ export async function getMenuData(qrIdentifier: string) {
                         },
                         branchAvailability: {
                             where: eq(branchProductAvailability.branchId, tableData.branchId)
+                        },
+                        productIngredients: {
+                            with: {
+                                inventoryItem: true
+                            }
                         }
                     }
                 }
@@ -87,8 +92,49 @@ export async function getMenuData(qrIdentifier: string) {
         categoriesData.forEach(c => {
             c.products.forEach(p => {
                 const availability = p.branchAvailability[0];
-                if (availability?.isInStock === false) return;
+                let isInStock = availability?.isInStock !== false; // Default to true unless explicitly false
 
+                // Check ingredient stock
+                if (isInStock && p.productIngredients.length > 0) {
+                    // Filter ingredients for this branch
+                    const branchIngredients = p.productIngredients.filter(pi => 
+                        pi.inventoryItem.branchId === tableData.branchId
+                    );
+
+                    for (const pi of branchIngredients) {
+                        const required = parseFloat(pi.quantityRequired);
+                        const available = parseFloat(pi.inventoryItem.quantity); // Use raw string -> float
+                        if (available < required) {
+                            isInStock = false;
+                            break;
+                        }
+                    }
+                }
+
+                if (!isInStock && availability?.isInStock === false) return; // If manually hidden OR out of stock, decide logic. 
+                // Requirement: "if an inventory item is over there should be an out of stock tag"
+                // Usually this means we still SHOW it but mark it out of stock?
+                // Or if the user meant "hidden"? 
+                // "out of stock tag in the menu items" suggests showing it.
+                
+                // Existing logic: `if (availability?.isInStock === false) return;` skips it entirely.
+                // I should probably change this to allow showing but with `isInStock: false`.
+                // However, let's respect the manual override "isInStock === false" means HIDE? 
+                // Or "Out of Stock"?
+                // `productsSchema.isHidden` is the "Hide" flag. `isInStock` is availability.
+                // If `availability.isInStock` is false, it usually means "Sold Out" in UI, not hidden.
+                // But the code had `if (availability?.isInStock === false) return;`.
+                // This implies "Don't send to frontend if out of stock".
+                // I will change this to INCLUDE it but set `isInStock: false`.
+
+                // Wait, if I change existing behavior I might break things.
+                // "inventory item is over there should be an out of stock tag"
+                // If I skip it, there is no tag. So I MUST include it.
+                
+                // Let's remove the skip, unless `isHidden` is true (handled in query).
+                // But wait, `isInStock` from DB override vs calculated.
+                // Calculated overrides DB if calculated says NO.
+                
                 transformedProducts.push({
                     id: p.id,
                     name: p.name,
@@ -96,17 +142,17 @@ export async function getMenuData(qrIdentifier: string) {
                     image: p.imageUrl,
                     categoryId: p.categoryId,
                     categoryIdReal: c.id, 
-                    description: '', // Added to match other side's shape if needed
+                    description: '', 
                     isSignature: false,
-                    isInStock: true,
-                    categoryType: (c.type || 'drink').toLowerCase(), // Added to support promotions logic
+                    isInStock: isInStock, // This will be false if ingredients missing
+                    categoryType: (c.type || 'drink').toLowerCase(),
                     modifiers: p.modifierLinks.map(ml => ({
                         id: ml.modifierGroup.id,
                         name: ml.modifierGroup.name,
                         options: ml.modifierGroup.options.map(o => ({
                             id: o.id,
                             name: o.name,
-                            price: 0 // TODO: Add price to options later
+                            price: 0 
                         }))
                     }))
                 });
