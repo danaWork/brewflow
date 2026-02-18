@@ -12,6 +12,7 @@ interface MenuClientProps {
   branchId: string;
   categories: any[];
   products: any[];
+  promotions: any[];
 }
 
 import Drawer from '@/components/ui/Drawer';
@@ -21,7 +22,7 @@ import FloatingOrderTabs from './FloatingOrderTabs';
 import { useTable } from '@/context/TableContext';
 import { useEffect } from 'react';
 
-export default function MenuClient({ tableId, tableName, branchId, categories, products }: MenuClientProps) {
+export default function MenuClient({ tableId, tableName, branchId, categories, products, promotions }: MenuClientProps) {
   const { setTableInfo } = useTable();
 
   useEffect(() => {
@@ -113,6 +114,8 @@ export default function MenuClient({ tableId, tableName, branchId, categories, p
           <ProductDrawerContent
             product={selectedProduct}
             category={categories.find(c => c.id === selectedProduct.categoryId)}
+            promotions={promotions}
+            allProducts={products}
             onClose={handleCloseDrawer}
           />
         )}

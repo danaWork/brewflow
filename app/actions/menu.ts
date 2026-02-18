@@ -1,7 +1,14 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { categories as categoriesSchema, products as productsSchema, tables as tablesSchema, branches as branchesSchema } from '@/db/schema';
+import {
+    categories as categoriesSchema,
+    products as productsSchema,
+    tables as tablesSchema,
+    branches as branchesSchema,
+    promotions as promotionsSchema,
+    promotionItems as promotionItemsSchema
+} from '@/db/schema';
 import { eq, asc, desc, and, or, isNull } from 'drizzle-orm';
 import { branchProductAvailability } from '@/db/schema';
 
@@ -12,7 +19,7 @@ export async function getMenuData(qrIdentifier: string) {
     try {
         // Fetch Table by QR identifier or ID (only if valid UUID)
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(qrIdentifier);
-        
+
         const conditions = [eq(tablesSchema.qrIdentifier, qrIdentifier)];
         if (isUuid) {
             conditions.push(eq(tablesSchema.id, qrIdentifier));
@@ -87,8 +94,12 @@ export async function getMenuData(qrIdentifier: string) {
                     name: p.name,
                     price: parseFloat((availability?.branchPriceOverride || p.basePrice).toString()),
                     image: p.imageUrl,
-                    categoryId: p.id, // Wait, fix: p.categoryId
+                    categoryId: p.categoryId,
                     categoryIdReal: c.id, 
+                    description: '', // Added to match other side's shape if needed
+                    isSignature: false,
+                    isInStock: true,
+                    categoryType: (c.type || 'drink').toLowerCase(), // Added to support promotions logic
                     modifiers: p.modifierLinks.map(ml => ({
                         id: ml.modifierGroup.id,
                         name: ml.modifierGroup.name,
@@ -102,13 +113,44 @@ export async function getMenuData(qrIdentifier: string) {
             });
         });
 
+        // Fetch promotions and their items
+        const promotionsData = await db
+            .select({
+                id: promotionsSchema.id,
+                name: promotionsSchema.name,
+                type: promotionsSchema.type,
+                discountType: promotionsSchema.discountType,
+                discountValue: promotionsSchema.discountValue,
+                triggerType: promotionsSchema.triggerType,
+                triggerValue: promotionsSchema.triggerValue,
+            })
+            .from(promotionsSchema)
+            .where(eq(promotionsSchema.branchId, tableData.branchId));
+
+        const promotionIds = promotionsData.map(p => p.id);
+        const linkedItems = promotionIds.length > 0
+            ? await db
+                .select({
+                    promotionId: promotionItemsSchema.promotionId,
+                    productId: promotionItemsSchema.productId,
+                })
+                .from(promotionItemsSchema)
+                .where(or(...promotionIds.map(id => eq(promotionItemsSchema.promotionId, id))))
+            : [];
+
+        const transformedPromotions = promotionsData.map(p => ({
+            ...p,
+            items: linkedItems.filter(li => li.promotionId === p.id)
+        }));
+
         return {
             success: true,
             tableId: tableData.id,
             tableName,
             branchId: tableData.branchId,
             categories: transformedCategories,
-            products: transformedProducts.map(p => ({...p, categoryId: p.categoryIdReal})),
+            products: transformedProducts.map(p => ({...p, categoryId: p.categoryIdReal || p.categoryId})),
+            promotions: transformedPromotions,
         };
     } catch (error) {
         console.error("Failed to fetch menu data:", error);

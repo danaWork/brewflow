@@ -5,6 +5,8 @@ import { relations } from 'drizzle-orm';
 export const roleEnum = pgEnum('role', ['SUPERADMIN', 'BRANCH_MANAGER', 'KITCHEN_STAFF']);
 export const orderStatusEnum = pgEnum('order_status', ['PENDING', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED']);
 export const paymentMethodEnum = pgEnum('payment_method', ['CASH', 'GCASH', 'PAYMAYA']);
+export const promotionTypeEnum = pgEnum('promotion_type', ['PERFECT_PAIR', 'CROSS_SELL']);
+export const discountTypeEnum = pgEnum('discount_type', ['PERCENTAGE', 'FIXED']);
 
 // Tables
 
@@ -119,6 +121,25 @@ export const orderItemModifiers = pgTable('order_item_modifiers', {
   priceCharged: decimal('price_charged', { precision: 10, scale: 2 }).notNull(),
 });
 
+export const promotions = pgTable('promotions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  branchId: uuid('branch_id').references(() => branches.id).notNull(),
+  name: text('name').notNull(),
+  type: promotionTypeEnum('type').notNull(),
+  triggerType: text('trigger_type').notNull(), // 'PRODUCT' or 'CATEGORY_TYPE'
+  triggerValue: text('trigger_value').notNull(), // productId or 'drink'/'snack'
+  discountType: discountTypeEnum('discount_type').notNull(),
+  discountValue: decimal('discount_value', { precision: 10, scale: 2 }).notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const promotionItems = pgTable('promotion_items', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  promotionId: uuid('promotion_id').references(() => promotions.id).notNull(),
+  productId: uuid('product_id').references(() => products.id).notNull(),
+});
+
 // Relations
 
 export const companiesRelations = relations(companies, ({ many }) => ({
@@ -134,6 +155,7 @@ export const branchesRelations = relations(branches, ({ one, many }) => ({
   tables: many(tables),
   orders: many(orders),
   productAvailability: many(branchProductAvailability),
+  promotions: many(promotions),
 }));
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -152,6 +174,7 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   modifierLinks: many(productModifierLinks),
   orderItems: many(orderItems),
   branchAvailability: many(branchProductAvailability),
+  promotionItems: many(promotionItems),
 }));
 
 export const branchProductAvailabilityRelations = relations(branchProductAvailability, ({ one }) => ({
@@ -209,4 +232,14 @@ export const activityLogs = pgTable('activity_logs', {
 export const activityLogsRelations = relations(activityLogs, ({ one }) => ({
   shop: one(branches, { fields: [activityLogs.shopId], references: [branches.id] }),
   user: one(users, { fields: [activityLogs.userId], references: [users.id] }),
+}));
+
+export const promotionsRelations = relations(promotions, ({ one, many }) => ({
+  branch: one(branches, { fields: [promotions.branchId], references: [branches.id] }),
+  items: many(promotionItems),
+}));
+
+export const promotionItemsRelations = relations(promotionItems, ({ one }) => ({
+  promotion: one(promotions, { fields: [promotionItems.promotionId], references: [promotions.id] }),
+  product: one(products, { fields: [promotionItems.productId], references: [products.id] }),
 }));
