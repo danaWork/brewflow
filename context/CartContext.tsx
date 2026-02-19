@@ -20,6 +20,7 @@ interface CartContextType {
   addItem: (item: Omit<CartItem, 'id'>) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, delta: number) => void;
+  updateExtraQuantity: (itemId: string, extraIndex: number, delta: number) => void;
   clearCart: () => void;
   cartTotal: number;
   cartCount: number;
@@ -28,38 +29,31 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([]);
-  const [isInitialized, setIsInitialized] = useState(false);
-
-  // Load from LocalStorage on mount
-  useEffect(() => {
-    const savedCart = localStorage.getItem('coffee-shop-cart');
-    if (savedCart) {
-      try {
-        setItems(JSON.parse(savedCart));
-      } catch (e) {
-        console.error('Failed to parse cart', e);
-      }
+  const [items, setItems] = useState<CartItem[]>(() => {
+    if (typeof window === 'undefined') return [];
+    const saved = localStorage.getItem('coffee-shop-cart');
+    if (!saved) return [];
+    try {
+      return JSON.parse(saved);
+    } catch (e) {
+      return [];
     }
-    setIsInitialized(true);
-  }, []);
+  });
 
   // Save to LocalStorage whenever items change
   useEffect(() => {
-    if (isInitialized) {
-      localStorage.setItem('coffee-shop-cart', JSON.stringify(items));
-    }
-  }, [items, isInitialized]);
+    localStorage.setItem('coffee-shop-cart', JSON.stringify(items));
+  }, [items]);
 
   const addItem = (newItem: Omit<CartItem, 'id'>) => {
     setItems((prev) => {
       // Create a unique ID based on product and options
-      // Simple hash or random string suffices for now
       const cartItemId = `${newItem.productId}-${Date.now()}`;
       
-      // Check if exact same item exists (optional optimization)
-      // For now, we just add as new line item
-      return [...prev, { ...newItem, id: cartItemId }];
+      // Ensure extras have quantity initialized if not present
+      const extrasWithQty = newItem.extras?.map(e => ({ ...e, quantity: e.quantity || 1 })) || [];
+
+      return [...prev, { ...newItem, id: cartItemId, extras: extrasWithQty }];
     });
   };
 
@@ -79,13 +73,43 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
+  const updateExtraQuantity = (itemId: string, extraIndex: number, delta: number) => {
+    setItems((prev) =>
+      prev.map((item) => {
+        if (item.id === itemId && item.extras) {
+           const newExtras = [...item.extras];
+           const currentQty = newExtras[extraIndex].quantity || 1;
+           const newQty = Math.max(0, currentQty + delta);
+
+           if (newQty === 0) {
+               newExtras.splice(extraIndex, 1);
+           } else {
+               newExtras[extraIndex] = { ...newExtras[extraIndex], quantity: newQty };
+           }
+           return { ...item, extras: newExtras };
+        }
+        return item;
+      })
+    );
+  };
+
   const clearCart = () => setItems([]);
 
+  // DECOUPLED TOTAL CALCULATION
+  // Main Item Cost = price * quantity
+  // Extras Cost = Sum(extra.price * extra.quantity) -- INDEPENDENT of Main Item Quantity
   const cartTotal = items.reduce((sum, item) => {
-    const extrasTotal = item.extras?.reduce((acc, ex) => acc + ex.price, 0) || 0;
-    return sum + (item.price + extrasTotal) * item.quantity;
+    const mainItemTotal = item.price * item.quantity;
+    const extrasTotal = item.extras?.reduce((acc, ex) => acc + (ex.price * (ex.quantity || 1)), 0) || 0;
+    return sum + mainItemTotal + extrasTotal;
   }, 0);
-  const cartCount = items.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Cart Count Loop
+  const mapCount = (item: CartItem): number => {
+      const extrasCount = item.extras?.reduce((acc, ex) => acc + (ex.quantity || 1), 0) || 0;
+      return item.quantity + extrasCount;
+  }
+  const cartCount = items.reduce((sum, item) => sum + mapCount(item), 0);
 
   return (
     <CartContext.Provider
@@ -94,6 +118,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         addItem,
         removeItem,
         updateQuantity,
+        updateExtraQuantity,
         clearCart,
         cartTotal,
         cartCount,

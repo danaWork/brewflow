@@ -1,184 +1,120 @@
+import { drizzle } from 'drizzle-orm/neon-http';
+import { neon } from '@neondatabase/serverless';
+import * as schema from '../db/schema';
 import 'dotenv/config';
-import { db } from '@/lib/db';
-import { tables, categories, products } from '@/db/schema';
-import { eq } from 'drizzle-orm';
 
-async function main() {
-  console.log('Seeding database with Drizzle...');
+const sql = neon(process.env.DATABASE_URL!);
+const db = drizzle(sql, { schema });
 
-  // 1. Create Table
-  // Check if exists first to avoid unique constraint error
-  const existingTable = await db.query.tables.findFirst({
-    where: eq(tables.qrCode, 'table-1')
-  });
+async function seed() {
+  console.log('🌱 Starting seed...');
 
-  if (!existingTable) {
-    await db.insert(tables).values({
-      name: 'Table 1',
-      qrCode: 'table-1',
-    });
-    console.log('Created Table 1');
-  }
+  try {
+    // 1. Create Company
+    const [company] = await db.insert(schema.companies).values({
+      name: 'Brewflow Coffee',
+      contactEmail: 'hello@brewflow.com',
+    }).returning();
+    console.log('✅ Company created:', company.name);
 
-  // 2. Create Categories
-  const categoryData = [
-    { name: 'Milk Tea', type: 'drink' },
-    { name: 'Tea', type: 'drink' },
-    { name: 'Smoothies', type: 'drink' },
-    { name: 'Iced Coffee', type: 'drink' },
-    { name: 'Pasta', type: 'snack' },
-    { name: 'Pastry', type: 'snack' },
-  ];
+    // 2. Create Branch
+    const [branch] = await db.insert(schema.branches).values({
+      companyId: company.id,
+      branchName: 'Main Street Branch',
+      address: '123 Brew Lane',
+      isActive: true,
+    }).returning();
+    console.log('✅ Branch created:', branch.branchName);
 
-  const cats = [];
-  for (const cat of categoryData) {
-    // Check existence by name roughly
-    const existing = await db.query.categories.findFirst({
-      where: eq(categories.name, cat.name)
-    });
+    // 3. Create Categories
+    const categoriesData = [
+      { name: 'Coffee', type: 'drink' },
+      { name: 'Tea', type: 'drink' },
+      { name: 'Pastries', type: 'snack' },
+    ];
     
-    if (!existing) {
-      const [newCat] = await db.insert(categories).values(cat).returning();
-      cats.push(newCat);
-    } else {
-      // Update type if needed (optional, but good for sync)
-      await db.update(categories).set({ type: cat.type }).where(eq(categories.id, existing.id));
-      cats.push(existing);
+    const categories = await db.insert(schema.categories).values(
+      categoriesData.map(c => ({ ...c, companyId: company.id }))
+    ).returning();
+    console.log(`✅ ${categories.length} Categories created`);
+
+    const coffeeCat = categories.find(c => c.name === 'Coffee')!;
+    const teaCat = categories.find(c => c.name === 'Tea')!;
+    const pastriesCat = categories.find(c => c.name === 'Pastries')!;
+
+    // 4. Create Modifier Groups
+    const modGroupsData = [
+      { name: 'Size' },
+      { name: 'Milk' },
+      { name: 'Syrup' },
+    ];
+
+    const modGroups = await db.insert(schema.modifierGroups).values(
+      modGroupsData.map(g => ({ ...g, companyId: company.id }))
+    ).returning();
+    console.log(`✅ ${modGroups.length} Modifier Groups created`);
+
+    const sizeGroup = modGroups.find(g => g.name === 'Size')!;
+    const milkGroup = modGroups.find(g => g.name === 'Milk')!;
+
+    // 5. Create Modifier Options
+    await db.insert(schema.modifierOptions).values([
+      { modifierGroupId: sizeGroup.id, name: 'Small' },
+      { modifierGroupId: sizeGroup.id, name: 'Medium' },
+      { modifierGroupId: sizeGroup.id, name: 'Large' },
+      { modifierGroupId: milkGroup.id, name: 'Whole Milk' },
+      { modifierGroupId: milkGroup.id, name: 'Oat Milk' },
+      { modifierGroupId: milkGroup.id, name: 'Almond Milk' },
+    ]);
+    console.log('✅ Modifier Options created');
+
+    // 6. Create Products
+    const productsData = [
+      { name: 'Espresso', basePrice: '3.00', categoryId: coffeeCat.id },
+      { name: 'Latte', basePrice: '4.50', categoryId: coffeeCat.id },
+      { name: 'Cappuccino', basePrice: '4.50', categoryId: coffeeCat.id },
+      { name: 'Green Tea', basePrice: '3.50', categoryId: teaCat.id },
+      { name: 'Taro Milk Tea', basePrice: '4.50', categoryId: teaCat.id },
+      { name: 'Bottled Water', basePrice: '1.50', categoryId: teaCat.id },
+      { name: 'Croissant', basePrice: '3.75', categoryId: pastriesCat.id, imageUrl: 'https://images.unsplash.com/photo-1555507036-ab1f40388085?auto=format&fit=crop&w=800&q=80' },
+      { name: 'Blueberry Muffin', basePrice: '3.25', categoryId: pastriesCat.id },
+    ];
+
+    const products = await db.insert(schema.products).values(productsData.map(p => ({
+        ...p,
+        basePrice: p.basePrice, // Ensure string for decimal
+    }))).returning();
+    console.log(`✅ ${products.length} Products created`);
+
+    // 7. Link Products to Branch (Availability)
+    await db.insert(schema.branchProductAvailability).values(
+      products.map(p => ({
+        branchId: branch.id,
+        productId: p.id,
+        isInStock: true,
+      }))
+    );
+    console.log('✅ Products linked to Branch');
+
+    // 8. Link Modifiers to Products (Coffee gets Size & Milk)
+    const coffeeProducts = products.filter(p => [coffeeCat.id].includes(p.categoryId));
+    
+    const productModLinks = [];
+    for (const prod of coffeeProducts) {
+      productModLinks.push({ productId: prod.id, modifierGroupId: sizeGroup.id });
+      productModLinks.push({ productId: prod.id, modifierGroupId: milkGroup.id });
     }
+
+    if (productModLinks.length > 0) {
+        await db.insert(schema.productModifierLinks).values(productModLinks);
+        console.log('✅ Modifiers linked to Products');
+    }
+
+    console.log('✨ Seed completed successfully!');
+  } catch (error) {
+    console.error('❌ Seed failed:', error);
+    process.exit(1);
   }
-  console.log('Categories synced');
-
-  // 3. Create Products
-  const milkTeaCat = cats.find(c => c.name === 'Milk Tea');
-  const teaCat = cats.find(c => c.name === 'Tea');
-  const pastaCat = cats.find(c => c.name === 'Pasta');
-
-  if (milkTeaCat) {
-    const existingP = await db.query.products.findFirst({
-      where: eq(products.name, 'Thai Milk Tea')
-    });
-    if (!existingP) {
-      await db.insert(products).values({
-        name: 'Thai Milk Tea',
-        price: '175.00',
-        description: 'Classic Thai milk tea.',
-        image: '/images/menu-items/thai-milk-tea.jpg',
-        isSignature: true,
-        categoryId: milkTeaCat.id,
-      });
-    } else {
-        await db.update(products).set({ image: '/images/menu-items/thai-milk-tea.jpg' }).where(eq(products.id, existingP.id));
-    }
-  }
-
-  if (teaCat) {
-    const existingP = await db.query.products.findFirst({
-      where: eq(products.name, 'Hot Lemon Tea')
-    });
-    if (!existingP) {
-      await db.insert(products).values({
-        name: 'Hot Lemon Tea',
-        price: '120.00',
-        description: 'Hot refreshing tea.',
-        image: '/images/menu-items/hot-lemon-tea.jpg',
-        categoryId: teaCat.id,
-      });
-    } else {
-        await db.update(products).set({ image: '/images/menu-items/hot-lemon-tea.jpg' }).where(eq(products.id, existingP.id));
-    }
-  }
-
-
-  if (pastaCat) {
-    const existingP = await db.query.products.findFirst({
-      where: eq(products.name, 'Spaghetti')
-    });
-    if (!existingP) {
-      await db.insert(products).values({
-        name: 'Spaghetti',
-        price: '150.75',
-        description: 'Classic tomato spaghetti.',
-        image: '/images/menu-items/spaghetti.jpg',
-        isSignature: true, 
-        categoryId: pastaCat.id,
-      });
-    } else {
-        await db.update(products).set({ image: '/images/menu-items/spaghetti.jpg' }).where(eq(products.id, existingP.id));
-    }
-
-    const existingMac = await db.query.products.findFirst({
-      where: eq(products.name, 'Macaroni')
-    });
-    if (!existingMac) {
-      await db.insert(products).values({
-        name: 'Macaroni',
-        price: '145.00',
-        description: 'Creamy macaroni pasta.',
-        image: '/images/menu-items/macaroni.jpg',
-        categoryId: pastaCat.id,
-      });
-    } else {
-        await db.update(products).set({ image: '/images/menu-items/macaroni.jpg' }).where(eq(products.id, existingMac.id));
-    }
-  }
-
-  const pastryCat = cats.find(c => c.name === 'Pastry');
-  if (pastryCat) {
-    const existingCroissant = await db.query.products.findFirst({
-      where: eq(products.name, 'Croissant')
-    });
-    if (!existingCroissant) {
-      await db.insert(products).values({
-        name: 'Croissant',
-        price: '95.00',
-        description: 'Buttery flaky pastry.',
-        image: '/images/menu-items/croissant.jpg',
-        categoryId: pastryCat.id,
-      });
-    } else {
-        await db.update(products).set({ image: '/images/menu-items/croissant.jpg' }).where(eq(products.id, existingCroissant.id));
-    }
-
-    const existingSandwich = await db.query.products.findFirst({
-      where: eq(products.name, 'Ham and Cheese Sandwich')
-    });
-    if (!existingSandwich) {
-      await db.insert(products).values({
-        name: 'Ham and Cheese Sandwich',
-        price: '120.00',
-        description: 'Classic sandwich with premium ham.',
-        image: '/images/menu-items/ham-and-cheese-sandwitch.jpg',
-        categoryId: pastryCat.id,
-      });
-    } else {
-        await db.update(products).set({ image: '/images/menu-items/ham-and-cheese-sandwitch.jpg' }).where(eq(products.id, existingSandwich.id));
-    }
-  }
-
-  const icedCoffeeCat = cats.find(c => c.name === 'Iced Coffee');
-  if (icedCoffeeCat) {
-    const existingP = await db.query.products.findFirst({
-      where: eq(products.name, 'Iced Caramel Macchiato')
-    });
-    if (!existingP) {
-      await db.insert(products).values({
-        name: 'Iced Caramel Macchiato',
-        price: '180.00',
-        description: 'Rich espresso with vanilla syrup, milk and caramel drizzle.',
-        image: '/images/menu-items/iced-caramel-macchiato.jpg',
-        isSignature: true,
-        categoryId: icedCoffeeCat.id,
-      });
-    } else {
-        await db.update(products).set({ image: '/images/menu-items/iced-caramel-macchiato.jpg' }).where(eq(products.id, existingP.id));
-    }
-  }
-
-  console.log('Seeding finished.');
-  process.exit(0);
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+seed();

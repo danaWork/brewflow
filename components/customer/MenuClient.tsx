@@ -9,8 +9,10 @@ import TypeToggle from './TypeToggle';
 interface MenuClientProps {
   tableId: string;
   tableName: string;
+  branchId: string;
   categories: any[];
   products: any[];
+  promotions: any[];
 }
 
 import Drawer from '@/components/ui/Drawer';
@@ -20,19 +22,18 @@ import FloatingOrderTabs from './FloatingOrderTabs';
 import { useTable } from '@/context/TableContext';
 import { useEffect } from 'react';
 
-export default function MenuClient({ tableId, tableName, categories, products }: MenuClientProps) {
+export default function MenuClient({ tableId, tableName, branchId, categories, products, promotions }: MenuClientProps) {
   const { setTableInfo } = useTable();
 
   useEffect(() => {
-    if (tableId && tableName) {
-      setTableInfo(tableId, tableName);
+    if (tableId && tableName && branchId) {
+      setTableInfo(tableId, tableName, branchId);
     }
-  }, [tableId, tableName, setTableInfo]);
+  }, [tableId, tableName, branchId, setTableInfo]);
 
   const [activeCategory, setActiveCategory] = useState('all');
   const [activeType, setActiveType] = useState<'drinks' | 'snacks'>('drinks');
-  
-  // Drawer State
+
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
 
@@ -43,34 +44,26 @@ export default function MenuClient({ tableId, tableName, categories, products }:
 
   const handleCloseDrawer = () => {
     setIsDrawerOpen(false);
-    // Optional: wait for animation to clear before clearing data, 
-    // but clearing immediately hides content during slide-down. 
-    // Usually better to keep data until close.
   };
 
-  // Determine available categories based on activeType
   const filteredCategories = useMemo(() => {
     return categories.filter(c => {
-      // If type exists check it, otherwise assume everything is a 'drink' (fallback)
       const cType = c.type || 'drink';
-      // Match simple plural/singular logic or strict match if seeded correctly
-      // Our seed uses 'drink' and 'snack' (singular). Toggle uses 'drinks'/'snacks' (plural).
-      return activeType.startsWith(cType); 
+      return activeType.startsWith(cType);
     });
   }, [categories, activeType]);
 
-  // Reset activeCategory when activeType changes if current activeCategory is not in the new list
-  const activeCatExists = filteredCategories.find(c => c.id === activeCategory);
-  if (activeCategory !== 'all' && !activeCatExists) {
-     setActiveCategory('all');
-  }
+  useEffect(() => {
+    const activeCatExists = filteredCategories.find(c => c.id === activeCategory);
+    if (activeCategory !== 'all' && !activeCatExists) {
+      setActiveCategory('all');
+    }
+  }, [activeCategory, filteredCategories]);
 
   const filteredProducts = useMemo(() => {
-    // 1. Filter products that belong to the visible categories
     const visibleCategoryIds = filteredCategories.map(c => c.id);
     const productsInType = products.filter(p => visibleCategoryIds.includes(p.categoryId));
 
-    // 2. Filter by specific category selection
     if (activeCategory === 'all') {
       return productsInType;
     }
@@ -81,15 +74,15 @@ export default function MenuClient({ tableId, tableName, categories, products }:
     <div className="min-h-screen bg-white pb-20">
       <div className="sticky top-0 z-20 bg-white shadow-sm">
         <MenuHeader tableId={tableId} />
-        
+
         <div className="border-b border-gray-100">
           <TypeToggle activeType={activeType} onToggle={setActiveType} />
         </div>
 
         <div className="py-2 border-b border-gray-50">
-          <CategoryFilter 
-            categories={filteredCategories} 
-            activeCategoryId={activeCategory} 
+          <CategoryFilter
+            categories={filteredCategories}
+            activeCategoryId={activeCategory}
             onSelectCategory={setActiveCategory}
             activeType={activeType}
           />
@@ -99,9 +92,9 @@ export default function MenuClient({ tableId, tableName, categories, products }:
       <div className="p-4 space-y-6">
         <div className="grid grid-cols-1 gap-6">
           {filteredProducts.map((product) => (
-            <ProductCard 
-              key={product.id} 
-              product={product} 
+            <ProductCard
+              key={product.id}
+              product={product}
               type={activeType}
               onClick={() => handleProductClick(product)}
             />
@@ -112,16 +105,18 @@ export default function MenuClient({ tableId, tableName, categories, products }:
       <FloatingOrderTabs />
       <CartFloatingBar />
 
-      <Drawer 
-        isOpen={isDrawerOpen} 
+      <Drawer
+        isOpen={isDrawerOpen}
         onClose={handleCloseDrawer}
-        // title={selectedProduct?.name} // Custom header in content instead
-        showCloseButton={false} 
+        showCloseButton={false}
       >
         {selectedProduct && (
-          <ProductDrawerContent 
-            product={selectedProduct} 
-            onClose={handleCloseDrawer} 
+          <ProductDrawerContent
+            product={selectedProduct}
+            category={categories.find(c => c.id === selectedProduct.categoryId)}
+            promotions={promotions}
+            allProducts={products}
+            onClose={handleCloseDrawer}
           />
         )}
       </Drawer>

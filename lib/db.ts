@@ -1,11 +1,8 @@
-import 'dotenv/config';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import { Pool } from '@neondatabase/serverless';
 import * as schema from '@/db/schema';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }, // Required for Supabase
-});
+const connectionString = process.env.DATABASE_URL || 'postgres://localhost/placeholder';
+const pool = new Pool({ connectionString });
 
-export const db = drizzle(pool, { schema });
+export const db = drizzle(pool, { schema }); // Schema updated for note field

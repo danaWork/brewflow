@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { QrCode, ShoppingBag, Zap, Users } from "lucide-react";
+import { QrCode, Coffee, Zap, Users } from "lucide-react";
 
 export default function Home() {
   return (
@@ -8,7 +8,7 @@ export default function Home() {
         {/* Hero Section */}
         <div className="mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-orange-500 to-amber-600 rounded-2xl shadow-lg mb-4">
-            <ShoppingBag className="w-8 h-8 text-white" />
+            <Coffee className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-gray-900 mb-3">
             BrewFlow
@@ -20,7 +20,7 @@ export default function Home() {
 
         {/* Cards */}
         <div className="grid gap-4 sm:gap-6 md:grid-cols-2 text-left mb-8">
-          
+
           {/* Owner Card */}
           <div className="bg-white p-6 rounded-2xl border border-gray-100 flex flex-col h-full shadow-lg hover:shadow-xl transition-all hover:-translate-y-1">
             <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-4">
@@ -32,9 +32,8 @@ export default function Home() {
             <p className="text-sm text-gray-500 mb-5 flex-grow">
               Manage incoming orders, update order statuses, and generate QR codes for tables.
             </p>
-            <Link 
-              href="/owner" 
-              target="_blank"
+            <Link
+              href="/login"
               className="inline-flex items-center justify-center w-full py-3 px-4 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl font-semibold transition-all shadow-md hover:shadow-lg active:scale-[0.98] transform"
             >
               Open Dashboard
@@ -52,8 +51,8 @@ export default function Home() {
             <p className="text-sm text-gray-500 mb-5 flex-grow">
               Customers scan the QR code at their table to browse the menu and place orders.
             </p>
-            <Link 
-              href="/customer/table/table-1" 
+            <Link
+              href="/customer/table/table-1"
               target="_blank"
               className="inline-flex items-center justify-center w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl font-semibold transition-all shadow-md hover:shadow-lg active:scale-[0.98] transform"
             >

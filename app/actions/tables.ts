@@ -1,149 +1,77 @@
 'use server';
 
-import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { db } from '@/lib/db';
+import { tables as tablesSchema } from '@/db/schema';
+import { eq, asc } from 'drizzle-orm';
 
 export interface TableData {
   id: string;
-  name: string;
-  qrCode: string;
+  tableNumber: string;
+  qrIdentifier: string;
 }
 
-/**
- * Sync tables in database - ensures tables 1 to count exist
- */
-export async function syncTables(count: number): Promise<{ success: boolean; tables: TableData[]; error?: string }> {
+export async function syncTables(branchId: string, count: number): Promise<{ success: boolean; tables: TableData[]; error?: string }> {
   if (count < 1 || count > 50) {
     return { success: false, tables: [], error: 'Table count must be between 1 and 50' };
   }
 
-  const supabase = await createSupabaseServerClient();
-
   try {
-    // Get existing tables
-    const { data: existingTables, error: fetchError } = await supabase
-      .from('tables')
-      .select('*')
-      .order('name', { ascending: true });
+    const existingTables = await db.select().from(tablesSchema).where(eq(tablesSchema.branchId, branchId)).orderBy(asc(tablesSchema.qrIdentifier));
 
-    if (fetchError) {
-      return { success: false, tables: [], error: fetchError.message };
-    }
+    const existingIdentifiers = new Set(existingTables.map((t) => t.qrIdentifier));
+    const tablesToCreate: { branchId: string; tableNumber: string; qrIdentifier: string }[] = [];
 
-    const existingQrCodes = new Set((existingTables || []).map((t: any) => t.qr_code));
-    const tablesToCreate: { name: string; qr_code: string }[] = [];
-
-    // Determine which tables need to be created
     for (let i = 1; i <= count; i++) {
-      const qrCode = `table-${i}`;
-      if (!existingQrCodes.has(qrCode)) {
+      const identifier = `table-${i}`;
+      if (!existingIdentifiers.has(identifier)) {
         tablesToCreate.push({
-          name: `Table ${i}`,
-          qr_code: qrCode,
+          branchId: branchId,
+          tableNumber: `Table ${i}`,
+          qrIdentifier: identifier,
         });
       }
     }
 
-    // Create missing tables
     if (tablesToCreate.length > 0) {
-      console.log('Creating tables:', tablesToCreate);
-      const { data: insertedData, error: insertError } = await supabase
-        .from('tables')
-        .insert(tablesToCreate)
-        .select();
-
-      console.log('Insert result:', { insertedData, insertError });
-
-      if (insertError) {
-        console.error('Insert error:', insertError);
-        return { success: false, tables: [], error: insertError.message };
-      }
+      await db.insert(tablesSchema).values(tablesToCreate);
     }
 
-    // Fetch all tables after sync
-    const { data: allTables, error: finalFetchError } = await supabase
-      .from('tables')
-      .select('*')
-      .order('qr_code', { ascending: true });
+    const allTables = await db.select().from(tablesSchema).where(eq(tablesSchema.branchId, branchId)).orderBy(asc(tablesSchema.qrIdentifier));
 
-    if (finalFetchError) {
-      return { success: false, tables: [], error: finalFetchError.message };
-    }
-
-    // Filter to only return tables 1-count and transform to our format
-    const tables: TableData[] = (allTables || [])
-      .filter((t: any) => {
-        const num = parseInt(t.qr_code.replace('table-', ''), 10);
-        return !isNaN(num) && num >= 1 && num <= count;
-      })
-      .map((t: any) => ({
+    const resultTables: TableData[] = allTables
+      .map((t) => ({
         id: t.id,
-        name: t.name,
-        qrCode: t.qr_code,
-      }))
-      .sort((a: TableData, b: TableData) => {
-        const aNum = parseInt(a.qrCode.replace('table-', ''), 10);
-        const bNum = parseInt(b.qrCode.replace('table-', ''), 10);
-        return aNum - bNum;
-      });
+        tableNumber: t.tableNumber,
+        qrIdentifier: t.qrIdentifier,
+      }));
 
-    return { success: true, tables };
+    return { success: true, tables: resultTables };
   } catch (e) {
     console.error('syncTables error:', e);
     return { success: false, tables: [], error: 'Failed to sync tables' };
   }
 }
 
-/**
- * Get all tables from database
- */
-export async function getTables(): Promise<{ tables: TableData[]; error?: string }> {
-  const supabase = await createSupabaseServerClient();
-
+export async function getTables(branchId: string): Promise<{ success: boolean; tables: TableData[]; error?: string }> {
   try {
-    const { data, error } = await supabase
-      .from('tables')
-      .select('*')
-      .order('qr_code', { ascending: true });
+    const data = await db.select().from(tablesSchema).where(eq(tablesSchema.branchId, branchId)).orderBy(asc(tablesSchema.qrIdentifier));
 
-    if (error) {
-      return { tables: [], error: error.message };
-    }
+    const tables: TableData[] = data.map((t) => ({
+      id: t.id,
+      tableNumber: t.tableNumber,
+      qrIdentifier: t.qrIdentifier,
+    }));
 
-    const tables: TableData[] = (data || [])
-      .map((t: any) => ({
-        id: t.id,
-        name: t.name,
-        qrCode: t.qr_code,
-      }))
-      .sort((a: TableData, b: TableData) => {
-        const aNum = parseInt(a.qrCode.replace('table-', ''), 10);
-        const bNum = parseInt(b.qrCode.replace('table-', ''), 10);
-        return aNum - bNum;
-      });
-
-    return { tables };
+    return { success: true, tables };
   } catch (e) {
     console.error('getTables error:', e);
-    return { tables: [], error: 'Failed to fetch tables' };
+    return { success: false, tables: [], error: 'Failed to fetch tables' };
   }
 }
 
-/**
- * Delete a table by ID
- */
 export async function deleteTable(tableId: string): Promise<{ success: boolean; error?: string }> {
-  const supabase = await createSupabaseServerClient();
-
   try {
-    const { error } = await supabase
-      .from('tables')
-      .delete()
-      .eq('id', tableId);
-
-    if (error) {
-      return { success: false, error: error.message };
-    }
-
+    await db.delete(tablesSchema).where(eq(tablesSchema.id, tableId));
     return { success: true };
   } catch (e) {
     console.error('deleteTable error:', e);

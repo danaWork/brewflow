@@ -1,268 +1,265 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { CartItem } from './CartContext';
-import { useTable } from './TableContext';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { useTable } from '@/context/TableContext';
+import {
+  createOrderAction,
+  getActiveOrdersAction,
+  updateOrderStatusAction,
+  getOrdersStatusAction,
+} from '@/app/actions/orders';
+import { getSessionAction } from '@/app/actions/auth';
 
-export type OrderStatus = 'payment' | 'preparing' | 'ready' | 'completed' | 'cancelled';
-
-export type OrderItem = CartItem;
+export type OrderStatus = 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
 
 export interface Order {
   id: string;
-  orderNumber?: number; // Sequential order number for display
+  orderNumber: number;
   status: OrderStatus;
-  items: OrderItem[];
+  items: CartItem[];
   total: number;
   table: string;
   tableId?: string;
   timestamp: Date;
-  specialInstructions?: string;
-  paymentMethod: string;
+  paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA';
+  note?: string;
 }
 
 interface OrderContextType {
   userOrders: Order[];
   activeOrders: Order[];
-  createOrder: (items: CartItem[], total: number, paymentMethod: string, specialInstructions?: string) => Promise<{ id: string; orderNumber: number } | null>;
+  createOrder: (items: CartItem[], total: number, paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA', note?: string) => Promise<{ id: string; orderNumber: number } | null>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   dismissOrder: (orderId: string) => void;
   refreshActiveOrders: () => Promise<void>;
+  isLoading: boolean;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
 export function OrderProvider({ children }: { children: React.ReactNode }) {
-  const [userOrders, setUserOrders] = useState<Order[]>([]);
+  const [userOrders, setUserOrders] = useState<Order[]>(() => {
+    if (typeof window === 'undefined') return [];
+    const saved = localStorage.getItem('coffee-shop-user-orders');
+    if (!saved) return [];
+    try {
+      const parsed = JSON.parse(saved);
+      return parsed.map((o: any) => ({ ...o, timestamp: new Date(o.timestamp) }));
+    } catch (e) {
+      return [];
+    }
+  });
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
-  
-  // Get current table from TableContext
-  const { tableId: currentTableId, tableName: currentTableName } = useTable();
+  const [isLoading, setIsLoading] = useState(true);
+  const userOrdersRef = useRef<Order[]>([]);
+  const sessionRef = useRef<{ branchId: string | null; timestamp: number } | null>(null);
+  const isRefreshingRef = useRef(false);
 
-  // Fetch active orders from Supabase
-  const refreshActiveOrders = useCallback(async () => {
-    if (!isSupabaseConfigured) return;
-    
-    // @ts-ignore - Supabase types not correctly inferring
-    const { data, error } = await supabase
-      .from('orders')
-      .select('*')
-      .in('status', ['payment', 'preparing', 'ready'])
-      .order('created_at', { ascending: false });
+  const { tableId: currentTableId, tableName: currentTableName, branchId: currentBranchId } = useTable();
 
-    if (error) {
-      console.error('Error fetching orders:', error);
-      return;
-    }
-
-    const ordersData = data as any[] || [];
-    
-    // Fetch table names for orders that have a table_id
-    const tableIds = [...new Set(ordersData.filter(o => o.table_id).map(o => o.table_id))];
-    let tableMap: Record<string, string> = {};
-    
-    if (tableIds.length > 0) {
-      const { data: tablesData } = await supabase
-        .from('tables')
-        .select('id, name')
-        .in('id', tableIds);
-      
-      if (tablesData) {
-        tableMap = Object.fromEntries((tablesData as any[]).map(t => [t.id, t.name]));
-      }
-    }
-
-    const orders: Order[] = ordersData.map((o: any) => ({
-      id: o.id,
-      orderNumber: o.order_number,
-      status: o.status as OrderStatus,
-      items: o.items || [],
-      total: parseFloat(o.total),
-      table: o.table_id ? (tableMap[o.table_id] || 'Unknown Table') : 'Unknown Table',
-      tableId: o.table_id,
-      timestamp: new Date(o.created_at),
-      specialInstructions: o.special_instructions,
-      paymentMethod: o.payment_method || 'Cash'
-    }));
-
-    setActiveOrders(orders);
-  }, []);
-
-  // Initial load and realtime subscription
+  // Keep ref in sync with state
   useEffect(() => {
-    // Load user orders from local storage
-    const savedUserOrders = localStorage.getItem('coffee-shop-user-orders');
-    if (savedUserOrders) {
-      try {
-        const parsed = JSON.parse(savedUserOrders);
-        const fixed = parsed.map((o: any) => ({ ...o, timestamp: new Date(o.timestamp) }));
-        setUserOrders(fixed);
-      } catch (e) {}
-    }
+    userOrdersRef.current = userOrders;
+  }, [userOrders]);
 
-    // Fetch active orders from database
-    refreshActiveOrders();
+  const refreshActiveOrders = useCallback(async () => {
+    // Prevent concurrent calls
+    if (isRefreshingRef.current) return;
+    isRefreshingRef.current = true;
 
-    // REALTIME SUBSCRIPTION
-    if (!isSupabaseConfigured) return;
+    try {
+      // Both customers and staff might use this, but staff definitely need it for dashboard.
+      // Customers might use it to see their own active orders if we implemented that.
 
-    const channel = supabase
-      .channel('orders-channel')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'orders' },
-        async (payload) => {
-          console.log('Realtime INSERT:', payload);
-          
-          // Fetch the table name for this order
-          let tableName = 'Unknown Table';
-          if (payload.new.table_id) {
-            const { data: tableData } = await supabase
-              .from('tables')
-              .select('name')
-              .eq('id', payload.new.table_id)
-              .single();
-            if (tableData) {
-              tableName = (tableData as any).name;
+      // First, try to use currentBranchId from TableContext (for customer pages)
+      let branchId = currentBranchId;
+
+      // Only fetch session if we don't have branchId and session cache is stale (> 30 seconds)
+      if (!branchId) {
+        const now = Date.now();
+        const cachedSession = sessionRef.current;
+
+        // Use cached session if it's fresh (less than 30 seconds old)
+        if (cachedSession && (now - cachedSession.timestamp) < 30000) {
+          branchId = cachedSession.branchId;
+        } else {
+          // Fetch session only if needed
+          const session = await getSessionAction();
+          branchId = session?.user?.branchId || null;
+          sessionRef.current = { branchId, timestamp: now };
+        }
+      }
+
+      if (!branchId) {
+        isRefreshingRef.current = false;
+        // If we can't get branchId, we can't load orders, so we stop loading
+        setIsLoading(false);
+        return;
+      }
+
+      const result = await getActiveOrdersAction(branchId);
+
+      if (!result.success || !result.orders) {
+        console.error('Error fetching orders:', result.error);
+        isRefreshingRef.current = false;
+        setIsLoading(false);
+        return;
+      }
+
+      const orders: Order[] = (result.orders as any[]).map((o) => ({
+        id: o.id,
+        orderNumber: o.orderNumber,
+        status: o.status as OrderStatus,
+        items: o.items || [],
+        total: o.totalAmount,
+        table: o.tableNumber || 'Unknown Table',
+        tableId: o.tableId || undefined,
+        timestamp: o.createdAt ? new Date(o.createdAt) : new Date(),
+        paymentMethod: (o.paymentMethod as any) || 'CASH'
+      }));
+
+      setActiveOrders(orders);
+      setIsLoading(false);
+
+      // Individually sync userOrders statuses, especially for those that might have been COMPLETED
+      // Use ref to avoid dependency on userOrders which would cause infinite loop
+      const currentUserOrders = userOrdersRef.current;
+      if (currentUserOrders.length > 0) {
+        const userOrderIds = currentUserOrders.map(o => o.id);
+        const statusResult = await getOrdersStatusAction(userOrderIds);
+
+        if (statusResult.success && statusResult.orders) {
+          setUserOrders(prev => prev.map(userOrder => {
+            const match = statusResult.orders?.find(so => so.id === userOrder.id);
+            if (match && match.status !== userOrder.status) {
+              return { ...userOrder, status: match.status as OrderStatus };
             }
-          }
-          
-          const newOrder = {
-            id: payload.new.id,
-            orderNumber: payload.new.order_number,
-            status: payload.new.status,
-            items: payload.new.items,
-            total: parseFloat(payload.new.total),
-            table: tableName,
-            tableId: payload.new.table_id,
-            timestamp: new Date(payload.new.created_at),
-            specialInstructions: payload.new.special_instructions,
-            paymentMethod: payload.new.payment_method || 'Cash'
-          } as Order;
-
-          setActiveOrders(prev => [newOrder, ...prev]);
+            return userOrder;
+          }));
         }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'orders' },
-        (payload) => {
-          console.log('Realtime UPDATE:', payload);
-          const updatedStatus = payload.new.status as OrderStatus;
-          const orderId = payload.new.id;
+      }
+    } finally {
+      isRefreshingRef.current = false;
+    }
+  }, [currentBranchId]);
 
-          // If status is completed/cancelled, remove from active
-          if (['completed', 'cancelled'].includes(updatedStatus)) {
-            setActiveOrders(prev => prev.filter(o => o.id !== orderId));
-          } else {
-            setActiveOrders(prev => prev.map(o =>
-              o.id === orderId ? { ...o, status: updatedStatus } : o
-            ));
-          }
-          setUserOrders(prev => prev.map(o =>
-            o.id === orderId ? { ...o, status: updatedStatus } : o
-          ));
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+    let isMounted = true;
+
+    // Initial refresh
+    refreshActiveOrders().then(() => {
+      // Only set up interval if we have a branchId (either from table context or session)
+      if (isMounted) {
+        const hasBranchId = sessionRef.current?.branchId || currentBranchId;
+        if (hasBranchId) {
+          intervalId = setInterval(refreshActiveOrders, 10000);
         }
-      )
-      .subscribe();
+      }
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      isMounted = false;
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
     };
-  }, [refreshActiveOrders]);
+  }, [refreshActiveOrders, currentBranchId]);
 
-  // Persist user orders to localStorage
   useEffect(() => {
     localStorage.setItem('coffee-shop-user-orders', JSON.stringify(userOrders));
   }, [userOrders]);
 
-  // Create order directly via Supabase
-  const createOrder = async (items: CartItem[], total: number, paymentMethod: string, specialInstructions?: string) => {
-    if (!isSupabaseConfigured) {
-      console.error('Supabase not configured');
-      return null;
-    }
-
+  const createOrder = async (items: CartItem[], total: number, paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA', note?: string) => {
     try {
-      // Use the current table from context
-      let tableId: string | null = null;
-      let tableName = currentTableName || 'Unknown Table';
-      
-      if (currentTableId) {
-        // Get the table ID from the qr_code
-        const { data: tableData } = await supabase
-          .from('tables')
-          .select('id, name')
-          .eq('qr_code', currentTableId)
-          .single();
-        
-        if (tableData) {
-          tableId = (tableData as any).id;
-          tableName = (tableData as any).name;
-        }
-      }
-      
-      // Fallback: if no table found, try table-1
-      if (!tableId) {
-        const { data: fallbackTable } = await supabase
-          .from('tables')
-          .select('id, name')
-          .eq('qr_code', 'table-1')
-          .single();
-        
-        if (fallbackTable) {
-          tableId = (fallbackTable as any).id;
-          tableName = (fallbackTable as any).name;
-        }
-      }
-
-      // @ts-ignore - Supabase types not correctly inferring
-      const { data, error } = await supabase
-        .from('orders')
-        .insert({
-          table_id: tableId,
-          status: 'payment',
-          total: total.toString(),
-          items: items as any,
-          special_instructions: specialInstructions,
-          payment_method: paymentMethod,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error creating order:', error);
+      if (!currentBranchId || !currentTableId) {
+        console.error('Missing branchId or tableId');
         return null;
       }
 
-      const orderData = data as any;
+      // Flatten items and their extras for the database
+      const itemsToPrepare: any[] = [];
+      items.forEach(item => {
+        // Add main item
+        itemsToPrepare.push({
+          productId: item.productId,
+          name: item.name, // Pass name for optimistic update
+          quantity: item.quantity,
+          priceAtTime: item.price,
+          customizations: {
+             ...item.options,
+             bundleLabel: item.bundleLabel,
+             tag: item.tag
+          }
+        });
+
+        // Add extras if any
+        if (item.extras && item.extras.length > 0) {
+          item.extras.forEach(extra => {
+            const extraQty = extra.quantity || 1;
+            itemsToPrepare.push({
+              productId: extra.productId,
+              name: extra.name, // Pass name for optimistic update
+              quantity: extraQty, // DECOUPLED: Use absolute quantity
+              priceAtTime: extra.price,
+              customizations: {
+                ...extra.options,
+                tag: extra.tag || 'EXTRA'
+              }
+            });
+          });
+        }
+      });
+
+      const result = await createOrderAction({
+        branchId: currentBranchId,
+        tableId: currentTableId,
+        items: itemsToPrepare,
+        totalAmount: total,
+        paymentMethod,
+        note,
+      });
+
+      if (!result.success || !result.order) {
+        console.error('Error creating order:', result.error);
+        return null;
+      }
+
+      const orderData = result.order;
       const newOrder: Order = {
         id: orderData.id,
-        orderNumber: orderData.order_number, // Include order number for display
-        status: 'payment',
-        items: items,
+        orderNumber: orderData.orderNumber,
+        status: 'PENDING',
+        items: itemsToPrepare.map(item => ({
+          id: `${item.productId}-${Date.now()}`,
+          productId: item.productId,
+          name: item.name, 
+          price: item.priceAtTime,
+          quantity: item.quantity,
+          options: item.customizations,
+          bundleLabel: item.customizations?.bundleLabel,
+          tag: item.customizations?.tag
+        })),
         total,
-        table: tableName,
-        tableId: tableId || undefined,
+        table: currentTableName || 'Unknown Table',
+        tableId: currentTableId,
         timestamp: new Date(),
-        specialInstructions,
-        paymentMethod
+        paymentMethod,
+        note
       };
 
       setUserOrders(prev => [newOrder, ...prev]);
-      // Note: activeOrders will update via realtime subscription
+      refreshActiveOrders();
 
-      return { id: orderData.id, orderNumber: orderData.order_number };
+      return { id: orderData.id, orderNumber: orderData.orderNumber };
     } catch (e) {
       console.error('Failed to create order:', e);
       return null;
     }
   };
 
-  // Update order status via Supabase
   const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
-    // Optimistic UI update
     setActiveOrders(prev => prev.map(o =>
       o.id === orderId ? { ...o, status } : o
     ));
@@ -270,19 +267,9 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       o.id === orderId ? { ...o, status } : o
     ));
 
-    // Persist to database
-    if (isSupabaseConfigured) {
-      // @ts-ignore
-      const { error } = await supabase
-        .from('orders')
-        // @ts-ignore
-        .update({ status })
-        .eq('id', orderId);
-
-      if (error) {
-        console.error('Error updating order status:', error);
-        // Could revert optimistic update here if needed
-      }
+    const result = await updateOrderStatusAction(orderId, status);
+    if (!result.success) {
+      console.error('Error updating order status:', result.error);
     }
   };
 
@@ -297,7 +284,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       createOrder,
       updateOrderStatus,
       dismissOrder,
-      refreshActiveOrders
+      refreshActiveOrders,
+      isLoading
     }}>
       {children}
     </OrderContext.Provider>

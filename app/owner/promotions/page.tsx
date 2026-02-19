@@ -1,17 +1,24 @@
-import { Tag } from 'lucide-react';
+import PromotionsTabs from './_components/PromotionsTabs';
+import { getSessionAction } from '@/app/actions/auth';
+import { getProductsAction, getPromotionsAction } from '@/app/actions/promotions';
 
-export default function PromotionsPage() {
+export default async function PromotionsPage() {
+  const session = await getSessionAction();
+  if (!session || !session.user) return null;
+
+  const branchId = session.user.branchId;
+  const [productsRes, promotionsRes] = await Promise.all([
+    getProductsAction(branchId),
+    getPromotionsAction(branchId),
+  ]);
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-8">
-      <div className="text-center">
-        <div className="bg-gray-100 p-6 rounded-full inline-block mb-6">
-          <Tag size={48} className="text-gray-400" />
-        </div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Promotions</h1>
-        <p className="text-gray-500 max-w-md">
-          Create and manage promotional offers and discounts. Coming soon!
-        </p>
-      </div>
+    <div className="min-h-screen bg-gray-50/30 p-4 md:p-8">
+      <PromotionsTabs
+        initialProducts={productsRes.data || []}
+        initialPromotions={promotionsRes.data || []}
+        branchId={branchId}
+      />
     </div>
   );
 }

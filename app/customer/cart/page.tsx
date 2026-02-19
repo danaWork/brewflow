@@ -7,6 +7,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import CartItem from '@/components/customer/CartItem';
+import FloatingOrderTabs from '@/components/customer/FloatingOrderTabs';
 
 export default function CartPage() {
   const { items, cartTotal, cartCount } = useCart();
@@ -120,6 +121,7 @@ export default function CartPage() {
           </Link>
         </div>
       </div>
+      <FloatingOrderTabs />
     </div>
   );
 }

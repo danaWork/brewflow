@@ -6,6 +6,7 @@ interface Product {
   price: number;
   image: string | null;
   isSignature: boolean;
+  isInStock?: boolean;
 }
 
 interface ProductCardProps {
@@ -21,11 +22,22 @@ export default function ProductCard({ product, onClick, type = 'drinks' }: Produ
     currency: 'PHP',
   }).format(product.price);
 
+  const handleClick = () => {
+    if (product.isInStock !== false) {
+      onClick?.();
+    }
+  };
+
   return (
     <div 
-      className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-100 overflow-hidden cursor-pointer hover:shadow-[0_8px_30px_rgb(0,0,0,0.16)] transition-shadow duration-300"
-      onClick={onClick}
+      className={`bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-100 overflow-hidden ${product.isInStock !== false ? 'cursor-pointer hover:shadow-[0_8px_30px_rgb(0,0,0,0.16)]' : 'opacity-75 cursor-not-allowed'} transition-shadow duration-300 relative`}
+      onClick={handleClick}
     >
+      {product.isInStock === false && (
+        <div className="absolute inset-0 z-10 bg-white/50 flex items-center justify-center">
+            <span className="bg-red-600 text-white px-3 py-1 rounded-full font-bold text-sm">Out of Stock</span>
+        </div>
+      )}
       <div className="relative h-64 w-full bg-gray-100">
         {product.image ? (
           <Image

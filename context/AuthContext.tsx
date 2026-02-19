@@ -1,8 +1,16 @@
 'use client';
 
-import { createSupabaseBrowserClient } from '@/lib/supabase';
 import { createContext, useContext, useEffect, useState } from 'react';
-import type { User, Session } from '@supabase/supabase-js';
+
+// Mock types formerly from @supabase/supabase-js
+interface User {
+  id: string;
+  email?: string;
+}
+
+interface Session {
+  user: User;
+}
 
 interface AuthContextType {
   user: User | null;
@@ -19,47 +27,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  
-  const supabase = createSupabaseBrowserClient();
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setIsLoading(false);
-    });
+    // Mock successful authentication for demo purposes
+    const mockUser: User = { id: 'mock-user-id', email: 'owner@example.com' };
+    const mockSession: Session = { user: mockUser };
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setIsLoading(false);
-      }
-    );
-
-    return () => subscription.unsubscribe();
-  }, [supabase]);
+    setSession(mockSession);
+    setUser(mockUser);
+    setIsLoading(false);
+  }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error };
+    console.log('Mock signIn:', email);
+    return { error: null };
   };
 
   const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-    return { error };
+    console.log('Mock signUp:', email);
+    return { error: null };
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    console.log('Mock signOut');
+    setUser(null);
+    setSession(null);
   };
 
   return (
@@ -83,3 +75,4 @@ export function useAuth() {
   }
   return context;
 }
+
