@@ -85,7 +85,8 @@ export async function getMenuData(qrIdentifier: string) {
             id: c.id,
             name: c.name,
             type: (c.type || 'drink').toLowerCase(),
-            companyId: c.companyId
+            companyId: c.companyId,
+            config: c.config
         }));
 
         const transformedProducts: any[] = [];

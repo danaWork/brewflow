@@ -23,6 +23,30 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'fullofplants.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'www.cremashop.eu',
+      },
+      {
+        protocol: 'https',
+        hostname: 'cornercoffeestore.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'encrypted-tbn0.gstatic.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'ik.imagekit.io',
+      },
+      {
+        protocol: 'https',
+        hostname: 'i.redd.it',
+      },
+      {
+        protocol: 'https',
+        hostname: 'upload.wikimedia.org',
+      },
     ],
   },
 };

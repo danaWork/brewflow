@@ -57,6 +57,9 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
     const [editingIngredients, setEditingIngredients] = useState<{ inventoryItemId: string; quantityRequired: number }[]>([]);
+
+    const [editingSizes, setEditingSizes] = useState<{name: string, price: number}[]>([]);
+
     const [editingModifierGroup, setEditingModifierGroup] = useState<{
         id?: string;
         name: string;
@@ -91,7 +94,10 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
         const type = formData.get('type') as string;
         const flow = formData.get('flow') as string;
 
-        const config = JSON.stringify({ flow });
+
+        // Filter out empty sizes
+        const validSizes = editingSizes.filter(s => s.name.trim() !== '');
+        const config = JSON.stringify({ flow, sizes: validSizes });
 
         if (editingCategory?.id) {
             await updateCategory(editingCategory.id, name, type, config);
@@ -243,6 +249,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                         <button
                             onClick={() => {
                                 setEditingCategory(null);
+                                setEditingSizes([{ name: 'Small', price: 0 }, { name: 'Medium', price: 25 }, { name: 'Large', price: 50 }]); // Default
                                 setIsCategoryModalOpen(true);
                             }}
                             className="bg-[#D95D1E] text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-[#bf4f18] transition-all shadow-md hover:shadow-lg active:scale-95"
@@ -287,6 +294,18 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                         <button
                                             onClick={() => {
                                                 setEditingCategory(category);
+                                                // Load config
+                                                try {
+                                                    const conf = category.config ? JSON.parse(category.config) : {};
+                                                    if (conf.sizes && Array.isArray(conf.sizes)) {
+                                                        setEditingSizes(conf.sizes);
+                                                    } else {
+                                                        // Default existing categories to standard if not present
+                                                        setEditingSizes([{ name: 'small', price: 0 }, { name: 'medium', price: 25 }, { name: 'large', price: 50 }]); 
+                                                    }
+                                                } catch (e) {
+                                                    setEditingSizes([]);
+                                                }
                                                 setIsCategoryModalOpen(true);
                                             }}
                                             className="p-2.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
@@ -482,14 +501,14 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
             {/* Category Modal */}
             {isCategoryModalOpen && (
                 <div className="fixed inset-0 flex items-center justify-center z-[110] p-4 animate-in zoom-in-95 duration-200">
-                    <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
-                        <div className="p-8 border-b border-gray-50 flex justify-between items-center">
+                    <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                        <div className="p-8 border-b border-gray-50 flex justify-between items-center shrink-0">
                             <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
                                 {editingCategory ? 'Edit Category' : 'New Category'}
                             </h2>
                             <button onClick={() => setIsCategoryModalOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
                         </div>
-                        <form onSubmit={handleSaveCategory} className="p-8 space-y-6">
+                        <form onSubmit={handleSaveCategory} className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
                             <div>
                                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Internal Name</label>
                                 <input
@@ -555,19 +574,79 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                     })}
                                 </div>
                             </div>
-                            <div className="flex justify-end gap-3 pt-4">
+                            
+                            {/* Size Configuration Section */}
+                            <div className="border-t border-gray-100 pt-4">
+                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Size Options</label>
+                                <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
+                                    <div className="flex justify-between items-center mb-2">
+                                         <p className="text-xs text-gray-500">Define sizes and their price adjustment (added to base price).</p>
+                                         <button 
+                                            type="button"
+                                            onClick={() => setEditingSizes([...editingSizes, { name: '', price: 0 }])}
+                                            className="text-xs font-bold text-[#D95D1E] hover:underline"
+                                         >
+                                            + Add Size
+                                         </button>
+                                    </div>
+                                    
+                                    {editingSizes.length === 0 ? (
+                                        <p className="text-sm text-gray-400 italic text-center py-2">No sizes configured. Default size step will be skipped.</p>
+                                    ) : (
+                                        editingSizes.map((size, idx) => (
+                                            <div key={idx} className="flex gap-2 items-center animate-in slide-in-from-left-2 duration-100">
+                                                <input
+                                                    type="text"
+                                                    value={size.name}
+                                                    onChange={(e) => {
+                                                        const newSizes = [...editingSizes];
+                                                        newSizes[idx].name = e.target.value;
+                                                        setEditingSizes(newSizes);
+                                                    }}
+                                                    placeholder="Size Name (e.g. Large)"
+                                                    className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-1 focus:ring-[#D95D1E] focus:border-[#D95D1E]"
+                                                />
+                                                <div className="relative w-24">
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">+₱</span>
+                                                    <input
+                                                        type="number"
+                                                        value={size.price}
+                                                        onChange={(e) => {
+                                                            const newSizes = [...editingSizes];
+                                                            newSizes[idx].price = parseFloat(e.target.value);
+                                                            setEditingSizes(newSizes);
+                                                        }}
+                                                        className="w-full pl-8 pr-2 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold focus:ring-1 focus:ring-[#D95D1E] focus:border-[#D95D1E]"
+                                                    />
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const newSizes = editingSizes.filter((_, i) => i !== idx);
+                                                        setEditingSizes(newSizes);
+                                                    }}
+                                                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex justify-between gap-3 pt-4 sticky bottom-0 bg-white border-t border-gray-50 mt-auto">
                                 <button
                                     type="button"
                                     onClick={() => setIsCategoryModalOpen(false)}
-                                    className="px-6 py-3 text-gray-600 font-bold hover:bg-gray-100 rounded-2xl transition-all"
+                                    className="flex-1 px-6 py-3 text-gray-600 font-bold hover:bg-gray-100 rounded-2xl transition-all"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-8 py-3 bg-[#D95D1E] text-white rounded-2xl font-bold shadow-lg shadow-orange-200 hover:bg-[#bf4f18] transition-all active:scale-95"
+                                    className="flex-1 px-8 py-3 bg-[#D95D1E] text-white rounded-2xl font-bold shadow-lg shadow-orange-200 hover:bg-[#bf4f18] transition-all active:scale-95"
                                 >
-                                    {editingCategory ? 'Update Changes' : 'Create Category'}
+                                    {editingCategory ? 'Update' : 'Create'}
                                 </button>
                             </div>
                         </form>
