@@ -23,6 +23,7 @@ export interface Order {
   tableId?: string;
   timestamp: Date;
   paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA';
+  note?: string;
 }
 
 interface OrderContextType {
@@ -164,7 +165,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('coffee-shop-user-orders', JSON.stringify(userOrders));
   }, [userOrders]);
 
-  const createOrder = async (items: CartItem[], total: number, paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA') => {
+  const createOrder = async (items: CartItem[], total: number, paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA', note?: string) => {
     try {
       if (!currentBranchId || !currentTableId) {
         console.error('Missing branchId or tableId');
@@ -172,11 +173,12 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Flatten items and their extras for the database
-      const orderItemsToSave: any[] = [];
+      const itemsToPrepare: any[] = [];
       items.forEach(item => {
         // Add main item
-        orderItemsToSave.push({
+        itemsToPrepare.push({
           productId: item.productId,
+          name: item.name, // Pass name for optimistic update
           quantity: item.quantity,
           priceAtTime: item.price,
           customizations: {
@@ -189,9 +191,11 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         // Add extras if any
         if (item.extras && item.extras.length > 0) {
           item.extras.forEach(extra => {
-            orderItemsToSave.push({
+            const extraQty = extra.quantity || 1;
+            itemsToPrepare.push({
               productId: extra.productId,
-              quantity: extra.quantity * item.quantity,
+              name: extra.name, // Pass name for optimistic update
+              quantity: extraQty, // DECOUPLED: Use absolute quantity
               priceAtTime: extra.price,
               customizations: {
                 ...extra.options,
@@ -205,9 +209,10 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       const result = await createOrderAction({
         branchId: currentBranchId,
         tableId: currentTableId,
-        items: orderItemsToSave,
+        items: itemsToPrepare,
         totalAmount: total,
         paymentMethod,
+        note,
       });
 
       if (!result.success || !result.order) {
@@ -220,10 +225,10 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         id: orderData.id,
         orderNumber: orderData.orderNumber,
         status: 'PENDING',
-        items: orderItemsToSave.map(item => ({
+        items: itemsToPrepare.map(item => ({
           id: `${item.productId}-${Date.now()}`,
           productId: item.productId,
-          name: item.name || items.find(i => i.productId === item.productId)?.name || 'Unknown Product',
+          name: item.name, 
           price: item.priceAtTime,
           quantity: item.quantity,
           options: item.customizations,
@@ -234,7 +239,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         table: currentTableName || 'Unknown Table',
         tableId: currentTableId,
         timestamp: new Date(),
-        paymentMethod
+        paymentMethod,
+        note
       };
 
       setUserOrders(prev => [newOrder, ...prev]);

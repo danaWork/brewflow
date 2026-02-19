@@ -24,7 +24,10 @@ export default async function MenuCategoriesPage() {
     <div className="p-4 md:p-8">
       <MenuManagementClient 
         initialCategories={categories} 
-        modifierGroups={modifierGroups}
+        modifierGroups={modifierGroups.map(g => ({
+        ...g,
+        displayMode: g.displayMode as 'list' | 'buttons' | 'cards'
+      }))}
         inventoryItems={inventoryRes.items || []}
         branchId={branchId}
       />

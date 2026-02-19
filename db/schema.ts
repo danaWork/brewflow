@@ -63,12 +63,15 @@ export const modifierGroups = pgTable('modifier_groups', {
   id: uuid('id').defaultRandom().primaryKey(),
   companyId: uuid('company_id').references(() => companies.id).notNull(),
   name: text('name').notNull(),
+  displayMode: text('display_mode').default('list').notNull(), // 'list', 'buttons', 'cards'
 });
 
 export const modifierOptions = pgTable('modifier_options', {
   id: uuid('id').defaultRandom().primaryKey(),
   modifierGroupId: uuid('modifier_group_id').references(() => modifierGroups.id).notNull(),
   name: text('name').notNull(),
+  price: decimal('price', { precision: 10, scale: 2 }).default('0').notNull(),
+  imageUrl: text('image_url'),
 });
 
 export const productModifierLinks = pgTable('product_modifier_links', {
@@ -99,6 +102,7 @@ export const orders = pgTable('orders', {
   orderNumber: integer('order_number').generatedAlwaysAsIdentity().notNull(), // Changed to generatedAlwaysAsIdentity for safer auto-increment
   status: orderStatusEnum('status').default('PENDING').notNull(),
   paymentMethod: paymentMethodEnum('payment_method'),
+  note: text('note'),
   totalAmount: decimal('total_amount', { precision: 10, scale: 2 }).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   acceptedAt: timestamp('accepted_at'),

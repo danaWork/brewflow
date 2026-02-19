@@ -21,6 +21,7 @@ export async function createOrderAction(data: {
     items: { productId: string; quantity: number; priceAtTime: number; customizations?: any }[];
     totalAmount: number;
     paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA';
+    note?: string;
 }) {
     try {
         const [insertedOrder] = await db.insert(ordersSchema).values({
@@ -29,6 +30,7 @@ export async function createOrderAction(data: {
             status: 'PENDING',
             totalAmount: data.totalAmount.toString(),
             paymentMethod: data.paymentMethod,
+            note: data.note,
         }).returning();
 
         if (data.items.length > 0) {
@@ -79,9 +81,24 @@ export async function getActiveOrdersAction(branchId: string) {
             orderBy: [desc(ordersSchema.createdAt)]
         });
 
+        // Fallback: If note is missing due to stale schema in db.query, fetch it manually
+        const enrichedOrders = await Promise.all(activeOrders.map(async (o: any) => {
+            if (o.note === undefined) {
+                try {
+                    const [raw] = await db.select({ note: ordersSchema.note }).from(ordersSchema).where(eq(ordersSchema.id, o.id));
+                    return { ...o, note: raw?.note || null };
+                } catch (e) {
+                    return o;
+                }
+            }
+            return o;
+        }));
+
+        console.log('Fetched active orders count:', enrichedOrders.length);
+
         return {
             success: true,
-            orders: activeOrders.map(o => ({
+            orders: enrichedOrders.map(o => ({
                 id: o.id,
                 orderNumber: o.orderNumber,
                 status: o.status as 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED',
@@ -90,7 +107,8 @@ export async function getActiveOrdersAction(branchId: string) {
                 tableNumber: o.table?.tableNumber || 'Unknown Table',
                 createdAt: o.createdAt,
                 paymentMethod: o.paymentMethod,
-                items: o.items.map(item => ({
+                note: o.note,
+                items: o.items.map((item: any) => ({
                     productId: item.productId,
                     name: item.product?.name || 'Unknown Product',
                     quantity: item.quantity,

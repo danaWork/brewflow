@@ -2,7 +2,7 @@
 
 import { db } from '@/lib/db';
 import { categories, products, modifierGroups, modifierOptions, productModifierLinks } from '@/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { getUserSession } from './auth';
 import { revalidatePath } from 'next/cache';
 
@@ -169,22 +169,81 @@ export async function getProductModifiers(productId: string) {
     return links.map(l => l.modifierGroupId);
 }
 
-export async function createModifierGroup(name: string, options: string[]) {
+export async function createModifierGroup(name: string, options: { name: string; price: number; imageUrl?: string }[], displayMode: 'list' | 'buttons' | 'cards' = 'list') {
     const session = await getUserSession();
     if (!session?.companyId) throw new Error('Unauthorized');
 
     const [group] = await db.insert(modifierGroups).values({
         companyId: session.companyId,
         name,
+        displayMode,
     }).returning();
 
     if (options.length > 0) {
         await db.insert(modifierOptions).values(
             options.map(opt => ({
                 modifierGroupId: group.id,
-                name: opt,
+                name: opt.name,
+                price: opt.price.toString(),
+                imageUrl: opt.imageUrl
             }))
         );
+    }
+
+    revalidatePath('/owner/menu-categories');
+}
+
+export async function updateModifierGroup(
+    id: string, 
+    name: string, 
+    options: { id?: string; name: string; price: number; imageUrl?: string }[], 
+    displayMode: 'list' | 'buttons' | 'cards' = 'list'
+) {
+    const session = await getUserSession();
+    if (!session?.companyId) throw new Error('Unauthorized');
+
+    // 1. Update Group Details
+    await db.update(modifierGroups)
+        .set({ name, displayMode })
+        .where(and(eq(modifierGroups.id, id), eq(modifierGroups.companyId, session.companyId)));
+
+    // 2. Handle Options
+    // Get existing options to know what to delete
+    const existingOptions = await db.select().from(modifierOptions).where(eq(modifierOptions.modifierGroupId, id));
+    const existingOptionIds = existingOptions.map(o => o.id);
+    
+    const incomingOptionIds = options.map(o => o.id).filter(Boolean) as string[];
+    const optionsToDelete = existingOptionIds.filter(id => !incomingOptionIds.includes(id));
+
+    // Delete removed options
+    if (optionsToDelete.length > 0) {
+        // Note: distinct from "blind delete", this only deletes options explicitly removed by user.
+        // If these options are linked to orders, this might fail if foreign keys enforce integrity without cascade.
+        // Assuming standard behavior or that we want to stop these from being used.
+        // For safety in this MVP, we try delete.
+        await db.delete(modifierOptions).where(inArray(modifierOptions.id, optionsToDelete));
+    }
+
+    // Upsert options
+    for (const opt of options) {
+        if (opt.id && existingOptionIds.includes(opt.id)) {
+            // Update
+            await db.update(modifierOptions)
+                .set({ 
+                    name: opt.name, 
+                    price: opt.price.toString(), 
+                    imageUrl: opt.imageUrl 
+                })
+                .where(eq(modifierOptions.id, opt.id));
+        } else {
+            // Insert
+            await db.insert(modifierOptions).values({
+                modifierGroupId: id,
+                name: opt.name,
+                price: opt.price.toString(),
+                imageUrl: opt.imageUrl
+            });
+        }
     }
 
     revalidatePath('/owner/menu-categories');

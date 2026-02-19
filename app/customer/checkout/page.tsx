@@ -17,6 +17,7 @@ export default function CheckoutPage() {
     const { tableId } = useTable();
     const router = useRouter();
     const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'GCASH' | 'PAYMAYA'>('CASH');
+    const [note, setNote] = useState('');
     const [isPaymentDropdownOpen, setIsPaymentDropdownOpen] = useState(false);
     const [showConfirmation, setShowConfirmation] = useState(false);
     const [lastOrderNumber, setLastOrderNumber] = useState<number>(0);
@@ -28,7 +29,7 @@ export default function CheckoutPage() {
     ];
 
     const handlePlaceOrder = async () => {
-        const result = await createOrder(items, cartTotal, paymentMethod);
+        const result = await createOrder(items, cartTotal, paymentMethod, note);
         console.log(result);
 
         if (result) {
@@ -85,19 +86,13 @@ export default function CheckoutPage() {
                                             <span className="text-lg font-bold text-gray-900">{item.quantity}x</span>
                                             <div>
                                                 <h3 className="font-bold text-gray-900 text-lg leading-tight mb-1">{item.name}</h3>
-                                                <div className="text-xs text-gray-400 font-medium line-clamp-2">
-                                                    {[
-                                                        item.options?.size && `${item.options.size},`,
-                                                        item.options?.milk && `${item.options.milk} Milk,`,
-                                                        item.options?.sweetness && `${item.options.sweetness},`,
-                                                        item.options?.ice && `${item.options.ice} Ice`
-                                                    ].filter(Boolean).join(' ')}
+                                                <div className="text-xs text-gray-400 font-medium flex flex-wrap gap-1 mt-1">
+                                                    {Object.entries(item.options || {}).map(([key, value]) => (
+                                                        <span key={key}>
+                                                            <span className="font-semibold text-gray-600">{key}:</span> {String(value)}{" "}
+                                                        </span>
+                                                    ))}
                                                 </div>
-                                                {item.options?.toppings && Array.isArray(item.options.toppings) && item.options.toppings.length > 0 && (
-                                                    <div className="text-xs text-[#D95D1E] font-medium mt-0.5">
-                                                        + {item.options.toppings.map((t: any) => t.name).join(', ')}
-                                                    </div>
-                                                )}
                                             </div>
                                         </div>
                                         <span className="font-bold text-gray-900 text-lg">
@@ -108,9 +103,9 @@ export default function CheckoutPage() {
                                     {hasExtras && <div className="my-4 border-t border-dashed border-orange-200/50" />}
 
                                     {item.extras?.map((extra, idx) => (
-                                        <div key={idx} className="flex justify-between items-start mt-4">
+                                            <div key={idx} className="flex justify-between items-start mt-4">
                                             <div className="flex gap-4">
-                                                <span className="text-lg font-bold text-gray-900">{item.quantity * extra.quantity}x</span>
+                                                <span className="text-lg font-bold text-gray-900">{extra.quantity}x</span>
                                                 <h4 className="font-bold text-gray-900 text-lg">{extra.name}</h4>
                                             </div>
                                             <div className="text-right leading-none">
@@ -135,19 +130,13 @@ export default function CheckoutPage() {
                                             <span className="text-lg font-bold text-gray-900">{item.quantity}x</span>
                                             <div>
                                                 <h3 className="font-bold text-gray-900 text-lg leading-tight mb-1">{item.name}</h3>
-                                                <div className="text-xs text-gray-400 font-medium line-clamp-2">
-                                                    {[
-                                                        item.options?.size && `${item.options.size},`,
-                                                        item.options?.milk && `${item.options.milk} Milk,`,
-                                                        item.options?.sweetness && `${item.options.sweetness},`,
-                                                        item.options?.ice && `${item.options.ice} Ice`
-                                                    ].filter(Boolean).join(' ')}
+                                                <div className="text-xs text-gray-400 font-medium flex flex-wrap gap-1 mt-1">
+                                                    {Object.entries(item.options || {}).map(([key, value]) => (
+                                                        <span key={key}>
+                                                            <span className="font-semibold text-gray-600">{key}:</span> {String(value)}{" "}
+                                                        </span>
+                                                    ))}
                                                 </div>
-                                                {item.options?.toppings && Array.isArray(item.options.toppings) && item.options.toppings.length > 0 && (
-                                                    <div className="text-xs text-[#D95D1E] font-medium mt-0.5">
-                                                        + {item.options.toppings.map((t: any) => t.name).join(', ')}
-                                                    </div>
-                                                )}
                                             </div>
                                         </div>
                                         <span className="font-bold text-gray-900 text-lg">
@@ -164,7 +153,7 @@ export default function CheckoutPage() {
                                                     <span className="bg-[#D95D1E] text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
                                                         TOGETHER
                                                     </span>
-                                                    <span className="text-lg font-bold text-gray-900">{item.quantity * extra.quantity}x</span>
+                                                    <span className="text-lg font-bold text-gray-900">{extra.quantity}x</span>
                                                     <h4 className="font-bold text-gray-900 text-lg">{extra.name}</h4>
                                                 </div>
                                                 <div className="text-right leading-none">
@@ -219,6 +208,17 @@ export default function CheckoutPage() {
                                 </div>
                             )}
                         </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <h2 className="text-xs font-bold text-gray-500 uppercase">Note / Special Instructions</h2>
+                        <textarea
+                            value={note}
+                            onChange={(e) => setNote(e.target.value)}
+                            placeholder="e.g. Allergy to peanuts, less ice..."
+                            className="w-full bg-white border border-gray-200 rounded-xl p-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 resize-none"
+                            rows={2}
+                        />
                     </div>
 
                     <div className="pt-2">
