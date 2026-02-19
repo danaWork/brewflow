@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { CartItem } from './CartContext';
-import { useTable } from './TableContext';
+import { useTable } from '@/context/TableContext';
 import {
   createOrderAction,
   getActiveOrdersAction,
@@ -29,10 +29,11 @@ export interface Order {
 interface OrderContextType {
   userOrders: Order[];
   activeOrders: Order[];
-  createOrder: (items: CartItem[], total: number, paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA') => Promise<{ id: string; orderNumber: number } | null>;
+  createOrder: (items: CartItem[], total: number, paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA', note?: string) => Promise<{ id: string; orderNumber: number } | null>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   dismissOrder: (orderId: string) => void;
   refreshActiveOrders: () => Promise<void>;
+  isLoading: boolean;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
@@ -50,6 +51,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     }
   });
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const userOrdersRef = useRef<Order[]>([]);
   const sessionRef = useRef<{ branchId: string | null; timestamp: number } | null>(null);
   const isRefreshingRef = useRef(false);
@@ -91,6 +93,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
 
       if (!branchId) {
         isRefreshingRef.current = false;
+        // If we can't get branchId, we can't load orders, so we stop loading
+        setIsLoading(false);
         return;
       }
 
@@ -99,6 +103,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       if (!result.success || !result.orders) {
         console.error('Error fetching orders:', result.error);
         isRefreshingRef.current = false;
+        setIsLoading(false);
         return;
       }
 
@@ -115,6 +120,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       }));
 
       setActiveOrders(orders);
+      setIsLoading(false);
 
       // Individually sync userOrders statuses, especially for those that might have been COMPLETED
       // Use ref to avoid dependency on userOrders which would cause infinite loop
@@ -278,7 +284,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       createOrder,
       updateOrderStatus,
       dismissOrder,
-      refreshActiveOrders
+      refreshActiveOrders,
+      isLoading
     }}>
       {children}
     </OrderContext.Provider>

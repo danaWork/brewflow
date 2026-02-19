@@ -8,9 +8,10 @@ export interface OrderNotification {
   id: string;
 }
 
-export function useOrderNotifications(orders: Order[]) {
+export function useOrderNotifications(orders: Order[], isLoading: boolean = false) {
   const previousOrderIdsRef = useRef<Set<string>>(new Set());
   const notificationPermissionRef = useRef<NotificationPermission | null>(null);
+  const isInitializedRef = useRef(false);
   const [newOrderNotification, setNewOrderNotification] = useState<OrderNotification | null>(null);
 
   useEffect(() => {
@@ -166,14 +167,22 @@ export function useOrderNotifications(orders: Order[]) {
   };
 
   useEffect(() => {
+    if (isLoading) return;
+
     const pendingOrders = orders.filter(order => order.status === 'PENDING');
     const currentPendingIds = new Set(pendingOrders.map(order => order.id));
     
+    if (!isInitializedRef.current) {
+      previousOrderIdsRef.current = currentPendingIds;
+      isInitializedRef.current = true;
+      return;
+    }
+
     const newOrders = pendingOrders.filter(
       order => !previousOrderIdsRef.current.has(order.id)
     );
 
-    if (newOrders.length > 0 && previousOrderIdsRef.current.size > 0) {
+    if (newOrders.length > 0) {
       newOrders.forEach((order) => {
         playNotificationSound();
         
@@ -191,7 +200,7 @@ export function useOrderNotifications(orders: Order[]) {
     }
 
     previousOrderIdsRef.current = currentPendingIds;
-  }, [orders]);
+  }, [orders, isLoading]);
 
   return {
     newOrderNotification,

@@ -28,14 +28,22 @@ export default function CheckoutPage() {
         { label: 'PayMaya', value: 'PAYMAYA' },
     ];
 
-    const handlePlaceOrder = async () => {
-        const result = await createOrder(items, cartTotal, paymentMethod, note);
-        console.log(result);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-        if (result) {
-            setLastOrderNumber(result.orderNumber);
-            clearCart();
-            setShowConfirmation(true);
+    const handlePlaceOrder = async () => {
+        if (isSubmitting) return;
+        setIsSubmitting(true);
+        try {
+            const result = await createOrder(items, cartTotal, paymentMethod, note);
+            console.log(result);
+
+            if (result) {
+                setLastOrderNumber(result.orderNumber);
+                clearCart();
+                setShowConfirmation(true);
+            }
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -229,10 +237,17 @@ export default function CheckoutPage() {
 
                         <button
                             onClick={handlePlaceOrder}
-                            disabled={items.length === 0}
-                            className="block w-full bg-[#10B981] text-white font-bold py-4 rounded-xl text-center text-lg border-2 border-gray-900 active:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={items.length === 0 || isSubmitting}
+                            className="block w-full bg-[#10B981] text-white font-bold py-4 rounded-xl text-center text-lg border-2 border-gray-900 active:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
                         >
-                            Place Order
+                            {isSubmitting ? (
+                                <>
+                                    <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    Placing Order...
+                                </>
+                            ) : (
+                                'Place Order'
+                            )}
                         </button>
                     </div>
                 </div>

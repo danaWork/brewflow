@@ -62,12 +62,12 @@ function CancelConfirmModal({
 }
 
 export default function LiveOrdersPage() {
-  const { activeOrders, updateOrderStatus } = useOrder();
+  const { activeOrders, updateOrderStatus, isLoading } = useOrder();
   const [cancelModalOrder, setCancelModalOrder] = useState<Order | null>(null);
 
   const visibleOrders = activeOrders.filter(o => o.status !== 'CANCELLED');
 
-  const { newOrderNotification, dismissNotification } = useOrderNotifications(activeOrders);
+  const { newOrderNotification, dismissNotification } = useOrderNotifications(activeOrders, isLoading);
 
   const columns: { id: OrderStatus, title: string, bgColor: string, borderColor: string, icon: any }[] = [
     { id: 'PENDING', title: 'Pending', bgColor: 'bg-[#FFF9E6]', borderColor: 'border-[#E6C84A]', icon: Clock },
