@@ -105,7 +105,10 @@ export async function getMenuData(qrIdentifier: string) {
                     for (const pi of branchIngredients) {
                         const required = parseFloat(pi.quantityRequired);
                         const available = parseFloat(pi.inventoryItem.quantity); // Use raw string -> float
-                        if (available < required) {
+                        const threshold = pi.inventoryItem.lowStockThreshold ? parseFloat(pi.inventoryItem.lowStockThreshold) : 0;
+                        
+                        // Check if not enough ingredients OR if stock is at/below threshold
+                        if (available < required || available <= threshold) {
                             isInStock = false;
                             break;
                         }
