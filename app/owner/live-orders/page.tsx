@@ -2,7 +2,8 @@
 
 import { useOrder, Order, OrderStatus } from '@/context/OrderContext';
 import { useState } from 'react';
-import { Clock, ChefHat, CheckCircle, X, CreditCard, Banknote, Smartphone, ClipboardList } from 'lucide-react';
+import { Clock, ChefHat, CheckCircle, X, CreditCard, Banknote, Smartphone, ClipboardList, Bell } from 'lucide-react';
+import { useOrderNotifications } from '@/hooks/useOrderNotifications';
 
 function PaymentIcon({ method }: { method: string }) {
   const lowerMethod = method.toLowerCase();
@@ -66,6 +67,8 @@ export default function LiveOrdersPage() {
 
   const visibleOrders = activeOrders.filter(o => o.status !== 'CANCELLED');
 
+  const { newOrderNotification, dismissNotification } = useOrderNotifications(activeOrders);
+
   const columns: { id: OrderStatus, title: string, bgColor: string, borderColor: string, icon: any }[] = [
     { id: 'PENDING', title: 'Pending', bgColor: 'bg-[#FFF9E6]', borderColor: 'border-[#E6C84A]', icon: Clock },
     { id: 'PREPARING', title: 'Preparing', bgColor: 'bg-[#FFF5EB]', borderColor: 'border-[#E6894A]', icon: ChefHat },
@@ -88,6 +91,30 @@ export default function LiveOrdersPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
+      {newOrderNotification && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 animate-in slide-in-from-top-5 fade-in duration-300">
+          <div className="bg-white rounded-xl shadow-2xl border-2 border-[#D95D1E] p-4 min-w-[320px] max-w-[90vw] flex items-center gap-4">
+            <div className="bg-[#D95D1E]/10 p-2 rounded-lg">
+              <Bell className="text-[#D95D1E]" size={24} />
+            </div>
+            <div className="flex-1">
+              <div className="font-bold text-gray-900 text-lg mb-0.5">
+                New Order Received! 🍽️
+              </div>
+              <div className="text-sm text-gray-600">
+                Order #{newOrderNotification.order.orderNumber} from {newOrderNotification.order.table}
+              </div>
+            </div>
+            <button
+              onClick={dismissNotification}
+              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white p-4 border-b border-gray-200 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <ClipboardList size={20} className="text-gray-600" />

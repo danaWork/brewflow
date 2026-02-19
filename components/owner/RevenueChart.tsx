@@ -1,13 +1,23 @@
 'use client';
 
 import { TrendingUp } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 
 interface RevenueChartProps {
     data: Array<{ date: string; revenue: number; orders: number }>;
 }
 
 export function RevenueChart({ data }: RevenueChartProps) {
+    const [tooltip, setTooltip] = useState<{
+        x: number;
+        y: number;
+        date: string;
+        revenue: number;
+        orders: number;
+    } | null>(null);
+    const svgRef = useRef<SVGSVGElement>(null);
+    const tooltipRef = useRef<HTMLDivElement>(null);
+
     // Format currency
     const formatCurrency = useMemo(() => {
         return (value: number) => {
@@ -87,8 +97,58 @@ export function RevenueChart({ data }: RevenueChartProps) {
 
     const { points, linePath, areaPath, gridLines, logicalWidth, logicalHeight, padding } = chartData;
 
+    useEffect(() => {
+        const updateTooltipPosition = () => {
+            if (tooltip && svgRef.current && tooltipRef.current) {
+                const svgRect = svgRef.current.getBoundingClientRect();
+                const tooltipRect = tooltipRef.current.getBoundingClientRect();
+                const svgAspectRatio = svgRect.width / logicalWidth;
+                
+                const screenX = svgRect.left + tooltip.x * svgAspectRatio;
+                const screenY = svgRect.top + tooltip.y * svgAspectRatio;
+                
+                const tooltipX = screenX;
+                const tooltipY = screenY - 10;
+                
+                tooltipRef.current.style.left = `${tooltipX}px`;
+                tooltipRef.current.style.top = `${tooltipY}px`;
+            }
+        };
+
+        updateTooltipPosition();
+        
+        window.addEventListener('scroll', updateTooltipPosition, true);
+        window.addEventListener('resize', updateTooltipPosition);
+        
+        return () => {
+            window.removeEventListener('scroll', updateTooltipPosition, true);
+            window.removeEventListener('resize', updateTooltipPosition);
+        };
+    }, [tooltip, logicalWidth, logicalHeight]);
+
+    const handlePointMouseEnter = (point: typeof points[0], event: React.MouseEvent) => {
+        if (svgRef.current) {
+            const svgRect = svgRef.current.getBoundingClientRect();
+            const svgAspectRatio = svgRect.width / logicalWidth;
+            const screenX = svgRect.left + point.x * svgAspectRatio;
+            const screenY = svgRect.top + point.y * svgAspectRatio;
+            
+            setTooltip({
+                x: point.x,
+                y: point.y,
+                date: point.date,
+                revenue: point.revenue,
+                orders: point.orders
+            });
+        }
+    };
+
+    const handlePointMouseLeave = () => {
+        setTooltip(null);
+    };
+
     return (
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm relative">
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-orange-50 rounded-lg">
@@ -103,6 +163,7 @@ export function RevenueChart({ data }: RevenueChartProps) {
 
             <div className="w-full overflow-hidden">
                 <svg
+                    ref={svgRef}
                     viewBox={`0 0 ${logicalWidth} ${logicalHeight}`}
                     className="w-full h-auto"
                 >
@@ -159,15 +220,21 @@ export function RevenueChart({ data }: RevenueChartProps) {
                             <circle
                                 cx={point.x}
                                 cy={point.y}
+                                r="12"
+                                fill="transparent"
+                                className="cursor-pointer"
+                                onMouseEnter={(e) => handlePointMouseEnter(point, e)}
+                                onMouseLeave={handlePointMouseLeave}
+                            />
+                            <circle
+                                cx={point.x}
+                                cy={point.y}
                                 r="4"
                                 fill="white"
                                 stroke="#D46215"
                                 strokeWidth="2"
-                                className="hover:r-6 transition-all cursor-pointer"
+                                className="transition-all pointer-events-none"
                             />
-                            <title>
-                                {`${formatDate(point.date)}: ${formatCurrency(point.revenue)} (${point.orders} orders)`}
-                            </title>
                         </g>
                     ))}
 
@@ -190,6 +257,34 @@ export function RevenueChart({ data }: RevenueChartProps) {
                     ))}
                 </svg>
             </div>
+
+            {tooltip && (
+                <div
+                    ref={tooltipRef}
+                    className="fixed z-50 pointer-events-none bg-white rounded-xl shadow-xl border border-gray-200 p-4 min-w-[150px] animate-in fade-in zoom-in duration-150"
+                    style={{
+                        transform: 'translate(-50%, -100%)',
+                    }}
+                >
+                    <div className="flex flex-col gap-1.5">
+                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            {formatDate(tooltip.date)}
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                            <span className="text-xl font-bold text-[#D95D1E]">
+                                {formatCurrency(tooltip.revenue)}
+                            </span>
+                        </div>
+                        <div className="text-xs text-gray-500 font-medium mt-0.5">
+                            {tooltip.orders} {tooltip.orders === 1 ? 'order' : 'orders'}
+                        </div>
+                    </div>
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-[-1px]">
+                        <div className="w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-transparent border-t-gray-200"></div>
+                        <div className="w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-transparent border-t-white absolute -top-[1px] left-1/2 transform -translate-x-1/2"></div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
