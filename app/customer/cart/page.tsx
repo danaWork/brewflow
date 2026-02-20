@@ -138,17 +138,24 @@ export default function CartPage() {
             <button
               onClick={handleWaterBottleClick}
               disabled={!waterBottleItem}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition-colors border ${
+              className={`relative w-12 h-12 rounded-xl overflow-hidden transition-all flex-shrink-0 ${
                 waterBottleItem 
-                  ? 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200' 
-                  : 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
+                  ? 'border border-orange-200 hover:border-2 hover:border-[#D95D1E] hover:scale-105 active:scale-95 shadow-sm hover:shadow-orange-200 hover:shadow-md' 
+                  : 'border border-gray-200 cursor-not-allowed opacity-50'
               }`}
               title={waterBottleItem ? "Add Water Bottle" : "Water bottle not available"}
             >
-              <span>💧</span>
-              <span>Water</span>
+              {waterBottleItem?.image ? (
+                <img
+                  src={waterBottleItem.image}
+                  alt={waterBottleItem.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="w-full h-full flex items-center justify-center bg-orange-50 text-xl">💧</span>
+              )}
               {waterBottleInCart && (
-                <span className="bg-blue-200 text-blue-800 text-xs font-bold px-2 py-0.5 rounded-full">
+                <span className="absolute -top-1 -right-1 bg-[#D95D1E] text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center shadow">
                   {waterBottleInCart.quantity}
                 </span>
               )}

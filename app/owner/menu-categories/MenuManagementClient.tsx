@@ -60,6 +60,8 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                 if (water) {
                     setWaterProduct(water);
                     setWaterPrice(water.basePrice);
+                    setWaterName(water.name);
+                    setWaterImageUrl(water.imageUrl || '');
                     return;
                 }
             }
@@ -83,6 +85,8 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
     const [waterProduct, setWaterProduct] = useState<Product | null>(null);
     const [isWaterModalOpen, setIsWaterModalOpen] = useState(false);
     const [waterPrice, setWaterPrice] = useState('1.50');
+    const [waterName, setWaterName] = useState('Bottled Water');
+    const [waterImageUrl, setWaterImageUrl] = useState('');
 
     const [editingModifierGroup, setEditingModifierGroup] = useState<{
         id?: string;
@@ -261,7 +265,11 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
         }
     };
 
-    const handleSaveWaterPrice = async () => {
+    const handleSaveWaterProduct = async () => {
+        if (!waterName.trim()) {
+            alert('Please enter a product name');
+            return;
+        }
         if (!waterProduct) {
             // Create water product if it doesn't exist
             const drinkCategory = categories.find(c => c.type === 'drink');
@@ -271,8 +279,9 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
             }
             const newProduct = await createProduct({
                 categoryId: drinkCategory.id,
-                name: 'Bottled Water',
+                name: waterName,
                 basePrice: waterPrice,
+                imageUrl: waterImageUrl || undefined,
                 isHidden: false,
             });
             setWaterProduct(newProduct);
@@ -280,9 +289,9 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
             // Update existing water product
             await updateProduct(waterProduct.id, {
                 categoryId: waterProduct.categoryId,
-                name: waterProduct.name,
+                name: waterName,
                 basePrice: waterPrice,
-                imageUrl: waterProduct.imageUrl || undefined,
+                imageUrl: waterImageUrl || undefined,
                 modifierGroups: [],
                 isHidden: waterProduct.isHidden || false,
             });
@@ -294,34 +303,73 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
         <div className="max-w-5xl mx-auto pb-20">
             {/* Water Product Quick Settings */}
             <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-6 shadow-sm">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <Droplet className="text-blue-500" size={20} />
-                        <div>
-                            <h3 className="text-sm font-bold text-gray-900">Water Bottle Product</h3>
-                            <p className="text-xs text-gray-500">Quick cart access product</p>
-                        </div>
+                <div className="flex items-start gap-4">
+                    {/* Image preview */}
+                    <div className="w-16 h-16 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                        {waterImageUrl ? (
+                            <img src={waterImageUrl} alt={waterName} className="w-full h-full object-cover" />
+                        ) : (
+                            <Droplet className="text-blue-400" size={24} />
+                        )}
                     </div>
-                    <div className="flex items-center gap-3">
+
+                    <div className="flex-1 space-y-3">
                         <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-500">Price:</span>
-                            <div className="relative">
-                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">₱</span>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={waterPrice}
-                                    onChange={(e) => setWaterPrice(e.target.value)}
-                                    className="w-20 pl-6 pr-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold focus:border-[#D95D1E] focus:ring-1 focus:ring-[#D95D1E]"
-                                />
+                            <Droplet className="text-blue-500" size={16} />
+                            <div>
+                                <h3 className="text-sm font-bold text-gray-900">Water Bottle Product</h3>
+                                <p className="text-xs text-gray-500">Quick cart access product</p>
                             </div>
                         </div>
-                        <button
-                            onClick={handleSaveWaterPrice}
-                            className="px-4 py-1.5 bg-[#D95D1E] text-white text-sm font-bold rounded-lg hover:bg-[#bf4f18] transition-colors"
-                        >
-                            {waterProduct ? 'Update' : 'Create'}
-                        </button>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            {/* Name */}
+                            <div className="md:col-span-1">
+                                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Name</label>
+                                <input
+                                    type="text"
+                                    value={waterName}
+                                    onChange={(e) => setWaterName(e.target.value)}
+                                    placeholder="e.g. Bottled Water"
+                                    className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold focus:border-[#D95D1E] focus:ring-1 focus:ring-[#D95D1E]"
+                                />
+                            </div>
+
+                            {/* Image URL */}
+                            <div className="md:col-span-1">
+                                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Image URL</label>
+                                <input
+                                    type="text"
+                                    value={waterImageUrl}
+                                    onChange={(e) => setWaterImageUrl(e.target.value)}
+                                    placeholder="https://..."
+                                    className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:border-[#D95D1E] focus:ring-1 focus:ring-[#D95D1E]"
+                                />
+                            </div>
+
+                            {/* Price + Save */}
+                            <div className="md:col-span-1">
+                                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Price</label>
+                                <div className="flex items-center gap-2">
+                                    <div className="relative flex-1">
+                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">₱</span>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            value={waterPrice}
+                                            onChange={(e) => setWaterPrice(e.target.value)}
+                                            className="w-full pl-6 pr-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold focus:border-[#D95D1E] focus:ring-1 focus:ring-[#D95D1E]"
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={handleSaveWaterProduct}
+                                        className="px-4 py-1.5 bg-[#D95D1E] text-white text-sm font-bold rounded-lg hover:bg-[#bf4f18] transition-colors whitespace-nowrap"
+                                    >
+                                        {waterProduct ? 'Update' : 'Create'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
