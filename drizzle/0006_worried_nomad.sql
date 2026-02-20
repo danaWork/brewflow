@@ -1,0 +1,2 @@
+ALTER TABLE "modifier_groups" ADD COLUMN "default_option_id" uuid;--> statement-breakpoint
+ALTER TABLE "modifier_groups" ADD CONSTRAINT "modifier_groups_default_option_id_modifier_options_id_fk" FOREIGN KEY ("default_option_id") REFERENCES "public"."modifier_options"("id") ON DELETE no action ON UPDATE no action;

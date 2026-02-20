@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, ChevronDown, ChevronRight, Edit2, Trash2, Image as ImageIcon, Settings2, X, Trash } from 'lucide-react';
+import React from 'react';
+import { Plus, ChevronDown, ChevronRight, Edit2, Trash2, Image as ImageIcon, Settings2, X, Trash, Droplet } from 'lucide-react';
 import { 
     createCategory, updateCategory, deleteCategory, 
     createProduct, updateProduct, deleteProduct,
@@ -16,7 +17,7 @@ type Product = {
     imageUrl: string | null;
     categoryId: string;
     isHidden?: boolean;
-    modifierLinks?: { modifierGroupId: string }[];
+    modifierLinks?: { modifierGroupId: string; defaultModifierOptionId?: string | null }[];
     productIngredients?: { inventoryItemId: string; quantityRequired: string }[];
 };
 
@@ -32,6 +33,7 @@ type ModifierGroup = {
     id: string;
     name: string;
     displayMode: 'list' | 'buttons' | 'cards';
+    defaultOptionId?: string | null;
     options: { id: string; name: string; price: string; imageUrl?: string | null }[];
 };
 
@@ -47,6 +49,24 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
     const [categories, setCategories] = useState<Category[]>(initialCategories);
     const [expandedCategories, setExpandedCategories] = useState<string[]>(initialCategories.map(c => c.id));
     
+    // Find water product on mount
+    React.useEffect(() => {
+        const findWaterProduct = () => {
+            for (const category of initialCategories) {
+                const water = category.products.find(p => 
+                    p.name.toLowerCase().includes('water') && 
+                    (p.name.toLowerCase().includes('bottle') || p.name.toLowerCase().includes('bottled'))
+                );
+                if (water) {
+                    setWaterProduct(water);
+                    setWaterPrice(water.basePrice);
+                    return;
+                }
+            }
+        };
+        findWaterProduct();
+    }, [initialCategories]);
+    
     // Modals
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -59,11 +79,17 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
     const [editingIngredients, setEditingIngredients] = useState<{ inventoryItemId: string; quantityRequired: number }[]>([]);
 
     const [editingSizes, setEditingSizes] = useState<{name: string, price: number}[]>([]);
+    const [defaultModifierOptions, setDefaultModifierOptions] = useState<Record<string, string>>({});
+    const [waterProduct, setWaterProduct] = useState<Product | null>(null);
+    const [isWaterModalOpen, setIsWaterModalOpen] = useState(false);
+    const [waterPrice, setWaterPrice] = useState('1.50');
 
     const [editingModifierGroup, setEditingModifierGroup] = useState<{
         id?: string;
         name: string;
         displayMode: 'list' | 'buttons' | 'cards';
+        defaultOptionId?: string | null;
+        defaultOptionIndex?: number | null; // For new groups before options have IDs
         options: { id?: string; name: string; price: number; imageUrl?: string }[];
     } | null>(null);
 
@@ -83,6 +109,18 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
             })));
         } else {
             setEditingIngredients([]);
+        }
+        // Initialize default modifier options from product
+        if (product && product.modifierLinks) {
+            const defaults: Record<string, string> = {};
+            product.modifierLinks.forEach(link => {
+                if (link.defaultModifierOptionId) {
+                    defaults[link.modifierGroupId] = link.defaultModifierOptionId;
+                }
+            });
+            setDefaultModifierOptions(defaults);
+        } else {
+            setDefaultModifierOptions({});
         }
         setIsProductModalOpen(true);
     };
@@ -126,12 +164,19 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
 
         const isHidden = formData.get('isHidden') === 'on';
 
+        // Build modifier groups with default options
+        const modifierGroupIds = formData.getAll('modifierGroups') as string[];
+        const modifierGroups = modifierGroupIds.map(groupId => ({
+            modifierGroupId: groupId,
+            defaultModifierOptionId: defaultModifierOptions[groupId] || undefined,
+        }));
+
         const data = {
             categoryId,
             name,
             basePrice,
             imageUrl: imageUrl || undefined,
-            modifierGroupIds: formData.getAll('modifierGroups') as string[],
+            modifierGroups,
             isHidden,
         };
 
@@ -186,17 +231,24 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
         const validOptions = editingModifierGroup.options.filter(o => o.name.trim() !== '');
         
         if (editingModifierGroup.id) {
+            // For existing groups, use defaultOptionId directly
             await updateModifierGroup(
                 editingModifierGroup.id,
                 editingModifierGroup.name,
                 validOptions,
-                editingModifierGroup.displayMode
+                editingModifierGroup.displayMode,
+                editingModifierGroup.defaultOptionId
             );
         } else {
+            // For new groups, we'll set defaultOptionId after options are created
+            // We'll pass the index, and the backend will handle it
             await createModifierGroup(
                 editingModifierGroup.name, 
                 validOptions, 
-                editingModifierGroup.displayMode
+                editingModifierGroup.displayMode,
+                editingModifierGroup.defaultOptionIndex !== null && editingModifierGroup.defaultOptionIndex !== undefined
+                    ? validOptions[editingModifierGroup.defaultOptionIndex]?.name // Pass name as identifier for new groups
+                    : null
             );
         }
         window.location.reload();
@@ -209,8 +261,71 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
         }
     };
 
+    const handleSaveWaterPrice = async () => {
+        if (!waterProduct) {
+            // Create water product if it doesn't exist
+            const drinkCategory = categories.find(c => c.type === 'drink');
+            if (!drinkCategory) {
+                alert('Please create a drink category first');
+                return;
+            }
+            const newProduct = await createProduct({
+                categoryId: drinkCategory.id,
+                name: 'Bottled Water',
+                basePrice: waterPrice,
+                isHidden: false,
+            });
+            setWaterProduct(newProduct);
+        } else {
+            // Update existing water product
+            await updateProduct(waterProduct.id, {
+                categoryId: waterProduct.categoryId,
+                name: waterProduct.name,
+                basePrice: waterPrice,
+                imageUrl: waterProduct.imageUrl || undefined,
+                modifierGroups: [],
+                isHidden: waterProduct.isHidden || false,
+            });
+        }
+        window.location.reload();
+    };
+
     return (
         <div className="max-w-5xl mx-auto pb-20">
+            {/* Water Product Quick Settings */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-6 shadow-sm">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <Droplet className="text-blue-500" size={20} />
+                        <div>
+                            <h3 className="text-sm font-bold text-gray-900">Water Bottle Product</h3>
+                            <p className="text-xs text-gray-500">Quick cart access product</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500">Price:</span>
+                            <div className="relative">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">₱</span>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={waterPrice}
+                                    onChange={(e) => setWaterPrice(e.target.value)}
+                                    className="w-20 pl-6 pr-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold focus:border-[#D95D1E] focus:ring-1 focus:ring-[#D95D1E]"
+                                />
+                            </div>
+                        </div>
+                        <button
+                            onClick={handleSaveWaterPrice}
+                            className="px-4 py-1.5 bg-[#D95D1E] text-white text-sm font-bold rounded-lg hover:bg-[#bf4f18] transition-colors"
+                        >
+                            {waterProduct ? 'Update' : 'Create'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             {/* Header Area */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
                 <div>
@@ -405,6 +520,8 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                 setEditingModifierGroup({ 
                                     name: '', 
                                     displayMode: activeTab === 'toppings' ? 'cards' : 'list', 
+                                    defaultOptionId: null,
+                                    defaultOptionIndex: null,
                                     options: [{ name: '', price: 0 }] 
                                 });
                                 setIsModifierModalOpen(true);
@@ -449,6 +566,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                                         id: group.id,
                                                         name: group.name,
                                                         displayMode: group.displayMode,
+                                                        defaultOptionId: group.defaultOptionId || null,
                                                         options: group.options.map(o => ({
                                                             id: o.id,
                                                             name: o.name,
@@ -734,30 +852,64 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
 
                             <div className="border-t border-gray-100 pt-6">
                                 <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-4">Linked Modifiers</label>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="space-y-4">
                                     {modifierGroups.length === 0 ? (
-                                        <p className="col-span-full text-xs text-gray-400 italic bg-gray-50 p-6 rounded-2xl text-center border border-dashed border-gray-200">
+                                        <p className="text-xs text-gray-400 italic bg-gray-50 p-6 rounded-2xl text-center border border-dashed border-gray-200">
                                             Go to the 'Modifiers' tab to create your first customization group.
                                         </p>
                                     ) : (
                                         modifierGroups.map((group) => {
                                             const isChecked = editingProduct?.modifierLinks?.some(link => link.modifierGroupId === group.id);
+                                            const currentDefault = defaultModifierOptions[group.id] || '';
                                             return (
-                                                <label key={group.id} className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 bg-gray-50/50 cursor-pointer hover:bg-white hover:border-[#D95D1E]/20 transition-all group">
-                                                    <input
-                                                        type="checkbox"
-                                                        name="modifierGroups"
-                                                        value={group.id}
-                                                        defaultChecked={isChecked}
-                                                        className="w-5 h-5 rounded-lg border-gray-300 text-[#D95D1E] focus:ring-[#D95D1E]"
-                                                    />
-                                                    <div>
-                                                        <span className="text-sm font-bold text-gray-700 group-hover:text-gray-900">{group.name}</span>
-                                                        <p className="text-[9px] text-gray-400 uppercase font-bold tracking-tighter mt-0.5">
-                                                            {group.options.length} OPTIONS
-                                                        </p>
-                                                    </div>
-                                                </label>
+                                                <div key={group.id} className="p-4 rounded-2xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:border-[#D95D1E]/20 transition-all">
+                                                    <label className="flex items-center gap-4 cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            name="modifierGroups"
+                                                            value={group.id}
+                                                            defaultChecked={isChecked}
+                                                            onChange={(e) => {
+                                                                if (!e.target.checked) {
+                                                                    const newDefaults = { ...defaultModifierOptions };
+                                                                    delete newDefaults[group.id];
+                                                                    setDefaultModifierOptions(newDefaults);
+                                                                }
+                                                            }}
+                                                            className="w-5 h-5 rounded-lg border-gray-300 text-[#D95D1E] focus:ring-[#D95D1E]"
+                                                        />
+                                                        <div className="flex-1">
+                                                            <span className="text-sm font-bold text-gray-700">{group.name}</span>
+                                                            <p className="text-[9px] text-gray-400 uppercase font-bold tracking-tighter mt-0.5">
+                                                                {group.options.length} OPTIONS
+                                                            </p>
+                                                            {isChecked && group.options.length > 0 && (
+                                                                <div className="mt-3">
+                                                                    <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">
+                                                                        Default Option
+                                                                    </label>
+                                                                    <select
+                                                                        value={currentDefault}
+                                                                        onChange={(e) => {
+                                                                            setDefaultModifierOptions({
+                                                                                ...defaultModifierOptions,
+                                                                                [group.id]: e.target.value || '',
+                                                                            });
+                                                                        }}
+                                                                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-[#D95D1E] focus:border-[#D95D1E]"
+                                                                    >
+                                                                        <option value="">None (no default)</option>
+                                                                        {group.options.map((opt) => (
+                                                                            <option key={opt.id} value={opt.id}>
+                                                                                {opt.name} {parseFloat(opt.price) > 0 ? `(+₱${opt.price})` : ''}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </label>
+                                                </div>
                                             );
                                         })
                                     )}
@@ -881,61 +1033,139 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-4">Options</label>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-400">Options</label>
+                                        <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 border border-orange-100 rounded-lg">
+                                            <span className="text-[10px] text-[#D95D1E] font-bold">⭐</span>
+                                            <span className="text-[10px] text-[#D95D1E] font-semibold">Click star to set default</span>
+                                        </div>
+                                    </div>
                                     <div className="space-y-3">
-                                        {editingModifierGroup.options.map((opt, idx) => (
-                                            <div key={idx} className="flex gap-3 items-start animate-in slide-in-from-left-2 duration-200">
-                                                <div className="flex-1 space-y-2">
-                                                    <div className="flex gap-3">
-                                                        <input
-                                                            value={opt.name}
-                                                            onChange={(e) => {
-                                                                const newOpts = [...editingModifierGroup.options];
-                                                                newOpts[idx].name = e.target.value;
-                                                                setEditingModifierGroup({ ...editingModifierGroup, options: newOpts });
-                                                            }}
-                                                            placeholder="Option Name"
-                                                            className="flex-1 px-4 py-2 bg-gray-50 border-none rounded-xl text-sm font-medium focus:ring-2 focus:ring-[#D95D1E]"
-                                                        />
-                                                        <div className="relative w-24">
-                                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">₱</span>
+                                        {editingModifierGroup.options.map((opt, idx) => {
+                                            const isDefault = editingModifierGroup.defaultOptionId === opt.id || 
+                                                             (editingModifierGroup.defaultOptionIndex === idx && !opt.id);
+                                            return (
+                                                <div 
+                                                    key={idx} 
+                                                    className={`flex gap-3 items-start p-4 rounded-2xl border-2 transition-all animate-in slide-in-from-left-2 duration-200 ${
+                                                        isDefault 
+                                                            ? 'bg-orange-50 border-[#D95D1E] shadow-sm' 
+                                                            : 'bg-gray-50 border-gray-100 hover:border-gray-200'
+                                                    }`}
+                                                >
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (opt.id) {
+                                                                setEditingModifierGroup({ 
+                                                                    ...editingModifierGroup, 
+                                                                    defaultOptionId: isDefault ? null : opt.id,
+                                                                    defaultOptionIndex: null
+                                                                });
+                                                            } else {
+                                                                setEditingModifierGroup({ 
+                                                                    ...editingModifierGroup, 
+                                                                    defaultOptionId: null,
+                                                                    defaultOptionIndex: isDefault ? null : idx
+                                                                });
+                                                            }
+                                                        }}
+                                                        className={`flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+                                                            isDefault 
+                                                                ? 'bg-[#D95D1E] text-white shadow-md' 
+                                                                : 'bg-white border-2 border-gray-200 text-gray-400 hover:border-[#D95D1E] hover:text-[#D95D1E]'
+                                                        }`}
+                                                        title={isDefault ? "Remove as default" : "Set as default option"}
+                                                    >
+                                                        {isDefault ? (
+                                                            <span className="text-lg">⭐</span>
+                                                        ) : (
+                                                            <span className="text-sm opacity-50">☆</span>
+                                                        )}
+                                                    </button>
+                                                    <div className="flex-1 space-y-2">
+                                                        <div className="flex gap-3 items-center">
                                                             <input
-                                                                type="number"
-                                                                value={opt.price}
+                                                                value={opt.name}
                                                                 onChange={(e) => {
                                                                     const newOpts = [...editingModifierGroup.options];
-                                                                    newOpts[idx].price = parseFloat(e.target.value);
+                                                                    newOpts[idx].name = e.target.value;
                                                                     setEditingModifierGroup({ ...editingModifierGroup, options: newOpts });
                                                                 }}
-                                                                className="w-full pl-6 pr-3 py-2 bg-gray-50 border-none rounded-xl text-sm font-bold focus:ring-2 focus:ring-[#D95D1E]"
+                                                                placeholder="Option Name"
+                                                                className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                                                                    isDefault 
+                                                                        ? 'bg-white border-2 border-[#D95D1E]/30 focus:border-[#D95D1E]' 
+                                                                        : 'bg-white border border-gray-200 focus:border-[#D95D1E] focus:ring-2 focus:ring-[#D95D1E]/20'
+                                                                }`}
                                                             />
+                                                            <div className="relative w-28">
+                                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">₱</span>
+                                                                <input
+                                                                    type="number"
+                                                                    value={opt.price}
+                                                                    onChange={(e) => {
+                                                                        const newOpts = [...editingModifierGroup.options];
+                                                                        newOpts[idx].price = parseFloat(e.target.value) || 0;
+                                                                        setEditingModifierGroup({ ...editingModifierGroup, options: newOpts });
+                                                                    }}
+                                                                    className={`w-full pl-7 pr-3 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                                                                        isDefault 
+                                                                            ? 'bg-white border-2 border-[#D95D1E]/30 focus:border-[#D95D1E]' 
+                                                                            : 'bg-white border border-gray-200 focus:border-[#D95D1E] focus:ring-2 focus:ring-[#D95D1E]/20'
+                                                                    }`}
+                                                                />
+                                                            </div>
                                                         </div>
+                                                        {editingModifierGroup.displayMode === 'cards' && (
+                                                            <input
+                                                                value={opt.imageUrl || ''}
+                                                                onChange={(e) => {
+                                                                    const newOpts = [...editingModifierGroup.options];
+                                                                    newOpts[idx].imageUrl = e.target.value;
+                                                                    setEditingModifierGroup({ ...editingModifierGroup, options: newOpts });
+                                                                }}
+                                                                placeholder="Image URL (https://...)"
+                                                                className={`w-full px-4 py-2 rounded-xl text-xs font-medium transition-all ${
+                                                                    isDefault 
+                                                                        ? 'bg-white border-2 border-[#D95D1E]/30 focus:border-[#D95D1E]' 
+                                                                        : 'bg-white border border-gray-200 focus:border-[#D95D1E] focus:ring-2 focus:ring-[#D95D1E]/20'
+                                                                }`}
+                                                            />
+                                                        )}
+                                                        {isDefault && (
+                                                            <div className="flex items-center gap-1.5 mt-1">
+                                                                <span className="text-[10px] font-bold text-[#D95D1E] uppercase tracking-wider bg-orange-100 px-2 py-0.5 rounded-full">
+                                                                    Default Option
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                    {editingModifierGroup.displayMode === 'cards' && (
-                                                        <input
-                                                            value={opt.imageUrl || ''}
-                                                            onChange={(e) => {
-                                                                const newOpts = [...editingModifierGroup.options];
-                                                                newOpts[idx].imageUrl = e.target.value;
-                                                                setEditingModifierGroup({ ...editingModifierGroup, options: newOpts });
-                                                            }}
-                                                            placeholder="Image URL (https://...)"
-                                                            className="w-full px-4 py-2 bg-gray-50 border-none rounded-xl text-xs font-medium text-gray-500 focus:ring-2 focus:ring-[#D95D1E]"
-                                                        />
-                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const newOpts = editingModifierGroup.options.filter((_, i) => i !== idx);
+                                                            // Clear defaultOptionId/defaultOptionIndex if the deleted option was the default
+                                                            const wasDefault = editingModifierGroup.defaultOptionId === opt.id || editingModifierGroup.defaultOptionIndex === idx;
+                                                            const newDefaultOptionId = wasDefault ? null : editingModifierGroup.defaultOptionId;
+                                                            const newDefaultOptionIndex = wasDefault ? null : 
+                                                                (editingModifierGroup.defaultOptionIndex !== null && editingModifierGroup.defaultOptionIndex !== undefined && editingModifierGroup.defaultOptionIndex > idx
+                                                                    ? editingModifierGroup.defaultOptionIndex - 1 
+                                                                    : editingModifierGroup.defaultOptionIndex);
+                                                            setEditingModifierGroup({ 
+                                                                ...editingModifierGroup, 
+                                                                options: newOpts, 
+                                                                defaultOptionId: newDefaultOptionId,
+                                                                defaultOptionIndex: newDefaultOptionIndex
+                                                            });
+                                                        }}
+                                                        className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all flex-shrink-0"
+                                                    >
+                                                        <Trash size={16} />
+                                                    </button>
                                                 </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const newOpts = editingModifierGroup.options.filter((_, i) => i !== idx);
-                                                        setEditingModifierGroup({ ...editingModifierGroup, options: newOpts });
-                                                    }}
-                                                    className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                                                >
-                                                    <Trash size={16} />
-                                                </button>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                     <button
                                         type="button"
@@ -943,7 +1173,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                             ...editingModifierGroup,
                                             options: [...editingModifierGroup.options, { name: '', price: 0 }]
                                         })}
-                                        className="mt-4 flex items-center gap-2 text-sm font-bold text-[#D95D1E] hover:bg-orange-50 px-3 py-2 rounded-lg transition-all"
+                                        className="mt-4 flex items-center gap-2 text-sm font-bold text-[#D95D1E] hover:bg-orange-50 px-4 py-2.5 rounded-xl transition-all border border-orange-100 hover:border-[#D95D1E]/30"
                                     >
                                         <Plus size={16} />
                                         Add Option

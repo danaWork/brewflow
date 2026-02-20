@@ -154,6 +154,7 @@ export async function getMenuData(qrIdentifier: string) {
                         id: ml.modifierGroup.id,
                         name: ml.modifierGroup.name,
                         displayMode: ml.modifierGroup.displayMode,
+                        defaultModifierOptionId: ml.defaultModifierOptionId || null,
                         options: ml.modifierGroup.options.map(o => ({
                             id: o.id,
                             name: o.name,
@@ -213,4 +214,12 @@ export async function getMenuData(qrIdentifier: string) {
             error: "Failed to fetch menu data",
         };
     }
+}
+
+export async function getProductsByTableId(tableId: string) {
+    const result = await getMenuData(tableId);
+    if (!result.success) {
+        return { success: false, error: result.error, products: [] };
+    }
+    return { success: true, products: result.products || [] };
 }

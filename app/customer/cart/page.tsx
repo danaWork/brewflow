@@ -6,13 +6,67 @@ import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import CartItem from '@/components/customer/CartItem';
 import FloatingOrderTabs from '@/components/customer/FloatingOrderTabs';
+import { getProductsByTableId } from '@/app/actions/menu';
 
 export default function CartPage() {
-  const { items, cartTotal, cartCount } = useCart();
+  const { items, cartTotal, cartCount, addItem, updateQuantity } = useCart();
   const { tableName, tableId } = useTable();
   const router = useRouter();
+  const [products, setProducts] = useState<any[]>([]);
+  const [waterBottleItem, setWaterBottleItem] = useState<any>(null);
+
+  // Fetch products to find water bottle
+  useEffect(() => {
+    if (tableId) {
+      getProductsByTableId(tableId).then(result => {
+        if (result.success) {
+          setProducts(result.products || []);
+          // Find water bottle product (case-insensitive search, more flexible)
+          const waterBottle = result.products?.find((p: any) => {
+            const nameLower = p.name.toLowerCase();
+            return nameLower.includes('water') && (nameLower.includes('bottle') || nameLower.includes('bottled'));
+          }) || result.products?.find((p: any) => {
+            // Fallback: just search for "water"
+            const nameLower = p.name.toLowerCase();
+            return nameLower === 'water' || nameLower === 'bottled water' || nameLower === 'water bottle';
+          });
+          if (waterBottle) {
+            setWaterBottleItem(waterBottle);
+          }
+        }
+      }).catch(err => {
+        console.error('Error fetching products for water bottle:', err);
+      });
+    }
+  }, [tableId]);
+
+  // Find water bottle in cart
+  const waterBottleInCart = items.find(item => 
+    item.productId === waterBottleItem?.id && 
+    (!item.options || Object.keys(item.options).length === 0)
+  );
+
+  const handleWaterBottleClick = () => {
+    if (!waterBottleItem) return;
+    
+    if (waterBottleInCart) {
+      // Increment quantity if already in cart
+      updateQuantity(waterBottleInCart.id, 1);
+    } else {
+      // Add new item
+      addItem({
+        productId: waterBottleItem.id,
+        name: waterBottleItem.name,
+        price: waterBottleItem.price,
+        quantity: 1,
+        image: waterBottleItem.image,
+        options: {},
+      });
+    }
+  };
 
   // Calculate generic discount (mock logic: 20% off on extras that are part of a bundle)
   // In a real app, 'originalPrice' would be stored in cart item extra data.
@@ -81,7 +135,24 @@ export default function CartPage() {
                 <span className="text-sm text-gray-500">{tableName || 'Table ...'}</span>
             </div>
 
-            <div className="w-10" /> {/* Spacer for centering */}
+            <button
+              onClick={handleWaterBottleClick}
+              disabled={!waterBottleItem}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition-colors border ${
+                waterBottleItem 
+                  ? 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200' 
+                  : 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
+              }`}
+              title={waterBottleItem ? "Add Water Bottle" : "Water bottle not available"}
+            >
+              <span>💧</span>
+              <span>Water</span>
+              {waterBottleInCart && (
+                <span className="bg-blue-200 text-blue-800 text-xs font-bold px-2 py-0.5 rounded-full">
+                  {waterBottleInCart.quantity}
+                </span>
+              )}
+            </button>
         </div>
       </div>
 

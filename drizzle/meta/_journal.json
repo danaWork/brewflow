@@ -36,6 +36,20 @@
       "when": 1771442469457,
       "tag": "0004_dazzling_franklin_richards",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1771582763853,
+      "tag": "0005_heavy_vin_gonzales",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1771586725026,
+      "tag": "0006_worried_nomad",
+      "breakpoints": true
     }
   ]
 }

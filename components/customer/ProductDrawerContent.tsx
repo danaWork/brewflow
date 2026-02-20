@@ -113,21 +113,39 @@ export default function ProductDrawerContent({
     product.categoryType === "snack" ||
     category?.name?.toLowerCase() === "snacks";
 
+  // Check if modifiers/toppings exist
+  const hasModifiers = (product.modifiers || []).some((g: any) => g.displayMode !== "cards");
+  const hasToppings = (product.modifiers || []).some((g: any) => g.displayMode === "cards");
+
   // Set initial step based on flow
   const initialStep = isSnack
     ? "quantity"
     : flow === "simple_choice" || flow === "fixed_meal"
       ? "dynamic_options"
-      : (hasSizes ? "size" : "customization");
+      : (hasSizes ? "size" : (hasModifiers ? "customization" : (hasToppings ? "toppings" : "quantity")));
       
   const [step, setStep] = useState<Step>(initialStep);
   // --- STATE ---
   const [quantity, setQuantity] = useState(1);
   const defaultSizeName = activeSizes.find((s: any) => s.name.toLowerCase() === 'medium')?.name || activeSizes[0]?.name || '';
   const [size, setSize] = useState(defaultSizeName);
+  
+  // Initialize selectedOptions with default modifier options
+  const initialSelectedOptions: Record<string, string | string[]> = {};
+  (product.modifiers || []).forEach((group: any) => {
+    if (group.defaultModifierOptionId) {
+      // Check if it's a multi-select (cards) or single-select
+      if (group.displayMode === 'cards') {
+        initialSelectedOptions[group.id] = [group.defaultModifierOptionId];
+      } else {
+        initialSelectedOptions[group.id] = group.defaultModifierOptionId;
+      }
+    }
+  });
+  
   const [selectedOptions, setSelectedOptions] = useState<
     Record<string, string | string[]>
-  >({});
+  >(initialSelectedOptions);
 
   const [infoModalOpen, setInfoModalOpen] = useState(false);
   const [activeInfoKey, setActiveInfoKey] = useState<string | null>(null);
@@ -136,9 +154,6 @@ export default function ProductDrawerContent({
     setActiveInfoKey(key);
     setInfoModalOpen(true);
   };
-
-  // Initialize defaults (optional)
-  // We could set the first option as default for single-select groups if needed
 
   // Pricing Logic
   const basePrice = product.price;
@@ -337,8 +352,26 @@ export default function ProductDrawerContent({
           <button
             onClick={() => {
               if (step === "customization") setStep("size");
-              if (step === "toppings") setStep("customization");
-              if (step === "upsell") setStep("toppings"); // Modified flow: customizing leads to toppings leads to upsell
+              if (step === "toppings") {
+                if (hasModifiers) {
+                  setStep("customization");
+                } else if (hasSizes) {
+                  setStep("size");
+                } else {
+                  setStep("quantity");
+                }
+              }
+              if (step === "upsell") {
+                if (hasToppings) {
+                  setStep("toppings");
+                } else if (hasModifiers) {
+                  setStep("customization");
+                } else if (hasSizes) {
+                  setStep("size");
+                } else {
+                  setStep("quantity");
+                }
+              }
             }}
             className="bg-white p-2 rounded-lg shadow-sm text-gray-900 transition-transform active:scale-95"
           >
@@ -407,7 +440,17 @@ export default function ProductDrawerContent({
             ))}
           </div>
         </div>
-        <StickyFooter onClick={() => setStep("customization")} />
+        <StickyFooter onClick={() => {
+          if (hasModifiers) {
+            setStep("customization");
+          } else if (hasToppings) {
+            setStep("toppings");
+          } else if (bundlePromo) {
+            setStep("upsell");
+          } else {
+            setStep("frequentlyBought");
+          }
+        }} />
       </div>
     );
   }
@@ -445,6 +488,18 @@ export default function ProductDrawerContent({
   }
 
   if (step === "customization") {
+    // Skip this step if no modifiers exist
+    if (!hasModifiers) {
+      if (hasToppings) {
+        setStep("toppings");
+      } else if (bundlePromo) {
+        setStep("upsell");
+      } else {
+        setStep("frequentlyBought");
+      }
+      return null;
+    }
+
     return (
       <div className="flex flex-col h-full bg-white">
         <HeaderImage compact />
@@ -462,7 +517,7 @@ export default function ProductDrawerContent({
             <span className="text-black font-bold text-sm">Make it yours</span>
           </div>
 
-          {(product.modifiers || []).length === 0 ? (
+          {(product.modifiers || []).filter((g: any) => g.displayMode !== "cards").length === 0 ? (
             <div className="text-center py-10 text-gray-400 text-sm">
               No options available for this item.
             </div>
@@ -554,7 +609,18 @@ export default function ProductDrawerContent({
               ))
           )}
         </div>
-        <StickyFooter onClick={() => setStep("toppings")} />
+        <StickyFooter onClick={() => {
+          if (hasToppings) {
+            setStep("toppings");
+          } else {
+            // Skip toppings step, go to next available step
+            if (bundlePromo) {
+              setStep("upsell");
+            } else {
+              setStep("frequentlyBought");
+            }
+          }
+        }} />
         {activeInfoKey && MODIFIER_INFO[activeInfoKey] && (
           <InfoPopup
             isOpen={infoModalOpen}
@@ -583,6 +649,16 @@ export default function ProductDrawerContent({
 
   // --- STEP: TOPPINGS ---
   if (step === "toppings") {
+    // Skip this step if no toppings exist
+    if (!hasToppings) {
+      if (bundlePromo) {
+        setStep("upsell");
+      } else {
+        setStep("frequentlyBought");
+      }
+      return null;
+    }
+
     const toppingsGroups = (product.modifiers || []).filter(
       (g: any) => g.displayMode === "cards",
     );

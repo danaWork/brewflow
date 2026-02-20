@@ -64,6 +64,7 @@ export const modifierGroups = pgTable('modifier_groups', {
   companyId: uuid('company_id').references(() => companies.id).notNull(),
   name: text('name').notNull(),
   displayMode: text('display_mode').default('list').notNull(), // 'list', 'buttons', 'cards'
+  defaultOptionId: uuid('default_option_id').references(() => modifierOptions.id),
 });
 
 export const modifierOptions = pgTable('modifier_options', {
@@ -78,6 +79,7 @@ export const productModifierLinks = pgTable('product_modifier_links', {
   id: uuid('id').defaultRandom().primaryKey(),
   productId: uuid('product_id').references(() => products.id).notNull(),
   modifierGroupId: uuid('modifier_group_id').references(() => modifierGroups.id).notNull(),
+  defaultModifierOptionId: uuid('default_modifier_option_id').references(() => modifierOptions.id),
 });
 
 export const tables = pgTable('tables', {
