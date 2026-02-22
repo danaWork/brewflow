@@ -128,17 +128,18 @@ export default function PerfectPairBundles({ products, promotions, branchId }: P
                         const triggerProduct = products.find(p => p.id === promo.triggerValue);
                         const pairProduct = promo.items[0]?.product;
 
+                        const discountLabel = promo.discountType === 'PERCENTAGE' ? `${parseFloat(promo.discountValue)}%` : `₱${parseFloat(promo.discountValue)}`;
                         return (
                             <div
                                 key={promo.id}
-                                className="bg-white border border-gray-100 rounded-lg p-3 flex items-center shadow-sm group/row"
+                                className="bg-white border border-gray-100 rounded-lg p-3 flex flex-col sm:flex-row sm:items-center gap-3 shadow-sm group/row relative pr-14 sm:pr-3"
                             >
-                                <div className="flex-1 text-sm font-medium text-gray-700">
+                                <div className="flex-1 min-w-0 text-sm font-medium text-gray-700">
                                     {triggerProduct?.name || 'Unknown Product'}
                                 </div>
 
-                                <div className="flex-[1.5] flex items-center gap-4">
-                                    <div className="flex-1">
+                                <div className="flex flex-col sm:flex-row sm:flex-[1.5] sm:items-center gap-2 sm:gap-4">
+                                    <div className="flex-1 min-w-0">
                                         <QuickChangeSelect
                                             value={pairProduct?.id || ''}
                                             options={products.filter(p => p.categoryType !== triggerProduct?.categoryType)}
@@ -148,34 +149,33 @@ export default function PerfectPairBundles({ products, promotions, branchId }: P
                                             })}
                                         />
                                     </div>
-                                    <div className="flex items-center gap-3">
-                                        <span className="bg-orange-500 text-white text-[10px] font-bold px-2 py-1 rounded">
-                                            {promo.discountType === 'PERCENTAGE' ? `${parseFloat(promo.discountValue)}%` : `₱${parseFloat(promo.discountValue)}`}
-                                        </span>
-                                        <div className="flex items-center gap-1 opacity-0 group-hover/row:opacity-100 transition-opacity">
-                                            <button
-                                                onClick={() => {
-                                                    setEditingPromotion({
-                                                        id: promo.id,
-                                                        name: promo.name,
-                                                        triggerItem: triggerProduct,
-                                                        pairItem: pairProduct,
-                                                        discountType: promo.discountType,
-                                                        discountValue: parseFloat(promo.discountValue)
-                                                    });
-                                                    setIsCreateModalOpen(true);
-                                                }}
-                                                className="text-gray-400 hover:text-orange-500 p-1"
-                                            >
-                                                <Pencil size={16} />
-                                            </button>
-                                            <button
-                                                onClick={() => setConfirmingAction({ type: 'delete', data: { promotionId: promo.id } })}
-                                                className="text-gray-400 hover:text-red-500 p-1"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
+                                    {/* Discount badge: top-right corner on mobile, inline on desktop */}
+                                    <span className="absolute top-2 right-2 sm:static shrink-0 w-fit bg-orange-500 text-white text-[10px] font-bold px-2 py-1 rounded">
+                                        {discountLabel}
+                                    </span>
+                                    <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover/row:opacity-100 transition-opacity">
+                                        <button
+                                            onClick={() => {
+                                                setEditingPromotion({
+                                                    id: promo.id,
+                                                    name: promo.name,
+                                                    triggerItem: triggerProduct,
+                                                    pairItem: pairProduct,
+                                                    discountType: promo.discountType,
+                                                    discountValue: parseFloat(promo.discountValue)
+                                                });
+                                                setIsCreateModalOpen(true);
+                                            }}
+                                            className="text-gray-400 hover:text-orange-500 p-1.5 rounded-lg hover:bg-orange-50"
+                                        >
+                                            <Pencil size={16} />
+                                        </button>
+                                        <button
+                                            onClick={() => setConfirmingAction({ type: 'delete', data: { promotionId: promo.id } })}
+                                            className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -202,7 +202,7 @@ export default function PerfectPairBundles({ products, promotions, branchId }: P
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-1">
                     <h2 className="text-lg font-bold text-gray-900">Perfect Pair Bundles</h2>
                     <p className="text-sm text-gray-400">Manage item pairings with special discounts.</p>
@@ -212,7 +212,7 @@ export default function PerfectPairBundles({ products, promotions, branchId }: P
                         setEditingPromotion(null);
                         setIsCreateModalOpen(true);
                     }}
-                    className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-lg text-sm font-bold transition-all shadow-md active:scale-95"
+                    className="flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-lg text-sm font-bold transition-all shadow-md active:scale-95 w-full sm:w-auto whitespace-nowrap"
                 >
                     <Plus size={18} />
                     Add Bundle

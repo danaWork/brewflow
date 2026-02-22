@@ -36,10 +36,20 @@ export default function LiveOrdersTabsMobile({
   const activeCol = columns.find((c) => c.id === activeTab) ?? columns[0];
   const orders = activeCol ? getOrdersByStatus(activeCol.id) : [];
 
+  /* Status accent color for content area top bar only */
+  const statusAccentBar: Record<OrderStatus, string> = {
+    PENDING: 'bg-amber-400',
+    PREPARING: 'bg-orange-400',
+    READY: 'bg-emerald-500',
+    COMPLETED: 'bg-gray-300',
+    CANCELLED: 'bg-gray-200',
+  };
+  const accentBar = statusAccentBar[activeCol.id] ?? 'bg-gray-200';
+
   return (
     <div className="flex flex-col flex-1 min-h-0 md:hidden">
-      {/* Tabs */}
-      <div className="flex border-b border-gray-200 bg-white overflow-x-auto shrink-0">
+      {/* Tabs - neutral bar, active = primary orange only */}
+      <div className="flex border-b border-gray-200 bg-gray-50 overflow-x-auto shrink-0 -mx-4 px-4">
         {columns.map((col) => {
           const count = getOrdersByStatus(col.id).length;
           const Icon = col.icon;
@@ -50,20 +60,20 @@ export default function LiveOrdersTabsMobile({
               type="button"
               onClick={() => setActiveTab(col.id)}
               className={`
-                flex items-center gap-1.5 px-4 py-3 min-h-[44px] shrink-0 text-sm font-medium transition-all
-                border-b-2
+                flex items-center gap-2 px-4 py-3.5 min-h-[48px] shrink-0 text-sm font-medium transition-all
+                border-b-2 -mb-px
                 ${isActive
-                  ? 'border-[#D95D1E] text-[#D95D1E] bg-[#FFEBE0]/30'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  ? 'border-[#D95D1E] text-[#D95D1E] bg-white shadow-sm'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-white/60'
                 }
               `}
             >
-              <Icon size={16} className={isActive ? 'text-[#D95D1E]' : 'text-gray-400'} />
+              <Icon size={18} className={isActive ? 'text-[#D95D1E]' : 'text-gray-400'} />
               <span className="whitespace-nowrap">{col.title}</span>
               <span
                 className={`
-                  ml-0.5 px-2 py-0.5 rounded-md text-xs font-semibold
-                  ${isActive ? 'bg-[#D95D1E]/20 text-[#D95D1E]' : 'bg-gray-100 text-gray-600'}
+                  px-2 py-0.5 rounded-full text-xs font-semibold min-w-[1.25rem] text-center
+                  ${isActive ? 'bg-[#D95D1E]/15 text-[#D95D1E]' : 'bg-gray-200/80 text-gray-600'}
                 `}
               >
                 {count}
@@ -73,11 +83,10 @@ export default function LiveOrdersTabsMobile({
         })}
       </div>
 
-      {/* Active column content */}
-      <div
-        className={`flex-1 overflow-y-auto p-4 rounded-b-xl border-2 border-t-0 ${activeCol.borderColor} ${activeCol.bgColor} min-h-[400px]`}
-      >
-        <div className="space-y-3">
+      {/* Content - neutral background with subtle status accent bar */}
+      <div className="flex-1 overflow-y-auto bg-gray-50 min-h-[400px] mt-0">
+        <div className={`h-1 shrink-0 ${accentBar}`} aria-hidden />
+        <div className="p-4 pt-4 space-y-4">
           {orders.map((order) => (
             <div
               key={order.id}

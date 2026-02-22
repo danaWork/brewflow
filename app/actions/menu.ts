@@ -98,7 +98,7 @@ export async function getMenuData(qrIdentifier: string) {
                 // Check ingredient stock
                 if (isInStock && p.productIngredients.length > 0) {
                     // Filter ingredients for this branch
-                    const branchIngredients = p.productIngredients.filter(pi => 
+                    const branchIngredients = p.productIngredients.filter((pi: { inventoryItem: { branchId: string } }) =>
                         pi.inventoryItem.branchId === tableData.branchId
                     );
 
@@ -150,12 +150,12 @@ export async function getMenuData(qrIdentifier: string) {
                     isSignature: false,
                     isInStock: isInStock, // This will be false if ingredients missing
                     categoryType: (c.type || 'drink').toLowerCase(),
-                    modifiers: p.modifierLinks.map(ml => ({
+                    modifiers: p.modifierLinks.map((ml: { modifierGroup: { id: string; name: string; displayMode: string; options: Array<{ id: string; name: string; price?: string; imageUrl?: string }> }; defaultModifierOptionId?: string | null }) => ({
                         id: ml.modifierGroup.id,
                         name: ml.modifierGroup.name,
                         displayMode: ml.modifierGroup.displayMode,
                         defaultModifierOptionId: ml.defaultModifierOptionId || null,
-                        options: ml.modifierGroup.options.map(o => ({
+                        options: ml.modifierGroup.options.map((o: { id: string; name: string; price?: string; imageUrl?: string }) => ({
                             id: o.id,
                             name: o.name,
                             // @ts-ignore - Schema updated but types might lag

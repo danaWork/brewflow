@@ -7,6 +7,8 @@ interface RevenueChartProps {
     data: Array<{ date: string; revenue: number; orders: number }>;
 }
 
+const MOBILE_BREAKPOINT = 768;
+
 export function RevenueChart({ data }: RevenueChartProps) {
     const [tooltip, setTooltip] = useState<{
         x: number;
@@ -15,8 +17,16 @@ export function RevenueChart({ data }: RevenueChartProps) {
         revenue: number;
         orders: number;
     } | null>(null);
+    const [isMobile, setIsMobile] = useState(false);
     const svgRef = useRef<SVGSVGElement>(null);
     const tooltipRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const check = () => setIsMobile(typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT);
+        check();
+        window.addEventListener('resize', check);
+        return () => window.removeEventListener('resize', check);
+    }, []);
 
     // Format currency
     const formatCurrency = useMemo(() => {
@@ -44,9 +54,12 @@ export function RevenueChart({ data }: RevenueChartProps) {
         }
 
         const maxRevenue = Math.max(...data.map(d => d.revenue), 1) * 1.1; // Add 10% headroom
-        const logicalWidth = 800;
-        const logicalHeight = 300;
-        const padding = { top: 40, right: 40, bottom: 60, left: 80 };
+        // Mobile: taller aspect ratio so chart is readable on small screens; desktop: original
+        const logicalWidth = isMobile ? 400 : 800;
+        const logicalHeight = isMobile ? 320 : 300;
+        const padding = isMobile
+            ? { top: 32, right: 24, bottom: 48, left: 56 }
+            : { top: 40, right: 40, bottom: 60, left: 80 };
 
         const innerWidth = logicalWidth - padding.left - padding.right;
         const innerHeight = logicalHeight - padding.top - padding.bottom;
@@ -82,7 +95,7 @@ export function RevenueChart({ data }: RevenueChartProps) {
             logicalHeight,
             padding
         };
-    }, [data]);
+    }, [data, isMobile]);
 
     if (!chartData) {
         return (
@@ -161,11 +174,12 @@ export function RevenueChart({ data }: RevenueChartProps) {
                 </div>
             </div>
 
-            <div className="w-full overflow-hidden">
+            <div className="w-full overflow-hidden min-h-[240px] md:min-h-0">
                 <svg
                     ref={svgRef}
                     viewBox={`0 0 ${logicalWidth} ${logicalHeight}`}
-                    className="w-full h-auto"
+                    className="w-full h-auto min-h-[240px] md:min-h-0"
+                    preserveAspectRatio="xMidYMid meet"
                 >
                     {/* Define gradient */}
                     <defs>
@@ -187,11 +201,11 @@ export function RevenueChart({ data }: RevenueChartProps) {
                                 strokeWidth="1"
                             />
                             <text
-                                x={padding.left - 10}
+                                x={padding.left - (isMobile ? 6 : 10)}
                                 y={line.y}
                                 textAnchor="end"
                                 dominantBaseline="middle"
-                                className="text-[12px] fill-gray-400"
+                                className={isMobile ? 'text-[10px] fill-gray-400' : 'text-[12px] fill-gray-400'}
                             >
                                 {formatCurrency(line.value)}
                             </text>
@@ -220,16 +234,17 @@ export function RevenueChart({ data }: RevenueChartProps) {
                             <circle
                                 cx={point.x}
                                 cy={point.y}
-                                r="12"
+                                r={isMobile ? 16 : 12}
                                 fill="transparent"
-                                className="cursor-pointer"
+                                className="cursor-pointer touch-none"
                                 onMouseEnter={(e) => handlePointMouseEnter(point, e)}
                                 onMouseLeave={handlePointMouseLeave}
+                                onClick={() => isMobile && setTooltip(tooltip?.date === point.date ? null : { x: point.x, y: point.y, date: point.date, revenue: point.revenue, orders: point.orders })}
                             />
                             <circle
                                 cx={point.x}
                                 cy={point.y}
-                                r="4"
+                                r={isMobile ? 5 : 4}
                                 fill="white"
                                 stroke="#D46215"
                                 strokeWidth="2"
@@ -241,6 +256,11 @@ export function RevenueChart({ data }: RevenueChartProps) {
                     {/* X-axis labels */}
                     {points.filter((_, i) => {
                         const count = points.length;
+                        if (isMobile) {
+                            if (count <= 5) return true;
+                            const step = Math.max(1, Math.floor(count / 5));
+                            return i % step === 0 || i === count - 1;
+                        }
                         if (count <= 7) return true;
                         if (count <= 15) return i % 2 === 0;
                         return i % 5 === 0;
@@ -248,9 +268,9 @@ export function RevenueChart({ data }: RevenueChartProps) {
                         <text
                             key={i}
                             x={point.x}
-                            y={logicalHeight - padding.bottom + 25}
+                            y={logicalHeight - padding.bottom + (isMobile ? 18 : 25)}
                             textAnchor="middle"
-                            className="text-[12px] fill-gray-400"
+                            className={isMobile ? 'text-[10px] fill-gray-400' : 'text-[12px] fill-gray-400'}
                         >
                             {formatDate(point.date)}
                         </text>

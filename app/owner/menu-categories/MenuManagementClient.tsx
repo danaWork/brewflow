@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import React from 'react';
-import { Plus, ChevronDown, ChevronRight, Edit2, Trash2, Image as ImageIcon, Settings2, X, Trash, Droplet } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, Edit2, Trash2, Image as ImageIcon, Settings2, X, Trash, Droplet, MoreVertical } from 'lucide-react';
 import { 
     createCategory, updateCategory, deleteCategory, 
     createProduct, updateProduct, deleteProduct,
@@ -96,6 +96,23 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
         defaultOptionIndex?: number | null; // For new groups before options have IDs
         options: { id?: string; name: string; price: number; imageUrl?: string }[];
     } | null>(null);
+
+    const [mobileActionsProductId, setMobileActionsProductId] = useState<string | null>(null);
+    const mobileActionsRowRef = useRef<HTMLDivElement | null>(null);
+    useEffect(() => {
+        if (!mobileActionsProductId) return;
+        const handle = (e: MouseEvent | TouchEvent) => {
+            if (mobileActionsRowRef.current && !mobileActionsRowRef.current.contains(e.target as Node)) {
+                setMobileActionsProductId(null);
+            }
+        };
+        document.addEventListener('mousedown', handle);
+        document.addEventListener('touchstart', handle, { passive: true });
+        return () => {
+            document.removeEventListener('mousedown', handle);
+            document.removeEventListener('touchstart', handle);
+        };
+    }, [mobileActionsProductId]);
 
     const toggleCategory = (id: string) => {
         setExpandedCategories(prev =>
@@ -383,25 +400,27 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                     </p>
                 </div>
                 
-                <div className="flex bg-gray-100 p-1 rounded-xl w-fit">
-                    <button 
-                        onClick={() => setActiveTab('menu')}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'menu' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                        Menu & Categories
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('modifiers')}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'modifiers' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                        Modifiers
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('toppings')}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'toppings' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                        Toppings
-                    </button>
+                <div className="flex bg-gray-100 p-1 rounded-xl w-full md:w-fit overflow-x-auto md:overflow-visible">
+                    <div className="flex flex-nowrap md:flex-wrap gap-0.5 min-h-[44px] items-stretch shrink-0">
+                        <button 
+                            onClick={() => setActiveTab('menu')}
+                            className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all shrink-0 min-h-[44px] ${activeTab === 'menu' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                            Menu & Categories
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('modifiers')}
+                            className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all shrink-0 min-h-[44px] ${activeTab === 'modifiers' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                            Modifiers
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('toppings')}
+                            className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all shrink-0 min-h-[44px] ${activeTab === 'toppings' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                            Toppings
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -500,18 +519,22 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                         ) : (
                                             <div className="divide-y divide-gray-100">
                                                 {category.products.map((product) => (
-                                                    <div key={product.id} className="p-4 pl-14 flex items-center justify-between hover:bg-white transition-colors group">
-                                                        <div className="flex items-center gap-4">
-                                                            <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm transition-transform group-hover:scale-105">
+                                                    <div
+                                                        key={product.id}
+                                                        ref={mobileActionsProductId === product.id ? mobileActionsRowRef : undefined}
+                                                        className="product-row p-4 pl-4 md:pl-14 flex items-center justify-between gap-3 hover:bg-white transition-colors group"
+                                                    >
+                                                        <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
+                                                            <div className="w-12 h-12 md:w-14 md:h-14 shrink-0 bg-white rounded-xl flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm transition-transform group-hover:scale-105">
                                                                 {product.imageUrl ? (
                                                                     <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
                                                                 ) : (
                                                                     <ImageIcon size={24} className="text-gray-300" />
                                                                 )}
                                                             </div>
-                                                            <div>
-                                                                <h4 className="font-semibold text-gray-900">{product.name}</h4>
-                                                                <div className="flex items-center gap-3">
+                                                            <div className="min-w-0 flex-1">
+                                                                <h4 className="font-semibold text-gray-900 truncate">{product.name}</h4>
+                                                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
                                                                     <p className="text-sm text-[#D95D1E] font-bold">₱{product.basePrice}</p>
                                                                     {product.modifierLinks && product.modifierLinks.length > 0 && (
                                                                         <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md font-bold uppercase tracking-tighter">
@@ -526,19 +549,43 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
+                                                        <div className="flex items-center gap-1 shrink-0">
                                                             <button
-                                                                onClick={() => openProductModal(product, category.id)}
-                                                                className="p-2.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                                                                type="button"
+                                                                aria-label="Product actions"
+                                                                className={`md:hidden p-2.5 text-gray-500 hover:bg-gray-100 rounded-xl transition-colors ${mobileActionsProductId === product.id ? 'hidden' : ''}`}
+                                                                onClick={() => setMobileActionsProductId((prev) => (prev === product.id ? null : product.id))}
                                                             >
-                                                                <Edit2 size={18} />
+                                                                <MoreVertical size={18} />
                                                             </button>
-                                                            <button
-                                                                onClick={() => handleDeleteProduct(product.id)}
-                                                                className="p-2.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                                                            <div
+                                                                className={`flex items-center gap-1 transition-all md:translate-x-2 md:group-hover:translate-x-0 ${
+                                                                    mobileActionsProductId === product.id ? 'flex' : 'hidden'
+                                                                } md:flex opacity-100 md:opacity-0 md:group-hover:opacity-100`}
                                                             >
-                                                                <Trash2 size={18} />
-                                                            </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setMobileActionsProductId(null);
+                                                                        openProductModal(product, category.id);
+                                                                    }}
+                                                                    className="p-2.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                                                                    title="Edit product"
+                                                                >
+                                                                    <Edit2 size={18} />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setMobileActionsProductId(null);
+                                                                        handleDeleteProduct(product.id);
+                                                                    }}
+                                                                    className="p-2.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                                                                    title="Delete product"
+                                                                >
+                                                                    <Trash2 size={18} />
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 ))}
@@ -552,12 +599,12 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                 </div>
             ) : (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <div className="flex justify-between items-center">
-                        <div>
+                    <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center">
+                        <div className="min-w-0">
                             <h2 className="text-lg font-semibold text-gray-800">
                                 {activeTab === 'toppings' ? 'Visual Toppings' : 'Standard Modifiers'}
                             </h2>
-                            <p className="text-sm text-gray-500">
+                            <p className="text-sm text-gray-500 mt-0.5">
                                 {activeTab === 'toppings' 
                                     ? 'Create rich visual options with images (e.g., Toppings, Add-ons).' 
                                     : 'Create standard list or button options (e.g., Size, Sugar, Milk).'}
@@ -574,7 +621,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                 });
                                 setIsModifierModalOpen(true);
                             }}
-                            className="bg-[#D95D1E] text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-[#bf4f18] transition-all shadow-md active:scale-95"
+                            className="w-full md:w-auto bg-[#D95D1E] text-white px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-[#bf4f18] transition-all shadow-md active:scale-95 whitespace-nowrap"
                         >
                             <Plus size={20} />
                             Add Group
@@ -583,7 +630,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {modifierGroups.filter(g => activeTab === 'toppings' ? g.displayMode === 'cards' : g.displayMode !== 'cards').length === 0 ? (
-                            <div className="col-span-full bg-white rounded-2xl border border-dashed border-gray-300 p-20 text-center">
+                            <div className="col-span-full bg-white rounded-2xl border border-dashed border-gray-300 p-8 md:p-20 text-center">
                                 <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                                     <Settings2 size={32} className="text-gray-300" />
                                 </div>
@@ -594,12 +641,12 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                             modifierGroups
                                 .filter(g => activeTab === 'toppings' ? g.displayMode === 'cards' : g.displayMode !== 'cards')
                                 .map((group) => (
-                                <div key={group.id} className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm relative group hover:border-[#D95D1E]/30 transition-all">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <h3 className="font-bold text-gray-900 truncate pr-2">{group.name}</h3>
-                                                <span className="text-[10px] uppercase font-bold bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
+                                <div key={group.id} className="bg-white p-4 md:p-5 rounded-2xl border border-gray-200 shadow-sm relative group hover:border-[#D95D1E]/30 transition-all">
+                                    <div className="flex justify-between items-start mb-4 pr-20 md:pr-0">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <h3 className="font-bold text-gray-900 truncate">{group.name}</h3>
+                                                <span className="text-[10px] uppercase font-bold bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded shrink-0">
                                                     {group.displayMode}
                                                 </span>
                                             </div>
@@ -607,7 +654,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                                 {group.options.length} OPTIONS
                                             </p>
                                         </div>
-                                        <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="absolute top-4 right-4 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                             <button
                                                 onClick={() => {
                                                     setEditingModifierGroup({
@@ -744,23 +791,13 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                             {/* Size Configuration Section */}
                             <div className="border-t border-gray-100 pt-4">
                                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Size Options</label>
-                                <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
-                                    <div className="flex justify-between items-center mb-2">
-                                         <p className="text-xs text-gray-500">Define sizes and their price adjustment (added to base price).</p>
-                                         <button 
-                                            type="button"
-                                            onClick={() => setEditingSizes([...editingSizes, { name: '', price: 0 }])}
-                                            className="text-xs font-bold text-[#D95D1E] hover:underline"
-                                         >
-                                            + Add Size
-                                         </button>
-                                    </div>
-                                    
+                                <p className="text-xs text-gray-500 mb-3">Define sizes and their price adjustment (added to base price).</p>
+                                <div className="bg-gray-50 rounded-2xl p-3 sm:p-4 space-y-3">
                                     {editingSizes.length === 0 ? (
                                         <p className="text-sm text-gray-400 italic text-center py-2">No sizes configured. Default size step will be skipped.</p>
                                     ) : (
                                         editingSizes.map((size, idx) => (
-                                            <div key={idx} className="flex gap-2 items-center animate-in slide-in-from-left-2 duration-100">
+                                            <div key={idx} className="bg-white rounded-xl border border-gray-200 p-3 sm:p-0 sm:border-0 sm:bg-transparent sm:flex sm:gap-2 sm:items-center animate-in slide-in-from-left-2 duration-100">
                                                 <input
                                                     type="text"
                                                     value={size.name}
@@ -769,35 +806,46 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                                         newSizes[idx].name = e.target.value;
                                                         setEditingSizes(newSizes);
                                                     }}
-                                                    placeholder="Size Name (e.g. Large)"
-                                                    className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-1 focus:ring-[#D95D1E] focus:border-[#D95D1E]"
+                                                    placeholder="Size name (e.g. Large)"
+                                                    className="w-full sm:flex-1 min-w-0 px-3 py-2.5 sm:py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium focus:ring-1 focus:ring-[#D95D1E] focus:border-[#D95D1E] mb-2 sm:mb-0"
                                                 />
-                                                <div className="relative w-24">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">+₱</span>
-                                                    <input
-                                                        type="number"
-                                                        value={size.price}
-                                                        onChange={(e) => {
-                                                            const newSizes = [...editingSizes];
-                                                            newSizes[idx].price = parseFloat(e.target.value);
+                                                <div className="flex gap-2 items-center">
+                                                    <div className="relative w-24 flex-shrink-0">
+                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">+₱</span>
+                                                        <input
+                                                            type="number"
+                                                            value={size.price}
+                                                            onChange={(e) => {
+                                                                const newSizes = [...editingSizes];
+                                                                newSizes[idx].price = parseFloat(e.target.value);
+                                                                setEditingSizes(newSizes);
+                                                            }}
+                                                            placeholder="0"
+                                                            className="w-full pl-9 pr-2 py-2.5 sm:py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold focus:ring-1 focus:ring-[#D95D1E] focus:border-[#D95D1E]"
+                                                        />
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const newSizes = editingSizes.filter((_, i) => i !== idx);
                                                             setEditingSizes(newSizes);
                                                         }}
-                                                        className="w-full pl-8 pr-2 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold focus:ring-1 focus:ring-[#D95D1E] focus:border-[#D95D1E]"
-                                                    />
+                                                        className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                        title="Remove size"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
                                                 </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const newSizes = editingSizes.filter((_, i) => i !== idx);
-                                                        setEditingSizes(newSizes);
-                                                    }}
-                                                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
                                             </div>
                                         ))
                                     )}
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditingSizes([...editingSizes, { name: '', price: 0 }])}
+                                        className="w-full sm:w-auto text-sm font-bold text-[#D95D1E] hover:bg-orange-50 py-2.5 sm:py-2 px-3 rounded-xl border border-orange-100 hover:border-[#D95D1E]/30 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        + Add Size
+                                    </button>
                                 </div>
                             </div>
                             <div className="flex justify-between gap-3 pt-4 sticky bottom-0 bg-white border-t border-gray-50 mt-auto">
@@ -1035,19 +1083,19 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
 
             {/* Modifier Modal */}
             {isModifierModalOpen && editingModifierGroup && (
-                <div className="fixed inset-0 flex items-center justify-center z-[110] p-4 animate-in zoom-in-95 duration-200">
-                    <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-                        <div className="p-6 border-b border-gray-50 flex justify-between items-center">
-                            <h2 className="text-xl font-bold text-gray-900 tracking-tight">
+                <div className="fixed inset-0 flex items-end md:items-center justify-center z-[110] p-0 md:p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-t-3xl md:rounded-3xl w-full md:max-w-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+                        <div className="p-4 md:p-6 border-b border-gray-50 flex justify-between items-center shrink-0">
+                            <h2 className="text-lg md:text-xl font-bold text-gray-900 tracking-tight min-w-0 pr-2">
                                 {editingModifierGroup.id 
                                     ? (activeTab === 'toppings' ? 'Edit Toppings Group' : 'Edit Modifier Group')
                                     : (activeTab === 'toppings' ? 'New Toppings Group' : 'New Modifier Group')}
                             </h2>
-                            <button onClick={() => setIsModifierModalOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+                            <button onClick={() => setIsModifierModalOpen(false)} className="p-2.5 -m-2.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 shrink-0" aria-label="Close"><X size={24} /></button>
                         </div>
-                        <form onSubmit={handleSaveModifier} className="flex-1 flex flex-col overflow-hidden">
-                            <div className="p-6 overflow-y-auto space-y-6 custom-scrollbar">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <form onSubmit={handleSaveModifier} className="flex-1 flex flex-col overflow-hidden min-h-0">
+                            <div className="p-4 md:p-6 overflow-y-auto space-y-6 custom-scrollbar flex-1 min-h-0">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                                     <div>
                                         <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Group Name</label>
                                         <input
@@ -1061,7 +1109,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Display Mode</label>
-                                        <div className="flex bg-gray-50 rounded-xl p-1">
+                                        <div className="flex flex-wrap sm:flex-nowrap bg-gray-50 rounded-xl p-1 gap-0.5">
                                             {[
                                                 { id: 'list', label: 'List' },
                                                 { id: 'buttons', label: 'Buttons' },
@@ -1071,7 +1119,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                                     type="button"
                                                     key={mode.id}
                                                     onClick={() => setEditingModifierGroup({ ...editingModifierGroup, displayMode: mode.id })}
-                                                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${editingModifierGroup.displayMode === mode.id ? 'bg-white shadow text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                                                    className={`flex-1 min-w-0 py-2.5 sm:py-2 text-xs font-bold rounded-lg transition-all ${editingModifierGroup.displayMode === mode.id ? 'bg-white shadow text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
                                                 >
                                                     {mode.label}
                                                 </button>
@@ -1131,8 +1179,8 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                                             <span className="text-sm opacity-50">☆</span>
                                                         )}
                                                     </button>
-                                                    <div className="flex-1 space-y-2">
-                                                        <div className="flex gap-3 items-center">
+                                                    <div className="flex-1 min-w-0 space-y-2">
+                                                        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
                                                             <input
                                                                 value={opt.name}
                                                                 onChange={(e) => {
@@ -1141,13 +1189,13 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                                                     setEditingModifierGroup({ ...editingModifierGroup, options: newOpts });
                                                                 }}
                                                                 placeholder="Option Name"
-                                                                className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                                                                className={`flex-1 min-w-0 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
                                                                     isDefault 
                                                                         ? 'bg-white border-2 border-[#D95D1E]/30 focus:border-[#D95D1E]' 
                                                                         : 'bg-white border border-gray-200 focus:border-[#D95D1E] focus:ring-2 focus:ring-[#D95D1E]/20'
                                                                 }`}
                                                             />
-                                                            <div className="relative w-28">
+                                                            <div className="relative w-full sm:w-28 shrink-0">
                                                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">₱</span>
                                                                 <input
                                                                     type="number"
@@ -1228,17 +1276,17 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                     </button>
                                 </div>
                             </div>
-                            <div className="p-6 border-t border-gray-50 flex justify-end gap-3 bg-white">
+                            <div className="p-4 md:p-6 border-t border-gray-50 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 bg-white shrink-0">
                                 <button
                                     type="button"
                                     onClick={() => setIsModifierModalOpen(false)}
-                                    className="px-6 py-3 text-gray-600 font-bold hover:bg-gray-100 rounded-2xl transition-all"
+                                    className="w-full sm:w-auto px-6 py-3 text-gray-600 font-bold hover:bg-gray-100 rounded-2xl transition-all"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-8 py-3 bg-[#D95D1E] text-white rounded-2xl font-bold shadow-lg shadow-orange-100 hover:bg-[#bf4f18] transition-all active:scale-95"
+                                    className="w-full sm:w-auto px-8 py-3 bg-[#D95D1E] text-white rounded-2xl font-bold shadow-lg shadow-orange-100 hover:bg-[#bf4f18] transition-all active:scale-95"
                                 >
                                     {editingModifierGroup.id ? 'Save Changes' : 'Create Group'}
                                 </button>

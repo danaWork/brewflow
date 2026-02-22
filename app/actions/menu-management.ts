@@ -198,15 +198,17 @@ export async function createModifierGroup(name: string, options: { name: string;
     if (!session?.companyId) throw new Error('Unauthorized');
 
     // Create group first without defaultOptionId (to avoid FK constraint issues)
-    const [group] = await db.insert(modifierGroups).values({
+    const inserted = await db.insert(modifierGroups).values({
         companyId: session.companyId,
         name,
         displayMode,
         defaultOptionId: null,
     }).returning();
+    const group = Array.isArray(inserted) ? inserted[0] : undefined;
+    if (!group) throw new Error('Failed to create modifier group');
 
     if (options.length > 0) {
-        const insertedOptions = await db.insert(modifierOptions).values(
+        const insertedOptionsRaw = await db.insert(modifierOptions).values(
             options.map(opt => ({
                 modifierGroupId: group.id,
                 name: opt.name,
@@ -214,6 +216,7 @@ export async function createModifierGroup(name: string, options: { name: string;
                 imageUrl: opt.imageUrl
             }))
         ).returning();
+        const insertedOptions = Array.isArray(insertedOptionsRaw) ? insertedOptionsRaw : [];
 
         // If defaultOptionIdentifier was provided (as option name for new groups), find and set it
         if (defaultOptionIdentifier) {

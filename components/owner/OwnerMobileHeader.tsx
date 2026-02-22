@@ -8,7 +8,7 @@ interface OwnerMobileHeaderProps {
 
 export default function OwnerMobileHeader({ onMenuClick }: OwnerMobileHeaderProps) {
   return (
-    <header className="md:hidden sticky top-0 z-40 flex items-center justify-between px-4 py-3 bg-[#FDFBF9] border-b border-gray-200">
+    <header className="md:hidden sticky top-0 z-40 flex items-center justify-between px-4 py-4 bg-[#FDFBF9] border-b border-gray-200">
       <div className="flex items-center gap-3">
         <div className="bg-[#FFEBE0] p-2 rounded-xl">
           <Coffee size={24} className="text-[#D95D1E]" />

@@ -116,20 +116,20 @@ export default function LiveOrdersPage() {
         </div>
       )}
 
-      <div className="bg-white p-4 border-b border-gray-200 flex items-center justify-between">
+      <div className="bg-white px-4 py-4 md:px-6 md:py-4 border-b border-gray-200 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <ClipboardList size={20} className="text-gray-600" />
           <h1 className="text-xl font-bold text-gray-900">Orders</h1>
         </div>
       </div>
 
-      <div className="px-4 md:px-6 pt-4 md:pt-6 pb-2">
+      <div className="px-4 md:px-6 pt-5 md:pt-6 pb-4 md:pb-2">
         <h2 className="text-lg font-bold text-gray-900">Live Orders</h2>
-        <p className="text-sm text-gray-500">{visibleOrders.length} active orders</p>
+        <p className="text-sm text-gray-500 mt-1">{visibleOrders.length} active orders</p>
       </div>
 
       {/* Mobile: tabbed view */}
-      <div className="flex-1 flex flex-col min-h-0 px-4 md:px-0 md:hidden">
+      <div className="flex-1 flex flex-col min-h-0 px-4 md:px-0 md:hidden mt-0">
         <LiveOrdersTabsMobile
           columns={columns}
           getOrdersByStatus={getOrdersByStatus}

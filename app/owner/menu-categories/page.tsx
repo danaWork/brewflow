@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react';
 import { getMenuCategories, getModifierGroups } from '@/app/actions/menu-management';
 import { getInventoryItemsAction } from '@/app/actions/inventory';
 import { getUserSession } from '@/app/actions/auth';
@@ -23,11 +24,11 @@ export default async function MenuCategoriesPage() {
   return (
     <div className="p-4 md:p-8">
       <MenuManagementClient 
-        initialCategories={categories} 
+        initialCategories={categories as unknown as ComponentProps<typeof MenuManagementClient>['initialCategories']} 
         modifierGroups={modifierGroups.map(g => ({
-        ...g,
-        displayMode: g.displayMode as 'list' | 'buttons' | 'cards'
-      }))}
+          ...g,
+          displayMode: g.displayMode as 'list' | 'buttons' | 'cards'
+        })) as ComponentProps<typeof MenuManagementClient>['modifierGroups']}
         inventoryItems={inventoryRes.items || []}
         branchId={branchId}
       />

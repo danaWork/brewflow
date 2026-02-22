@@ -23,11 +23,11 @@ export default function PromotionsTabs({ initialProducts, initialPromotions, bra
                 <button
                     onClick={() => setActiveTab('perfect-pair')}
                     className={`
-            flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200
-            ${activeTab === 'perfect-pair'
+                        flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 whitespace-nowrap
+                        ${activeTab === 'perfect-pair'
                             ? 'bg-white text-gray-900 shadow-sm'
                             : 'text-gray-500 hover:text-gray-700'}
-          `}
+                    `}
                 >
                     <Zap size={16} className={activeTab === 'perfect-pair' ? 'text-orange-500' : ''} />
                     Perfect Pair Bundles
@@ -35,11 +35,11 @@ export default function PromotionsTabs({ initialProducts, initialPromotions, bra
                 <button
                     onClick={() => setActiveTab('cross-sell')}
                     className={`
-            flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200
-            ${activeTab === 'cross-sell'
+                        flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 whitespace-nowrap
+                        ${activeTab === 'cross-sell'
                             ? 'bg-white text-gray-900 shadow-sm'
                             : 'text-gray-500 hover:text-gray-700'}
-          `}
+                    `}
                 >
                     <TrendingUp size={16} className={activeTab === 'cross-sell' ? 'text-orange-500' : ''} />
                     Cross-Sell

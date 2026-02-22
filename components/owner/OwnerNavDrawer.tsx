@@ -60,8 +60,8 @@ export default function OwnerNavDrawer({ isOpen, onClose }: OwnerNavDrawerProps)
 
   return (
     <Drawer isOpen={isOpen} onClose={onClose} showCloseButton={false}>
-      <div className="p-4 flex flex-col h-full">
-        <div className="flex items-center justify-between gap-3 pb-4 border-b border-gray-200 mb-4">
+      <div className="p-5 flex flex-col h-full">
+        <div className="flex items-center justify-between gap-3 pb-5 border-b border-gray-200 mb-5">
           <div className="flex items-center gap-3">
             <div className="bg-[#FFEBE0] p-2 rounded-xl">
               <Coffee size={24} className="text-[#D95D1E]" />
@@ -81,10 +81,10 @@ export default function OwnerNavDrawer({ isOpen, onClose }: OwnerNavDrawerProps)
           </button>
         </div>
 
-        <nav className="flex-1 space-y-6 overflow-y-auto">
+        <nav className="flex-1 space-y-5 overflow-y-auto pt-1">
           {navGroups.map((group) => (
             <div key={group.title}>
-              <h3 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              <h3 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2.5">
                 {group.title}
               </h3>
               <ul className="space-y-1">
@@ -118,7 +118,7 @@ export default function OwnerNavDrawer({ isOpen, onClose }: OwnerNavDrawerProps)
           ))}
         </nav>
 
-        <div className="pt-4 border-t border-gray-200">
+        <div className="pt-5 border-t border-gray-200 mt-2">
           <button
             type="button"
             onClick={async () => {

@@ -59,16 +59,21 @@ export const products = pgTable('products', {
   isHidden: boolean('is_hidden').default(false).notNull(),
 });
 
+// Circular ref with modifierOptions; TypeScript cannot infer type. See modifierOptions below.
+// @ts-expect-error - circular table reference (modifierGroups <-> modifierOptions)
 export const modifierGroups = pgTable('modifier_groups', {
   id: uuid('id').defaultRandom().primaryKey(),
   companyId: uuid('company_id').references(() => companies.id).notNull(),
   name: text('name').notNull(),
   displayMode: text('display_mode').default('list').notNull(), // 'list', 'buttons', 'cards'
+  // @ts-expect-error - callback in references() has circular return type
   defaultOptionId: uuid('default_option_id').references(() => modifierOptions.id),
 });
 
+// @ts-expect-error - circular table reference (modifierOptions <-> modifierGroups)
 export const modifierOptions = pgTable('modifier_options', {
   id: uuid('id').defaultRandom().primaryKey(),
+  // @ts-expect-error - callback in references() has circular return type
   modifierGroupId: uuid('modifier_group_id').references(() => modifierGroups.id).notNull(),
   name: text('name').notNull(),
   price: decimal('price', { precision: 10, scale: 2 }).default('0').notNull(),
