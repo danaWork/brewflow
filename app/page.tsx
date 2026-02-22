@@ -66,23 +66,24 @@ export default function Home() {
         </section>
 
         {/* Hero — for shop owners */}
-        <section className="relative overflow-hidden">
+        <section className="relative overflow-hidden bg-[url('/images/hero-bg.png')] bg-cover bg-center">
+          <div className="absolute inset-0 bg-white/60 backdrop-blur-md pointer-events-none" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_0%,rgba(212,98,21,0.06),transparent)] pointer-events-none" />
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 sm:pt-16 md:pt-20 pb-16 sm:pb-20 md:pb-24 text-center relative">
-            <p className="text-sm font-semibold text-[#D46215] uppercase tracking-wider mb-3 sm:mb-4">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 sm:pt-16 md:pt-20 pb-16 sm:pb-20 md:pb-24 text-center relative z-10">
+            <p className="text-sm font-semibold text-[#D46215] uppercase tracking-wider mb-3 sm:mb-4 drop-shadow-sm">
               For shop owners
             </p>
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-[2.75rem] font-bold text-gray-900 tracking-tight max-w-3xl mx-auto leading-[1.15]">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-[2.75rem] font-bold text-gray-900 tracking-tight max-w-3xl mx-auto leading-[1.15] drop-shadow-sm">
               Coffee shop ordering,{" "}
               <span className="text-[#D46215]">simplified</span>
             </h1>
-            <p className="mt-4 sm:mt-5 text-base sm:text-lg md:text-xl text-gray-600 max-w-xl mx-auto leading-relaxed">
+            <p className="mt-4 sm:mt-5 text-base sm:text-lg md:text-xl text-gray-800 font-medium max-w-xl mx-auto leading-relaxed drop-shadow-sm">
               Real-time orders, QR menus, and everything you need to run your shop from one dashboard.
             </p>
             <div className="mt-8 sm:mt-10">
               <Link
                 href="/login"
-                className="inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3.5 sm:py-4 bg-[#D46215] hover:bg-[#B75311] text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all text-base sm:text-lg active:scale-[0.98]"
+                className="inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3.5 sm:py-4 bg-[#D46215] hover:bg-[#B75311] text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all text-base sm:text-lg active:scale-[0.98]"
               >
                 Log in to dashboard
                 <ArrowRight className="w-5 h-5" aria-hidden />
@@ -142,20 +143,23 @@ export default function Home() {
         </section>
 
         {/* CTA */}
-        <section className="border-t border-gray-200/80 bg-gradient-to-b from-orange-50/80 to-amber-50/50">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20 md:py-24 text-center">
-            <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-[#D46215] rounded-2xl shadow-lg mb-6" aria-hidden>
+        <section className="relative overflow-hidden bg-stone-900 border-t border-stone-800">
+          {/* Subtle glow effect */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-[#D46215]/20 blur-[100px] rounded-full pointer-events-none" />
+          
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 md:py-24 text-center relative z-10">
+            <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-[#D46215] rounded-2xl shadow-[0_0_30px_rgba(212,98,21,0.3)] mb-6 ring-1 ring-white/10" aria-hidden>
               <LayoutDashboard className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
             </div>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white tracking-tight">
               Ready to run your shop?
             </h2>
-            <p className="mt-3 text-gray-600 max-w-md mx-auto text-sm sm:text-base">
+            <p className="mt-4 text-stone-300 max-w-md mx-auto text-base sm:text-lg">
               Log in to manage orders, menus, and more from your dashboard.
             </p>
             <Link
               href="/login"
-              className="mt-6 sm:mt-8 inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3.5 sm:py-4 bg-[#D46215] hover:bg-[#B75311] text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all text-base sm:text-lg active:scale-[0.98]"
+              className="mt-8 sm:mt-10 inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3.5 sm:py-4 bg-[#D46215] hover:bg-[#B75311] text-white font-semibold rounded-xl shadow-lg hover:shadow-xl hover:shadow-[#D46215]/20 transition-all text-base sm:text-lg active:scale-[0.98] ring-1 ring-white/10"
             >
               Log in
               <ArrowRight className="w-5 h-5" aria-hidden />
