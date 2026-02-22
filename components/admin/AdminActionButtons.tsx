@@ -38,19 +38,19 @@ export function AdminActionButtons({ shops }: { shops: any[] }) {
     };
 
     return (
-        <div className="flex gap-4 mb-8">
+        <div className="flex flex-wrap gap-2 md:gap-4 mb-6 md:mb-8">
             <button
                 onClick={() => setShowShopModal(true)}
-                className="flex items-center gap-2 bg-[#D46215] text-white px-6 py-3 rounded-2xl font-bold hover:bg-[#B75311] transition-all shadow-md active:scale-95"
+                className="flex items-center gap-1.5 md:gap-2 bg-[#D46215] text-white px-4 py-2 md:px-6 md:py-3 rounded-xl md:rounded-2xl text-sm md:text-base font-bold hover:bg-[#B75311] transition-all shadow-md active:scale-95"
             >
-                <Plus size={20} />
+                <Plus size={18} className="md:w-5 md:h-5" />
                 Add New Shop
             </button>
             <button
                 onClick={() => setShowUserModal(true)}
-                className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-6 py-3 rounded-2xl font-bold hover:bg-gray-50 transition-all shadow-sm active:scale-95"
+                className="flex items-center gap-1.5 md:gap-2 bg-white border border-gray-200 text-gray-700 px-4 py-2 md:px-6 md:py-3 rounded-xl md:rounded-2xl text-sm md:text-base font-bold hover:bg-gray-50 transition-all shadow-sm active:scale-95"
             >
-                <UserPlus size={20} />
+                <UserPlus size={18} className="md:w-5 md:h-5" />
                 Add Manager
             </button>
 

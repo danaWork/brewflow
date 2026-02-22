@@ -78,69 +78,98 @@ export function ActivityLog({ logs, shops }: { logs: ActivityLogItem[], shops: S
                 </div>
 
                 {/* Filters */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4 mb-6">
                     {/* Action Search */}
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                        <Search className="absolute left-2.5 md:left-3 top-1/2 -translate-y-1/2 text-gray-400 md:w-[18px] md:h-[18px]" size={16} />
                         <input
                             type="text"
                             placeholder="Search by action..."
                             value={actionFilter}
                             onChange={(e) => setActionFilter(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                            className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none focus:border-[#D46215] transition-all"
+                            className="w-full bg-gray-50 border border-gray-100 rounded-lg md:rounded-xl pl-8 md:pl-10 pr-3 md:pr-4 py-2 md:py-2.5 text-sm outline-none focus:border-[#D46215] transition-all"
                         />
                     </div>
 
                     {/* Shop Filter */}
                     <div className="relative">
-                        <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                        <Filter className="absolute left-2.5 md:left-3 top-1/2 -translate-y-1/2 text-gray-400 md:w-[18px] md:h-[18px]" size={16} />
                         <select
                             value={shopFilter}
                             onChange={(e) => setShopFilter(e.target.value)}
-                            className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-10 pr-10 py-2.5 text-sm outline-none focus:border-[#D46215] transition-all appearance-none cursor-pointer"
+                            className="w-full bg-gray-50 border border-gray-100 rounded-lg md:rounded-xl pl-8 md:pl-10 pr-8 md:pr-10 py-2 md:py-2.5 text-sm outline-none focus:border-[#D46215] transition-all appearance-none cursor-pointer"
                         >
                             <option value="all">All Shops</option>
                             {shops.map((shop) => (
                                 <option key={shop.id} value={shop.id}>{shop.name}</option>
                             ))}
                         </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                        <ChevronDown className="absolute right-2.5 md:right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={14} />
                     </div>
 
                     {/* Date Filter */}
                     <div className="relative">
-                        <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                        <CalendarIcon className="absolute left-2.5 md:left-3 top-1/2 -translate-y-1/2 text-gray-400 md:w-[18px] md:h-[18px]" size={16} />
                         <input
                             type="date"
                             value={dateFilter}
                             onChange={(e) => setDateFilter(e.target.value)}
-                            className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none focus:border-[#D46215] transition-all"
+                            className="w-full bg-gray-50 border border-gray-100 rounded-lg md:rounded-xl pl-8 md:pl-10 pr-3 md:pr-4 py-2 md:py-2.5 text-sm outline-none focus:border-[#D46215] transition-all"
                         />
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 md:gap-2">
                         <button
                             onClick={handleSearch}
                             disabled={isPending}
-                            className="flex-1 bg-[#D46215] text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-[#b54f0d] transition-colors disabled:opacity-50"
+                            className="flex-1 bg-[#D46215] text-white px-3 md:px-4 py-2 md:py-2.5 rounded-lg md:rounded-xl text-xs md:text-sm font-medium hover:bg-[#b54f0d] transition-colors disabled:opacity-50"
                         >
-                            {isPending ? 'Searching...' : 'Apply Filters'}
+                            {isPending ? 'Searching...' : 'Apply'}
                         </button>
                         <button
                             onClick={handleReset}
                             disabled={isPending}
-                            className="p-2.5 bg-gray-50 text-gray-500 rounded-xl hover:bg-gray-100 transition-colors"
+                            className="p-2 md:p-2.5 bg-gray-50 text-gray-500 rounded-lg md:rounded-xl hover:bg-gray-100 transition-colors"
                             title="Reset Filters"
                         >
-                            <RefreshCcw size={20} />
+                            <RefreshCcw size={18} className="md:w-5 md:h-5" />
                         </button>
                     </div>
                 </div>
 
-                {/* Table */}
-                <div className="overflow-x-auto">
+                {/* Mobile: card list */}
+                <div className="md:hidden space-y-3">
+                    {logs.length > 0 ? (
+                        logs.map((log) => (
+                            <div key={log.id} className="bg-gray-50/50 rounded-xl p-4 border border-gray-100">
+                                <div className="flex justify-between items-start gap-2 mb-1">
+                                    <span className="font-medium text-gray-900 text-sm">{log.action}</span>
+                                    <span className="text-xs text-gray-500">{log.shopDisplayName}</span>
+                                </div>
+                                {log.userEmail && <div className="text-xs text-gray-400 mb-1">{log.userEmail}</div>}
+                                <div className="text-xs text-gray-500 mb-2">
+                                    {log.formattedDate} · {log.formattedTime} ({log.relativeTime} ago)
+                                </div>
+                                {log.details ? (
+                                    <div className="truncate text-xs text-gray-500 font-mono bg-white px-2 py-1.5 rounded border border-gray-100" title={log.details}>
+                                        {log.details}
+                                    </div>
+                                ) : (
+                                    <span className="text-gray-400 text-xs">—</span>
+                                )}
+                            </div>
+                        ))
+                    ) : (
+                        <div className="py-10 text-center text-gray-400 italic text-sm">
+                            No activity logs found matching your filters.
+                        </div>
+                    )}
+                </div>
+
+                {/* Desktop: table */}
+                <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="border-b border-gray-100">

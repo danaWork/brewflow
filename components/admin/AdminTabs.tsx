@@ -26,12 +26,12 @@ export function AdminTabs() {
                     <button
                         key={tab.id}
                         onClick={() => handleTabChange(tab.id)}
-                        className={`flex items-center gap-2 px-4 md:px-5 py-2.5 rounded-lg text-sm font-medium transition-all shrink-0 min-h-[44px] ${activeTab === tab.id
+                        className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-5 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium transition-all shrink-0 min-h-[40px] md:min-h-[44px] ${activeTab === tab.id
                                 ? 'bg-white text-gray-900 shadow-sm'
                                 : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
                             }`}
                     >
-                        <tab.icon size={16} className="shrink-0" />
+                        <tab.icon size={14} className="shrink-0 md:w-4 md:h-4" />
                         {tab.label}
                     </button>
                 ))}

@@ -53,13 +53,13 @@ export function StatCards({ stats }: StatCardsProps) {
             {cards.map((card) => (
                 <div
                     key={card.label}
-                    className={`relative p-6 rounded-2xl border ${card.borderColor} bg-white transition-all hover:shadow-md`}
+                    className={`relative p-4 md:p-6 rounded-xl md:rounded-2xl border ${card.borderColor} bg-white transition-all hover:shadow-md`}
                 >
                     {card.hasDot && (
                         <div className="absolute top-3 right-3 h-2 w-2 rounded-full bg-emerald-500" />
                     )}
                     <div className="flex flex-col items-center">
-                        <span className={`text-5xl font-bold ${card.color} mb-2`}>
+                        <span className={`text-4xl md:text-5xl font-bold ${card.color} mb-2`}>
                             {card.value}
                         </span>
                         <span className="text-gray-500 font-medium text-sm lg:text-base">
