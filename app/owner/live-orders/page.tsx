@@ -4,6 +4,7 @@ import { useOrder, Order, OrderStatus } from '@/context/OrderContext';
 import { useState } from 'react';
 import { Clock, ChefHat, CheckCircle, X, CreditCard, Banknote, Smartphone, ClipboardList, Bell } from 'lucide-react';
 import { useOrderNotifications } from '@/hooks/useOrderNotifications';
+import LiveOrdersTabsMobile from './LiveOrdersTabsMobile';
 
 function PaymentIcon({ method }: { method: string }) {
   const lowerMethod = method.toLowerCase();
@@ -122,12 +123,23 @@ export default function LiveOrdersPage() {
         </div>
       </div>
 
-      <div className="px-6 pt-6 pb-2">
+      <div className="px-4 md:px-6 pt-4 md:pt-6 pb-2">
         <h2 className="text-lg font-bold text-gray-900">Live Orders</h2>
         <p className="text-sm text-gray-500">{visibleOrders.length} active orders</p>
       </div>
 
-      <div className="flex-1 overflow-x-auto px-6 pb-6 mt-4">
+      {/* Mobile: tabbed view */}
+      <div className="flex-1 flex flex-col min-h-0 px-4 md:px-0 md:hidden">
+        <LiveOrdersTabsMobile
+          columns={columns}
+          getOrdersByStatus={getOrdersByStatus}
+          updateOrderStatus={updateOrderStatus}
+          onCancelClick={handleCancelClick}
+        />
+      </div>
+
+      {/* Desktop: four columns */}
+      <div className="flex-1 overflow-x-auto px-6 pb-6 mt-4 hidden md:block min-h-0">
         <div className="flex gap-4 h-full min-w-[max-content]">
           {columns.map(col => (
             <div key={col.id} className="w-80 flex flex-col h-full">

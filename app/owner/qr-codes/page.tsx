@@ -313,17 +313,17 @@ export default function QRCodesPage() {
         </div>
       </div>
 
-      <div className="p-6 max-w-6xl mx-auto">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Table QR Codes</h2>
-        <p className="text-gray-500 mb-8">
+      <div className="p-4 md:p-6 max-w-6xl mx-auto">
+        <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">Table QR Codes</h2>
+        <p className="text-gray-500 mb-6 md:mb-8 text-sm md:text-base">
           Generate QR codes for up to 50 tables. Each code links directly to your menu.
         </p>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-8">
+        <div className="bg-white rounded-xl p-4 md:p-6 shadow-sm border border-gray-100 mb-6 md:mb-8">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Number of Tables
           </label>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
             <input
               type="number"
               min={1}
@@ -334,7 +334,7 @@ export default function QRCodesPage() {
               onKeyDown={handleKeyDown}
               className="w-24 px-4 py-3 border-2 border-gray-300 rounded-lg text-center text-xl font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#D95D1E] focus:border-transparent"
             />
-            <span className="text-gray-500">(1-50 tables)</span>
+            <span className="text-gray-500 text-sm">(1-50 tables)</span>
             {syncing && <Loader2 size={16} className="text-[#D95D1E] animate-spin" />}
           </div>
 

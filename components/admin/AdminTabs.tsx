@@ -20,20 +20,22 @@ export function AdminTabs() {
     };
 
     return (
-        <div className="flex bg-gray-100/80 p-1 rounded-xl w-fit mb-8">
-            {tabs.map((tab) => (
-                <button
-                    key={tab.id}
-                    onClick={() => handleTabChange(tab.id)}
-                    className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === tab.id
-                            ? 'bg-white text-gray-900 shadow-sm'
-                            : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
-                        }`}
-                >
-                    <tab.icon size={16} />
-                    {tab.label}
-                </button>
-            ))}
+        <div className="flex bg-gray-100/80 p-1 rounded-xl w-full md:w-fit mb-6 md:mb-8 overflow-x-auto overflow-y-hidden">
+            <div className="flex flex-nowrap gap-0.5 min-h-[44px] items-stretch">
+                {tabs.map((tab) => (
+                    <button
+                        key={tab.id}
+                        onClick={() => handleTabChange(tab.id)}
+                        className={`flex items-center gap-2 px-4 md:px-5 py-2.5 rounded-lg text-sm font-medium transition-all shrink-0 min-h-[44px] ${activeTab === tab.id
+                                ? 'bg-white text-gray-900 shadow-sm'
+                                : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
+                            }`}
+                    >
+                        <tab.icon size={16} className="shrink-0" />
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
         </div>
     );
 }
