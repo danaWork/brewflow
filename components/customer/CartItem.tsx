@@ -1,6 +1,6 @@
 'use client';
 
-import { Minus, Plus, X, Package } from 'lucide-react';
+import { Minus, Plus, X, Package, Droplet } from 'lucide-react';
 import Image from 'next/image';
 import { CartItem as CartItemType, useCart } from '@/context/CartContext';
 
@@ -64,8 +64,12 @@ export default function CartItem({ item }: CartItemProps) {
 
             {/* Main Item */}
             <div className="flex gap-4 relative">
-                <div className="relative w-20 h-20 shrink-0 rounded-2xl overflow-hidden bg-gray-100">
-                   {item.image ? <Image src={item.image} alt={item.name} fill className="object-cover" /> : null}
+                <div className="relative w-20 h-20 shrink-0 rounded-2xl overflow-hidden bg-gray-100 flex items-center justify-center">
+                   {item.image ? (
+                     <Image src={item.image} alt={item.name} fill className="object-cover" />
+                   ) : item.name.toLowerCase().includes('water') ? (
+                     <Droplet className="text-blue-400" size={28} />
+                   ) : null}
                 </div>
 
                 <div className="flex-1 min-w-0 flex flex-col justify-between">
@@ -105,8 +109,12 @@ export default function CartItem({ item }: CartItemProps) {
             {/* Extras */}
             {item.extras?.map((extra, idx) => (
                   <div key={idx} className={`flex gap-4 relative ${idx > 0 ? 'mt-6 pt-6 border-t border-dashed border-orange-200/50' : 'mt-0'}`}>
-                       <div className="relative w-20 h-20 shrink-0 rounded-2xl overflow-hidden bg-gray-100 border border-black/5">
-                          {extra.image && <Image src={extra.image} alt={extra.name} fill className="object-cover" /> }
+                       <div className="relative w-20 h-20 shrink-0 rounded-2xl overflow-hidden bg-gray-100 border border-black/5 flex items-center justify-center">
+                          {extra.image ? (
+                            <Image src={extra.image} alt={extra.name} fill className="object-cover" />
+                          ) : extra.name.toLowerCase().includes('water') ? (
+                            <Droplet className="text-blue-400" size={28} />
+                          ) : null}
                        </div>
                        
                        <div className="flex-1 min-w-0 flex flex-col justify-between">
@@ -152,8 +160,12 @@ export default function CartItem({ item }: CartItemProps) {
       {/* 1. MAIN ITEM CARD */}
       <div className={`bg-white rounded-2xl p-5 shadow-sm border border-gray-100 relative z-10 ${hasExtras ? 'rounded-b-none border-b-0 pb-8' : ''}`}>
           <div className="flex gap-4 relative">
-            <div className="relative w-24 h-24 shrink-0 rounded-2xl overflow-hidden bg-gray-100">
-               {item.image ? <Image src={item.image} alt={item.name} fill className="object-cover" /> : null}
+            <div className="relative w-24 h-24 shrink-0 rounded-2xl overflow-hidden bg-gray-100 flex items-center justify-center">
+               {item.image ? (
+                 <Image src={item.image} alt={item.name} fill className="object-cover" />
+               ) : item.name.toLowerCase().includes('water') ? (
+                 <Droplet className="text-blue-400" size={32} />
+               ) : null}
             </div>
 
             <div className="flex-1 min-w-0 flex flex-col justify-between">
@@ -192,8 +204,12 @@ export default function CartItem({ item }: CartItemProps) {
         <div className="bg-orange-50 rounded-2xl rounded-t-none p-5 pt-6 shadow-sm border border-orange-100 border-t-0 relative z-0 border-l-4 border-l-[#D95D1E]">
              {item.extras?.map((extra, idx) => (
                   <div key={idx} className={`flex gap-4 relative ${idx > 0 ? 'mt-6 pt-6 border-t border-dashed border-orange-200/50' : 'mt-2'}`}>
-                       <div className="relative w-20 h-20 shrink-0 rounded-2xl overflow-hidden bg-gray-100 border border-black/5">
-                          {extra.image && <Image src={extra.image} alt={extra.name} fill className="object-cover" /> }
+                       <div className="relative w-20 h-20 shrink-0 rounded-2xl overflow-hidden bg-gray-100 border border-black/5 flex items-center justify-center">
+                          {extra.image ? (
+                            <Image src={extra.image} alt={extra.name} fill className="object-cover" />
+                          ) : extra.name.toLowerCase().includes('water') ? (
+                            <Droplet className="text-blue-400" size={28} />
+                          ) : null}
                        </div>
                        
                        <div className="flex-1 min-w-0 flex flex-col justify-between">

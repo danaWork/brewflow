@@ -49,9 +49,10 @@ async function seed() {
       { name: 'Syrup' },
     ];
 
-    const modGroups = await db.insert(schema.modifierGroups).values(
+    const modGroupsRaw = await db.insert(schema.modifierGroups).values(
       modGroupsData.map(g => ({ ...g, companyId: company.id }))
     ).returning();
+    const modGroups = Array.isArray(modGroupsRaw) ? modGroupsRaw : [];
     console.log(`✅ ${modGroups.length} Modifier Groups created`);
 
     const sizeGroup = modGroups.find(g => g.name === 'Size')!;

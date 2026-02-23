@@ -1,0 +1,139 @@
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import {
+  ClipboardList,
+  QrCode,
+  Tag,
+  BarChart3,
+  UtensilsCrossed,
+  Package,
+  Coffee,
+  LogOut,
+  X,
+} from 'lucide-react';
+import Drawer from '@/components/ui/Drawer';
+
+type NavItem = {
+  label: string;
+  href: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+};
+
+type NavGroup = {
+  title: string;
+  items: NavItem[];
+};
+
+const navGroups: NavGroup[] = [
+  {
+    title: 'Business / Operations',
+    items: [
+      { label: 'Live Orders', href: '/owner/live-orders', icon: ClipboardList },
+      { label: 'QR Codes', href: '/owner/qr-codes', icon: QrCode },
+    ],
+  },
+  {
+    title: 'Marketing / Revenue',
+    items: [
+      { label: 'Promotions', href: '/owner/promotions', icon: Tag },
+      { label: 'Analytics', href: '/owner/analytics', icon: BarChart3 },
+    ],
+  },
+  {
+    title: 'Menu Management',
+    items: [
+      { label: 'Menu & Categories', href: '/owner/menu-categories', icon: UtensilsCrossed },
+      { label: 'Inventory', href: '/owner/inventory', icon: Package },
+    ],
+  },
+];
+
+interface OwnerNavDrawerProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export default function OwnerNavDrawer({ isOpen, onClose }: OwnerNavDrawerProps) {
+  const pathname = usePathname();
+
+  return (
+    <Drawer isOpen={isOpen} onClose={onClose} showCloseButton={false}>
+      <div className="p-5 flex flex-col h-full">
+        <div className="flex items-center justify-between gap-3 pb-5 border-b border-gray-200 mb-5">
+          <div className="flex items-center gap-3">
+            <div className="bg-[#FFEBE0] p-2 rounded-xl">
+              <Coffee size={24} className="text-[#D95D1E]" />
+            </div>
+            <div>
+              <h2 className="font-bold text-gray-900 text-lg">BrewFlow</h2>
+              <p className="text-xs text-gray-500">Admin Panel</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+            aria-label="Close menu"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <nav className="flex-1 space-y-5 overflow-y-auto pt-1">
+          {navGroups.map((group) => (
+            <div key={group.title}>
+              <h3 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2.5">
+                {group.title}
+              </h3>
+              <ul className="space-y-1">
+                {group.items.map((item) => {
+                  const isActive =
+                    pathname === item.href ||
+                    (item.href === '/owner/live-orders' && pathname === '/owner');
+                  const Icon = item.icon;
+
+                  return (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        onClick={onClose}
+                        className={`
+                          flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
+                          ${isActive
+                            ? 'bg-[#D95D1E] text-white shadow-sm'
+                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                          }
+                        `}
+                      >
+                        <Icon size={18} className={isActive ? 'text-white' : 'text-gray-500'} />
+                        {item.label}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </nav>
+
+        <div className="pt-5 border-t border-gray-200 mt-2">
+          <button
+            type="button"
+            onClick={async () => {
+              onClose();
+              const { logout } = await import('@/app/actions/auth');
+              await logout();
+              window.location.href = '/login';
+            }}
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-all"
+          >
+            <LogOut size={18} />
+            Logout
+          </button>
+        </div>
+      </div>
+    </Drawer>
+  );
+}

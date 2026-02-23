@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { InventoryItem, linkProductToIngredientsAction } from '@/app/actions/inventory';
 import { Plus, Trash2, Save } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { AlertModal } from '@/components/ui/AlertModal';
 
 interface Ingredient {
     inventoryItemId: string;
@@ -22,6 +23,7 @@ export default function ProductRecipeEditor({ branchId, productId, initialIngred
         initialIngredients.map(i => ({ inventoryItemId: i.inventoryItemId, quantityRequired: i.quantityRequired }))
     );
     const [isSaving, setIsSaving] = useState(false);
+    const [alertConfig, setAlertConfig] = useState<{isOpen: boolean, message: string}>({ isOpen: false, message: '' });
     const router = useRouter();
 
     const addIngredient = () => {
@@ -49,10 +51,10 @@ export default function ProductRecipeEditor({ branchId, productId, initialIngred
         
         const res = await linkProductToIngredientsAction(branchId, productId, validIngredients);
         if (res.success) {
-            alert('Recipe saved successfully');
+            setAlertConfig({ isOpen: true, message: 'Recipe saved successfully' });
             router.refresh();
         } else {
-            alert('Failed to save recipe');
+            setAlertConfig({ isOpen: true, message: 'Failed to save recipe' });
         }
         setIsSaving(false);
     };
@@ -117,6 +119,12 @@ export default function ProductRecipeEditor({ branchId, productId, initialIngred
                     {isSaving ? 'Saving...' : 'Save Recipe'}
                 </button>
             </div>
+
+            <AlertModal 
+                isOpen={alertConfig.isOpen} 
+                onClose={() => setAlertConfig({ ...alertConfig, isOpen: false })} 
+                message={alertConfig.message} 
+            />
         </div>
     );
 }

@@ -6,13 +6,74 @@ import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import CartItem from '@/components/customer/CartItem';
 import FloatingOrderTabs from '@/components/customer/FloatingOrderTabs';
+import { getProductsByTableId } from '@/app/actions/menu';
 
 export default function CartPage() {
-  const { items, cartTotal, cartCount } = useCart();
-  const { tableName, tableId } = useTable();
+  const { items, cartTotal, cartCount, addItem, updateQuantity } = useCart();
+  const { tableName, tableId, branchId } = useTable();
   const router = useRouter();
+  const [products, setProducts] = useState<any[]>([]);
+  const [waterBottleItem, setWaterBottleItem] = useState<any>(null);
+
+  // Fetch products to find water bottle
+  useEffect(() => {
+    if (tableId) {
+      getProductsByTableId(branchId || '', tableId).then(result => {
+        if (result.success) {
+          setProducts(result.products || []);
+          const otherCategory = result.categories?.find((c: any) => c.name.toLowerCase() === 'other');
+
+          // Find water bottle product, prioritizing the "Other" category
+          let waterBottle = result.products?.find((p: any) => {
+            const nameLower = p.name.toLowerCase();
+            const isWater = nameLower.includes('water') && (nameLower.includes('bottle') || nameLower.includes('bottled'));
+            return isWater && (!otherCategory || p.categoryId === otherCategory.id);
+          });
+
+          if (!waterBottle) {
+            // Fallback: search for other water bottle if not in "Other" category, or simple exact match
+            waterBottle = result.products?.find((p: any) => {
+              const nameLower = p.name.toLowerCase();
+              return nameLower === 'water' || nameLower === 'bottled water' || nameLower === 'water bottle';
+            });
+          }
+          if (waterBottle) {
+            setWaterBottleItem(waterBottle);
+          }
+        }
+      }).catch(err => {
+        console.error('Error fetching products for water bottle:', err);
+      });
+    }
+  }, [tableId]);
+
+  // Find water bottle in cart
+  const waterBottleInCart = items.find(item => 
+    item.productId === waterBottleItem?.id && 
+    (!item.options || Object.keys(item.options).length === 0)
+  );
+
+  const handleWaterBottleClick = () => {
+    if (!waterBottleItem) return;
+    
+    if (waterBottleInCart) {
+      // Increment quantity if already in cart
+      updateQuantity(waterBottleInCart.id, 1);
+    } else {
+      // Add new item
+      addItem({
+        productId: waterBottleItem.id,
+        name: waterBottleItem.name,
+        price: waterBottleItem.price,
+        quantity: 1,
+        image: waterBottleItem.image,
+        options: {},
+      });
+    }
+  };
 
   // Calculate generic discount (mock logic: 20% off on extras that are part of a bundle)
   // In a real app, 'originalPrice' would be stored in cart item extra data.
@@ -52,7 +113,7 @@ export default function CartPage() {
           Looks like you haven't added anything yet. Go ahead and explore our menu!
         </p>
         <Link 
-          href={`/customer/table/${tableId || '1'}`} 
+          href={`/customer/table/${branchId || ''}/${tableId || '1'}`} 
           className="bg-[#D95D1E] text-white font-bold py-3 px-8 rounded-xl shadow-lg shadow-orange-200"
         >
           Browse Menu
@@ -66,7 +127,7 @@ export default function CartPage() {
       {/* Header */}
       <div className="bg-white sticky top-0 z-10 shadow-sm">
         <div className="flex items-center justify-between p-4">
-            <Link href={`/customer/table/${tableId || '1'}`} className="p-2 -ml-2 text-gray-600 hover:bg-gray-50 rounded-lg">
+            <Link href={`/customer/table/${branchId || ''}/${tableId || '1'}`} className="p-2 -ml-2 text-gray-600 hover:bg-gray-50 rounded-lg">
                 <ArrowLeft size={24} />
             </Link>
             
@@ -81,7 +142,31 @@ export default function CartPage() {
                 <span className="text-sm text-gray-500">{tableName || 'Table ...'}</span>
             </div>
 
-            <div className="w-10" /> {/* Spacer for centering */}
+            <button
+              onClick={handleWaterBottleClick}
+              disabled={!waterBottleItem}
+              className={`relative w-12 h-12 rounded-xl overflow-hidden transition-all flex-shrink-0 ${
+                waterBottleItem 
+                  ? 'border border-orange-200 hover:border-2 hover:border-[#D95D1E] hover:scale-105 active:scale-95 shadow-sm hover:shadow-orange-200 hover:shadow-md' 
+                  : 'border border-gray-200 cursor-not-allowed opacity-50'
+              }`}
+              title={waterBottleItem ? "Add Water Bottle" : "Water bottle not available"}
+            >
+              {waterBottleItem?.image ? (
+                <img
+                  src={waterBottleItem.image}
+                  alt={waterBottleItem.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="w-full h-full flex items-center justify-center bg-orange-50 text-xl">💧</span>
+              )}
+              {waterBottleInCart && (
+                <span className="absolute -top-1 -right-1 bg-[#D95D1E] text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center shadow">
+                  {waterBottleInCart.quantity}
+                </span>
+              )}
+            </button>
         </div>
       </div>
 

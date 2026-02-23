@@ -72,23 +72,26 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       // Both customers and staff might use this, but staff definitely need it for dashboard.
       // Customers might use it to see their own active orders if we implemented that.
 
-      // First, try to use currentBranchId from TableContext (for customer pages)
-      let branchId = currentBranchId;
+      // Always prefer the session branchId (staff kitchen dashboard).
+      // This prevents stale localStorage from a customer session on the same
+      // device routing kitchen orders to the wrong shop.
+      let branchId: string | null = null;
 
-      // Only fetch session if we don't have branchId and session cache is stale (> 30 seconds)
+      const now = Date.now();
+      const cachedSession = sessionRef.current;
+
+      // Use cached session if it's fresh (less than 30 seconds old)
+      if (cachedSession && (now - cachedSession.timestamp) < 30000) {
+        branchId = cachedSession.branchId;
+      } else {
+        const session = await getSessionAction();
+        branchId = session?.user?.branchId || null;
+        sessionRef.current = { branchId, timestamp: now };
+      }
+
+      // Fallback to TableContext branchId for unauthenticated customers
       if (!branchId) {
-        const now = Date.now();
-        const cachedSession = sessionRef.current;
-
-        // Use cached session if it's fresh (less than 30 seconds old)
-        if (cachedSession && (now - cachedSession.timestamp) < 30000) {
-          branchId = cachedSession.branchId;
-        } else {
-          // Fetch session only if needed
-          const session = await getSessionAction();
-          branchId = session?.user?.branchId || null;
-          sessionRef.current = { branchId, timestamp: now };
-        }
+        branchId = currentBranchId;
       }
 
       if (!branchId) {

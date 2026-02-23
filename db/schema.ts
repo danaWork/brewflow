@@ -57,17 +57,24 @@ export const products = pgTable('products', {
   basePrice: decimal('base_price', { precision: 10, scale: 2 }).notNull(),
   imageUrl: text('image_url'),
   isHidden: boolean('is_hidden').default(false).notNull(),
+  isFeatured: boolean('is_featured').default(false).notNull(),
 });
 
+// Circular ref with modifierOptions; TypeScript cannot infer type. See modifierOptions below.
+// @ts-expect-error - circular table reference (modifierGroups <-> modifierOptions)
 export const modifierGroups = pgTable('modifier_groups', {
   id: uuid('id').defaultRandom().primaryKey(),
   companyId: uuid('company_id').references(() => companies.id).notNull(),
   name: text('name').notNull(),
   displayMode: text('display_mode').default('list').notNull(), // 'list', 'buttons', 'cards'
+  // @ts-expect-error - callback in references() has circular return type
+  defaultOptionId: uuid('default_option_id').references(() => modifierOptions.id),
 });
 
+// @ts-expect-error - circular table reference (modifierOptions <-> modifierGroups)
 export const modifierOptions = pgTable('modifier_options', {
   id: uuid('id').defaultRandom().primaryKey(),
+  // @ts-expect-error - callback in references() has circular return type
   modifierGroupId: uuid('modifier_group_id').references(() => modifierGroups.id).notNull(),
   name: text('name').notNull(),
   price: decimal('price', { precision: 10, scale: 2 }).default('0').notNull(),
@@ -78,6 +85,7 @@ export const productModifierLinks = pgTable('product_modifier_links', {
   id: uuid('id').defaultRandom().primaryKey(),
   productId: uuid('product_id').references(() => products.id).notNull(),
   modifierGroupId: uuid('modifier_group_id').references(() => modifierGroups.id).notNull(),
+  defaultModifierOptionId: uuid('default_modifier_option_id').references(() => modifierOptions.id),
 });
 
 export const tables = pgTable('tables', {

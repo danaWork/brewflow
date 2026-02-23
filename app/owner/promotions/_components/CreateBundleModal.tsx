@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Search, Check, Save } from 'lucide-react';
 import { savePromotionAction } from '@/app/actions/promotions';
+import { AlertModal } from '@/components/ui/AlertModal';
 
 interface Product {
     id: string;
@@ -31,6 +32,7 @@ export default function CreateBundleModal({ isOpen, onClose, products, branchId,
     const [triggerSearch, setTriggerSearch] = useState('');
     const [pairSearch, setPairSearch] = useState('');
     const [loading, setLoading] = useState(false);
+    const [alertConfig, setAlertConfig] = useState<{isOpen: boolean, message: string}>({ isOpen: false, message: '' });
 
     useEffect(() => {
         if (!isOpen) {
@@ -97,25 +99,25 @@ export default function CreateBundleModal({ isOpen, onClose, products, branchId,
             onSuccess();
             onClose();
         } else {
-            alert(res.error || 'Failed to save promotion');
+            setAlertConfig({ isOpen: true, message: res.error || 'Failed to save promotion' });
         }
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4">
+            <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl shadow-2xl overflow-hidden animate-in fade-in duration-200 flex flex-col max-h-[90vh] sm:max-h-[85vh]">
                 {/* Header */}
-                <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                    <div>
-                        <h2 className="text-xl font-bold text-gray-900">{initialData ? 'Edit Bundle Rule' : 'Create New Bundle Rule'}</h2>
-                        <p className="text-sm text-gray-400">Set up a new Perfect Pair bundle promotion.</p>
+                <div className="p-4 sm:p-6 border-b border-gray-100 flex items-start sm:items-center justify-between gap-3 shrink-0">
+                    <div className="min-w-0 flex-1">
+                        <h2 className="text-lg sm:text-xl font-bold text-gray-900">{initialData ? 'Edit Bundle Rule' : 'Create New Bundle Rule'}</h2>
+                        <p className="text-xs sm:text-sm text-gray-400 mt-0.5">Set up a new Perfect Pair bundle promotion.</p>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                    <button onClick={onClose} className="p-2.5 -m-2.5 hover:bg-gray-100 rounded-full transition-colors shrink-0" aria-label="Close">
                         <X size={20} className="text-gray-400" />
                     </button>
                 </div>
 
-                <div className="p-6 space-y-8 max-h-[70vh] overflow-y-auto">
+                <div className="p-4 sm:p-6 space-y-6 sm:space-y-8 overflow-y-auto flex-1 min-h-0">
                     {/* Bundle Name */}
                     <div className="space-y-2">
                         <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Bundle Name</label>
@@ -131,7 +133,7 @@ export default function CreateBundleModal({ isOpen, onClose, products, branchId,
                     {/* Selection Area */}
                     <div className="space-y-4">
                         <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Select Pairing Items</label>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50/50 p-4 rounded-xl border border-gray-100">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50/50 p-3 sm:p-4 rounded-xl border border-gray-100">
                             {/* Trigger Item */}
                             <div className="space-y-3">
                                 <span className="text-[10px] font-bold text-gray-400 uppercase">Trigger Item</span>
@@ -145,7 +147,7 @@ export default function CreateBundleModal({ isOpen, onClose, products, branchId,
                                         className="w-full text-xs pl-9 pr-3 py-2 bg-white border border-gray-100 rounded-lg text-gray-700 focus:outline-none focus:border-orange-300"
                                     />
                                 </div>
-                                <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                                <div className="space-y-2 max-h-48 overflow-y-auto">
                                     {filteredDrinks.slice(0, 3).map(p => (
                                         <button
                                             key={p.id}
@@ -198,7 +200,7 @@ export default function CreateBundleModal({ isOpen, onClose, products, branchId,
                                         className="w-full text-xs pl-9 pr-3 py-2 bg-white border border-gray-100 rounded-lg text-gray-700 focus:outline-none focus:border-orange-300"
                                     />
                                 </div>
-                                <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                                <div className="space-y-2 max-h-48 overflow-y-auto">
                                     {pairItems.length === 0 ? (
                                         <p className="text-sm text-gray-400 text-center py-4">Select a trigger item first</p>
                                     ) : (
@@ -232,7 +234,7 @@ export default function CreateBundleModal({ isOpen, onClose, products, branchId,
                     </div>
 
                     {/* Discount */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
                         <div className="space-y-2">
                             <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Type</label>
                             <select
@@ -257,23 +259,29 @@ export default function CreateBundleModal({ isOpen, onClose, products, branchId,
                 </div>
 
                 {/* Footer */}
-                <div className="p-6 border-t border-gray-100 flex items-center justify-end gap-3 bg-gray-50/50">
+                <div className="p-4 sm:p-6 border-t border-gray-100 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3 bg-gray-50/50 shrink-0">
                     <button
                         onClick={onClose}
-                        className="px-6 py-2.5 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-100 transition-colors"
+                        className="w-full sm:w-auto px-6 py-3 sm:py-2.5 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-100 transition-colors"
                     >
                         Cancel
                     </button>
                     <button
                         onClick={handleSave}
                         disabled={loading || !triggerItem || !pairItem || !name}
-                        className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white px-8 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-md active:scale-95"
+                        className="w-full sm:w-auto flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white px-8 py-3 sm:py-2.5 rounded-lg text-sm font-semibold transition-all shadow-md active:scale-95"
                     >
                         <Save size={18} />
                         {loading ? 'Saving...' : initialData ? 'Update Rule' : 'Create Rule'}
                     </button>
                 </div>
             </div>
+
+            <AlertModal 
+                isOpen={alertConfig.isOpen}
+                onClose={() => setAlertConfig({ ...alertConfig, isOpen: false })}
+                message={alertConfig.message}
+            />
         </div>
     );
 }

@@ -2,7 +2,8 @@
 
 import { Pause, Play, Trash2, Crown } from 'lucide-react';
 import { toggleShopStatus, deleteShop } from '@/app/actions/admin';
-import { useTransition } from 'react';
+import { useTransition, useState } from 'react';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 
 interface Shop {
     id: string;
@@ -14,6 +15,7 @@ interface Shop {
 
 export function ShopCard({ shop }: { shop: Shop }) {
     const [isPending, startTransition] = useTransition();
+    const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
     const handleToggleStatus = () => {
         startTransition(async () => {
@@ -21,12 +23,14 @@ export function ShopCard({ shop }: { shop: Shop }) {
         });
     };
 
-    const handleDelete = async () => {
-        if (confirm(`Are you sure you want to delete ${shop.name}?`)) {
-            startTransition(async () => {
-                await deleteShop(shop.id);
-            });
-        }
+    const handleDeleteClick = () => {
+        setIsConfirmOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        startTransition(async () => {
+            await deleteShop(shop.id);
+        });
     };
 
     return (
@@ -48,38 +52,47 @@ export function ShopCard({ shop }: { shop: Shop }) {
                 <span className="px-3 py-1 bg-gray-100 rounded-lg text-xs font-bold text-gray-700">{shop.plan}</span>
             </div>
 
-            <div className="flex gap-2 mt-2">
+            <div className="flex gap-1.5 md:gap-2 mt-2">
                 <button
                     onClick={handleToggleStatus}
                     disabled={isPending}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-medium transition-colors ${shop.isActive
+                    className={`flex-1 flex items-center justify-center gap-1.5 md:gap-2 py-2 md:py-2.5 rounded-lg md:rounded-xl text-sm md:text-base font-medium transition-colors ${shop.isActive
                         ? 'bg-red-600 text-white hover:bg-red-700'
                         : 'bg-emerald-600 text-white hover:bg-emerald-700'
                         } disabled:opacity-50`}
                 >
                     {shop.isActive ? (
                         <>
-                            <Pause size={18} fill="currentColor" /> Pause
+                            <Pause size={16} className="md:w-[18px] md:h-[18px]" fill="currentColor" /> Pause
                         </>
                     ) : (
                         <>
-                            <Play size={18} fill="currentColor" /> Resume
+                            <Play size={16} className="md:w-[18px] md:h-[18px]" fill="currentColor" /> Resume
                         </>
                     )}
                 </button>
 
-                <button className="p-2.5 border border-gray-100 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-50">
-                    <Crown size={18} />
+                <button className="p-2 md:p-2.5 border border-gray-100 rounded-lg md:rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-50">
+                    <Crown size={16} className="md:w-[18px] md:h-[18px]" />
                 </button>
 
                 <button
-                    onClick={handleDelete}
+                    onClick={handleDeleteClick}
                     disabled={isPending}
-                    className="p-2.5 border border-gray-100 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                    className="p-2 md:p-2.5 border border-gray-100 rounded-lg md:rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
                 >
-                    <Trash2 size={18} />
+                    <Trash2 size={16} className="md:w-[18px] md:h-[18px]" />
                 </button>
             </div>
+
+            <ConfirmModal 
+                isOpen={isConfirmOpen}
+                onClose={() => setIsConfirmOpen(false)}
+                onConfirm={handleConfirmDelete}
+                title="Delete Shop"
+                message={`Are you sure you want to delete ${shop.name}?`}
+                variant="danger"
+            />
         </div>
     );
 }

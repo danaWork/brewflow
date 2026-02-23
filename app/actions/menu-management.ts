@@ -68,7 +68,9 @@ export async function createProduct(data: {
     basePrice: string;
     imageUrl?: string;
     modifierGroupIds?: string[];
+    modifierGroups?: { modifierGroupId: string; defaultModifierOptionId?: string }[];
     isHidden?: boolean;
+    isFeatured?: boolean;
 }) {
     const session = await getUserSession();
     if (!session?.companyId) throw new Error('Unauthorized');
@@ -79,9 +81,19 @@ export async function createProduct(data: {
         basePrice: data.basePrice,
         imageUrl: data.imageUrl,
         isHidden: data.isHidden || false,
+        isFeatured: data.isFeatured || false,
     }).returning();
 
-    if (data.modifierGroupIds && data.modifierGroupIds.length > 0) {
+    // Support both old format (modifierGroupIds) and new format (modifierGroups with defaults)
+    if (data.modifierGroups && data.modifierGroups.length > 0) {
+        await db.insert(productModifierLinks).values(
+            data.modifierGroups.map(mg => ({
+                productId: product.id,
+                modifierGroupId: mg.modifierGroupId,
+                defaultModifierOptionId: mg.defaultModifierOptionId || null,
+            }))
+        );
+    } else if (data.modifierGroupIds && data.modifierGroupIds.length > 0) {
         await db.insert(productModifierLinks).values(
             data.modifierGroupIds.map(groupId => ({
                 productId: product.id,
@@ -100,7 +112,9 @@ export async function updateProduct(id: string, data: {
     basePrice: string;
     imageUrl?: string;
     modifierGroupIds?: string[];
+    modifierGroups?: { modifierGroupId: string; defaultModifierOptionId?: string }[];
     isHidden?: boolean;
+    isFeatured?: boolean;
 }) {
     if (!id) throw new Error('Product ID is required');
     const session = await getUserSession();
@@ -113,11 +127,25 @@ export async function updateProduct(id: string, data: {
             basePrice: data.basePrice,
             imageUrl: data.imageUrl,
             isHidden: data.isHidden ?? false,
+            isFeatured: data.isFeatured ?? false,
         })
         .where(eq(products.id, id));
 
-    if (data.modifierGroupIds) {
+    if (data.modifierGroups !== undefined) {
         // Simple approach: delete existing links and create new ones
+        await db.delete(productModifierLinks).where(eq(productModifierLinks.productId, id));
+        
+        if (data.modifierGroups.length > 0) {
+            await db.insert(productModifierLinks).values(
+                data.modifierGroups.map(mg => ({
+                    productId: id,
+                    modifierGroupId: mg.modifierGroupId,
+                    defaultModifierOptionId: mg.defaultModifierOptionId || null,
+                }))
+            );
+        }
+    } else if (data.modifierGroupIds !== undefined) {
+        // Support old format for backward compatibility
         await db.delete(productModifierLinks).where(eq(productModifierLinks.productId, id));
         
         if (data.modifierGroupIds.length > 0) {
@@ -169,25 +197,40 @@ export async function getProductModifiers(productId: string) {
     return links.map(l => l.modifierGroupId);
 }
 
-export async function createModifierGroup(name: string, options: { name: string; price: number; imageUrl?: string }[], displayMode: 'list' | 'buttons' | 'cards' = 'list') {
+export async function createModifierGroup(name: string, options: { name: string; price: number; imageUrl?: string }[], displayMode: 'list' | 'buttons' | 'cards' = 'list', defaultOptionIdentifier?: string | null) {
     const session = await getUserSession();
     if (!session?.companyId) throw new Error('Unauthorized');
 
-    const [group] = await db.insert(modifierGroups).values({
+    // Create group first without defaultOptionId (to avoid FK constraint issues)
+    const inserted = await db.insert(modifierGroups).values({
         companyId: session.companyId,
         name,
         displayMode,
+        defaultOptionId: null,
     }).returning();
+    const group = Array.isArray(inserted) ? inserted[0] : undefined;
+    if (!group) throw new Error('Failed to create modifier group');
 
     if (options.length > 0) {
-        await db.insert(modifierOptions).values(
+        const insertedOptionsRaw = await db.insert(modifierOptions).values(
             options.map(opt => ({
                 modifierGroupId: group.id,
                 name: opt.name,
                 price: opt.price.toString(),
                 imageUrl: opt.imageUrl
             }))
-        );
+        ).returning();
+        const insertedOptions = Array.isArray(insertedOptionsRaw) ? insertedOptionsRaw : [];
+
+        // If defaultOptionIdentifier was provided (as option name for new groups), find and set it
+        if (defaultOptionIdentifier) {
+            const defaultOption = insertedOptions.find(opt => opt.name === defaultOptionIdentifier);
+            if (defaultOption) {
+                await db.update(modifierGroups)
+                    .set({ defaultOptionId: defaultOption.id })
+                    .where(eq(modifierGroups.id, group.id));
+            }
+        }
     }
 
     revalidatePath('/owner/menu-categories');
@@ -197,14 +240,15 @@ export async function updateModifierGroup(
     id: string, 
     name: string, 
     options: { id?: string; name: string; price: number; imageUrl?: string }[], 
-    displayMode: 'list' | 'buttons' | 'cards' = 'list'
+    displayMode: 'list' | 'buttons' | 'cards' = 'list',
+    defaultOptionId?: string | null
 ) {
     const session = await getUserSession();
     if (!session?.companyId) throw new Error('Unauthorized');
 
     // 1. Update Group Details
     await db.update(modifierGroups)
-        .set({ name, displayMode })
+        .set({ name, displayMode, defaultOptionId: defaultOptionId || null })
         .where(and(eq(modifierGroups.id, id), eq(modifierGroups.companyId, session.companyId)));
 
     // 2. Handle Options

@@ -323,7 +323,11 @@ export async function deductInventoryForOrder(orderId: string) {
 
         await db.transaction(async (tx) => {
             for (const item of items) {
-                const ingredients = item.product.productIngredients.filter(
+                const product = Array.isArray(item.product) ? item.product[0] : item.product;
+                const productIngredients = product && typeof product === 'object' && 'productIngredients' in product
+                    ? (product.productIngredients as Array<{ inventoryItem: { branchId: string }; quantityRequired: string; inventoryItemId: string }>)
+                    : [];
+                const ingredients = productIngredients.filter(
                     pi => pi.inventoryItem.branchId === order.branchId
                 );
 

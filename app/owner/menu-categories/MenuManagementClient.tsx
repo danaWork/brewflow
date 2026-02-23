@@ -1,13 +1,16 @@
 'use client';
 
-import { useState } from 'react';
-import { Plus, ChevronDown, ChevronRight, Edit2, Trash2, Image as ImageIcon, Settings2, X, Trash } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import React from 'react';
+import { Plus, ChevronDown, ChevronRight, Edit2, Trash2, Image as ImageIcon, Settings2, X, Trash, Droplet, MoreVertical } from 'lucide-react';
 import { 
     createCategory, updateCategory, deleteCategory, 
     createProduct, updateProduct, deleteProduct,
     createModifierGroup, updateModifierGroup, deleteModifierGroup 
 } from '@/app/actions/menu-management';
 import { InventoryItem, linkProductToIngredientsAction } from '@/app/actions/inventory';
+import { AlertModal } from '@/components/ui/AlertModal';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 
 type Product = {
     id: string;
@@ -16,7 +19,8 @@ type Product = {
     imageUrl: string | null;
     categoryId: string;
     isHidden?: boolean;
-    modifierLinks?: { modifierGroupId: string }[];
+    isFeatured?: boolean;
+    modifierLinks?: { modifierGroupId: string; defaultModifierOptionId?: string | null }[];
     productIngredients?: { inventoryItemId: string; quantityRequired: string }[];
 };
 
@@ -32,6 +36,7 @@ type ModifierGroup = {
     id: string;
     name: string;
     displayMode: 'list' | 'buttons' | 'cards';
+    defaultOptionId?: string | null;
     options: { id: string; name: string; price: string; imageUrl?: string | null }[];
 };
 
@@ -47,6 +52,26 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
     const [categories, setCategories] = useState<Category[]>(initialCategories);
     const [expandedCategories, setExpandedCategories] = useState<string[]>(initialCategories.map(c => c.id));
     
+    // Find water product on mount
+    React.useEffect(() => {
+        const findWaterProduct = () => {
+            for (const category of initialCategories) {
+                const water = category.products.find(p => 
+                    p.name.toLowerCase().includes('water') && 
+                    (p.name.toLowerCase().includes('bottle') || p.name.toLowerCase().includes('bottled'))
+                );
+                if (water) {
+                    setWaterProduct(water);
+                    setWaterPrice(water.basePrice);
+                    setWaterName(water.name);
+                    setWaterImageUrl(water.imageUrl || '');
+                    return;
+                }
+            }
+        };
+        findWaterProduct();
+    }, [initialCategories]);
+    
     // Modals
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -59,13 +84,46 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
     const [editingIngredients, setEditingIngredients] = useState<{ inventoryItemId: string; quantityRequired: number }[]>([]);
 
     const [editingSizes, setEditingSizes] = useState<{name: string, price: number}[]>([]);
+    const [defaultModifierOptions, setDefaultModifierOptions] = useState<Record<string, string>>({});
+    const [waterProduct, setWaterProduct] = useState<Product | null>(null);
+    const [isWaterModalOpen, setIsWaterModalOpen] = useState(false);
+    const [waterPrice, setWaterPrice] = useState('1.50');
+    const [waterName, setWaterName] = useState('Bottled Water');
+    const [waterImageUrl, setWaterImageUrl] = useState('');
 
     const [editingModifierGroup, setEditingModifierGroup] = useState<{
         id?: string;
         name: string;
         displayMode: 'list' | 'buttons' | 'cards';
+        defaultOptionId?: string | null;
+        defaultOptionIndex?: number | null; // For new groups before options have IDs
         options: { id?: string; name: string; price: number; imageUrl?: string }[];
     } | null>(null);
+
+    const [mobileActionsProductId, setMobileActionsProductId] = useState<string | null>(null);
+    const mobileActionsRowRef = useRef<HTMLDivElement | null>(null);
+    useEffect(() => {
+        if (!mobileActionsProductId) return;
+        const handle = (e: MouseEvent | TouchEvent) => {
+            if (mobileActionsRowRef.current && !mobileActionsRowRef.current.contains(e.target as Node)) {
+                setMobileActionsProductId(null);
+            }
+        };
+        document.addEventListener('mousedown', handle);
+        document.addEventListener('touchstart', handle, { passive: true });
+        return () => {
+            document.removeEventListener('mousedown', handle);
+            document.removeEventListener('touchstart', handle);
+        };
+    }, [mobileActionsProductId]);
+
+    const [alertConfig, setAlertConfig] = useState<{isOpen: boolean, message: string}>({ isOpen: false, message: '' });
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        action: (() => void) | null;
+    }>({ isOpen: false, title: '', message: '', action: null });
 
     const toggleCategory = (id: string) => {
         setExpandedCategories(prev =>
@@ -83,6 +141,18 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
             })));
         } else {
             setEditingIngredients([]);
+        }
+        // Initialize default modifier options from product
+        if (product && product.modifierLinks) {
+            const defaults: Record<string, string> = {};
+            product.modifierLinks.forEach(link => {
+                if (link.defaultModifierOptionId) {
+                    defaults[link.modifierGroupId] = link.defaultModifierOptionId;
+                }
+            });
+            setDefaultModifierOptions(defaults);
+        } else {
+            setDefaultModifierOptions({});
         }
         setIsProductModalOpen(true);
     };
@@ -107,11 +177,16 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
         window.location.reload();
     };
 
-    const handleDeleteCategory = async (id: string) => {
-        if (confirm('Are you sure you want to delete this category? All products in it will be affected.')) {
-            await deleteCategory(id);
-            window.location.reload();
-        }
+    const handleDeleteCategory = (id: string) => {
+        setConfirmConfig({
+            isOpen: true,
+            title: 'Delete Category',
+            message: 'Are you sure you want to delete this category? All products in it will be affected.',
+            action: async () => {
+                await deleteCategory(id);
+                window.location.reload();
+            }
+        });
     };
 
     const handleSaveProduct = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -125,14 +200,23 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
         if (!categoryId) return;
 
         const isHidden = formData.get('isHidden') === 'on';
+        const isFeatured = formData.get('isFeatured') === 'on';
+
+        // Build modifier groups with default options
+        const modifierGroupIds = formData.getAll('modifierGroups') as string[];
+        const modifierGroups = modifierGroupIds.map(groupId => ({
+            modifierGroupId: groupId,
+            defaultModifierOptionId: defaultModifierOptions[groupId] || undefined,
+        }));
 
         const data = {
             categoryId,
             name,
             basePrice,
             imageUrl: imageUrl || undefined,
-            modifierGroupIds: formData.getAll('modifierGroups') as string[],
+            modifierGroups,
             isHidden,
+            isFeatured,
         };
 
         let productId = editingProduct?.id;
@@ -153,11 +237,16 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
         window.location.reload();
     };
 
-    const handleDeleteProduct = async (id: string) => {
-        if (confirm('Are you sure you want to delete this product?')) {
-            await deleteProduct(id);
-            window.location.reload();
-        }
+    const handleDeleteProduct = (id: string) => {
+        setConfirmConfig({
+            isOpen: true,
+            title: 'Delete Product',
+            message: 'Are you sure you want to delete this product?',
+            action: async () => {
+                await deleteProduct(id);
+                window.location.reload();
+            }
+        });
     };
     
     // ... helpers for ingredients ...
@@ -179,38 +268,157 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
         if (!editingModifierGroup) return;
         
         if (!editingModifierGroup.name.trim()) {
-            alert("Please enter a group name");
+            setAlertConfig({ isOpen: true, message: "Please enter a group name" });
             return;
         }
 
         const validOptions = editingModifierGroup.options.filter(o => o.name.trim() !== '');
         
         if (editingModifierGroup.id) {
+            // For existing groups, use defaultOptionId directly
             await updateModifierGroup(
                 editingModifierGroup.id,
                 editingModifierGroup.name,
                 validOptions,
-                editingModifierGroup.displayMode
+                editingModifierGroup.displayMode,
+                editingModifierGroup.defaultOptionId
             );
         } else {
+            // For new groups, we'll set defaultOptionId after options are created
+            // We'll pass the index, and the backend will handle it
             await createModifierGroup(
                 editingModifierGroup.name, 
                 validOptions, 
-                editingModifierGroup.displayMode
+                editingModifierGroup.displayMode,
+                editingModifierGroup.defaultOptionIndex !== null && editingModifierGroup.defaultOptionIndex !== undefined
+                    ? validOptions[editingModifierGroup.defaultOptionIndex]?.name // Pass name as identifier for new groups
+                    : null
             );
         }
         window.location.reload();
     };
 
-    const handleDeleteModifier = async (id: string) => {
-        if (confirm('Are you sure? This will remove this modifier group from all products.')) {
-            await deleteModifierGroup(id);
-            window.location.reload();
+    const handleDeleteModifier = (id: string) => {
+        setConfirmConfig({
+            isOpen: true,
+            title: 'Delete Modifier Group',
+            message: 'Are you sure? This will remove this modifier group from all products.',
+            action: async () => {
+                await deleteModifierGroup(id);
+                window.location.reload();
+            }
+        });
+    };
+
+    const handleSaveWaterProduct = async () => {
+        if (!waterName.trim()) {
+            setAlertConfig({ isOpen: true, message: 'Please enter a product name' });
+            return;
         }
+        if (!waterProduct) {
+            // Create water product if it doesn't exist
+            const drinkCategory = categories.find(c => c.type === 'drink');
+            if (!drinkCategory) {
+                setAlertConfig({ isOpen: true, message: 'Please create a drink category first' });
+                return;
+            }
+            const newProduct = await createProduct({
+                categoryId: drinkCategory.id,
+                name: waterName,
+                basePrice: waterPrice,
+                imageUrl: waterImageUrl || undefined,
+                isHidden: false,
+            });
+            setWaterProduct(newProduct);
+        } else {
+            // Update existing water product
+            await updateProduct(waterProduct.id, {
+                categoryId: waterProduct.categoryId,
+                name: waterName,
+                basePrice: waterPrice,
+                imageUrl: waterImageUrl || undefined,
+                modifierGroups: [],
+                isHidden: waterProduct.isHidden || false,
+            });
+        }
+        window.location.reload();
     };
 
     return (
         <div className="max-w-5xl mx-auto pb-20">
+            {/* Water Product Quick Settings */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-6 shadow-sm">
+                <div className="flex items-start gap-4">
+                    {/* Image preview */}
+                    <div className="w-16 h-16 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                        {waterImageUrl ? (
+                            <img src={waterImageUrl} alt={waterName} className="w-full h-full object-cover" />
+                        ) : (
+                            <Droplet className="text-blue-400" size={24} />
+                        )}
+                    </div>
+
+                    <div className="flex-1 space-y-3">
+                        <div className="flex items-center gap-2">
+                            <Droplet className="text-blue-500" size={16} />
+                            <div>
+                                <h3 className="text-sm font-bold text-gray-900">Water Bottle Product</h3>
+                                <p className="text-xs text-gray-500">Quick cart access product</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            {/* Name */}
+                            <div className="md:col-span-1">
+                                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Name</label>
+                                <input
+                                    type="text"
+                                    value={waterName}
+                                    onChange={(e) => setWaterName(e.target.value)}
+                                    placeholder="e.g. Bottled Water"
+                                    className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold focus:border-[#D95D1E] focus:ring-1 focus:ring-[#D95D1E]"
+                                />
+                            </div>
+
+                            {/* Image URL */}
+                            <div className="md:col-span-1">
+                                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Image URL</label>
+                                <input
+                                    type="text"
+                                    value={waterImageUrl}
+                                    onChange={(e) => setWaterImageUrl(e.target.value)}
+                                    placeholder="https://..."
+                                    className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:border-[#D95D1E] focus:ring-1 focus:ring-[#D95D1E]"
+                                />
+                            </div>
+
+                            {/* Price + Save */}
+                            <div className="md:col-span-1">
+                                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Price</label>
+                                <div className="flex items-center gap-2">
+                                    <div className="relative flex-1">
+                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">₱</span>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            value={waterPrice}
+                                            onChange={(e) => setWaterPrice(e.target.value)}
+                                            className="w-full pl-6 pr-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold focus:border-[#D95D1E] focus:ring-1 focus:ring-[#D95D1E]"
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={handleSaveWaterProduct}
+                                        className="px-4 py-1.5 bg-[#D95D1E] text-white text-sm font-bold rounded-lg hover:bg-[#bf4f18] transition-colors whitespace-nowrap"
+                                    >
+                                        {waterProduct ? 'Update' : 'Create'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {/* Header Area */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
                 <div>
@@ -220,25 +428,27 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                     </p>
                 </div>
                 
-                <div className="flex bg-gray-100 p-1 rounded-xl w-fit">
-                    <button 
-                        onClick={() => setActiveTab('menu')}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'menu' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                        Menu & Categories
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('modifiers')}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'modifiers' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                        Modifiers
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('toppings')}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'toppings' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                        Toppings
-                    </button>
+                <div className="flex bg-gray-100 p-1 rounded-xl w-full md:w-fit overflow-x-auto md:overflow-visible">
+                    <div className="flex flex-nowrap md:flex-wrap gap-0.5 min-h-[44px] items-stretch shrink-0">
+                        <button 
+                            onClick={() => setActiveTab('menu')}
+                            className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all shrink-0 min-h-[44px] ${activeTab === 'menu' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                            Menu & Categories
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('modifiers')}
+                            className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all shrink-0 min-h-[44px] ${activeTab === 'modifiers' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                            Modifiers
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('toppings')}
+                            className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all shrink-0 min-h-[44px] ${activeTab === 'toppings' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                            Toppings
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -337,18 +547,22 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                         ) : (
                                             <div className="divide-y divide-gray-100">
                                                 {category.products.map((product) => (
-                                                    <div key={product.id} className="p-4 pl-14 flex items-center justify-between hover:bg-white transition-colors group">
-                                                        <div className="flex items-center gap-4">
-                                                            <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm transition-transform group-hover:scale-105">
+                                                    <div
+                                                        key={product.id}
+                                                        ref={mobileActionsProductId === product.id ? mobileActionsRowRef : undefined}
+                                                        className="product-row p-4 pl-4 md:pl-14 flex items-center justify-between gap-3 hover:bg-white transition-colors group"
+                                                    >
+                                                        <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
+                                                            <div className="w-12 h-12 md:w-14 md:h-14 shrink-0 bg-white rounded-xl flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm transition-transform group-hover:scale-105">
                                                                 {product.imageUrl ? (
                                                                     <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
                                                                 ) : (
                                                                     <ImageIcon size={24} className="text-gray-300" />
                                                                 )}
                                                             </div>
-                                                            <div>
-                                                                <h4 className="font-semibold text-gray-900">{product.name}</h4>
-                                                                <div className="flex items-center gap-3">
+                                                            <div className="min-w-0 flex-1">
+                                                                <h4 className="font-semibold text-gray-900 truncate">{product.name}</h4>
+                                                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
                                                                     <p className="text-sm text-[#D95D1E] font-bold">₱{product.basePrice}</p>
                                                                     {product.modifierLinks && product.modifierLinks.length > 0 && (
                                                                         <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md font-bold uppercase tracking-tighter">
@@ -363,19 +577,43 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
+                                                        <div className="flex items-center gap-1 shrink-0">
                                                             <button
-                                                                onClick={() => openProductModal(product, category.id)}
-                                                                className="p-2.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                                                                type="button"
+                                                                aria-label="Product actions"
+                                                                className={`md:hidden p-2.5 text-gray-500 hover:bg-gray-100 rounded-xl transition-colors ${mobileActionsProductId === product.id ? 'hidden' : ''}`}
+                                                                onClick={() => setMobileActionsProductId((prev) => (prev === product.id ? null : product.id))}
                                                             >
-                                                                <Edit2 size={18} />
+                                                                <MoreVertical size={18} />
                                                             </button>
-                                                            <button
-                                                                onClick={() => handleDeleteProduct(product.id)}
-                                                                className="p-2.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                                                            <div
+                                                                className={`flex items-center gap-1 transition-all md:translate-x-2 md:group-hover:translate-x-0 ${
+                                                                    mobileActionsProductId === product.id ? 'flex' : 'hidden'
+                                                                } md:flex opacity-100 md:opacity-0 md:group-hover:opacity-100`}
                                                             >
-                                                                <Trash2 size={18} />
-                                                            </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setMobileActionsProductId(null);
+                                                                        openProductModal(product, category.id);
+                                                                    }}
+                                                                    className="p-2.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                                                                    title="Edit product"
+                                                                >
+                                                                    <Edit2 size={18} />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setMobileActionsProductId(null);
+                                                                        handleDeleteProduct(product.id);
+                                                                    }}
+                                                                    className="p-2.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                                                                    title="Delete product"
+                                                                >
+                                                                    <Trash2 size={18} />
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 ))}
@@ -389,12 +627,12 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                 </div>
             ) : (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <div className="flex justify-between items-center">
-                        <div>
+                    <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center">
+                        <div className="min-w-0">
                             <h2 className="text-lg font-semibold text-gray-800">
                                 {activeTab === 'toppings' ? 'Visual Toppings' : 'Standard Modifiers'}
                             </h2>
-                            <p className="text-sm text-gray-500">
+                            <p className="text-sm text-gray-500 mt-0.5">
                                 {activeTab === 'toppings' 
                                     ? 'Create rich visual options with images (e.g., Toppings, Add-ons).' 
                                     : 'Create standard list or button options (e.g., Size, Sugar, Milk).'}
@@ -405,11 +643,13 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                 setEditingModifierGroup({ 
                                     name: '', 
                                     displayMode: activeTab === 'toppings' ? 'cards' : 'list', 
+                                    defaultOptionId: null,
+                                    defaultOptionIndex: null,
                                     options: [{ name: '', price: 0 }] 
                                 });
                                 setIsModifierModalOpen(true);
                             }}
-                            className="bg-[#D95D1E] text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-[#bf4f18] transition-all shadow-md active:scale-95"
+                            className="w-full md:w-auto bg-[#D95D1E] text-white px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-[#bf4f18] transition-all shadow-md active:scale-95 whitespace-nowrap"
                         >
                             <Plus size={20} />
                             Add Group
@@ -418,7 +658,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {modifierGroups.filter(g => activeTab === 'toppings' ? g.displayMode === 'cards' : g.displayMode !== 'cards').length === 0 ? (
-                            <div className="col-span-full bg-white rounded-2xl border border-dashed border-gray-300 p-20 text-center">
+                            <div className="col-span-full bg-white rounded-2xl border border-dashed border-gray-300 p-8 md:p-20 text-center">
                                 <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                                     <Settings2 size={32} className="text-gray-300" />
                                 </div>
@@ -429,12 +669,12 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                             modifierGroups
                                 .filter(g => activeTab === 'toppings' ? g.displayMode === 'cards' : g.displayMode !== 'cards')
                                 .map((group) => (
-                                <div key={group.id} className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm relative group hover:border-[#D95D1E]/30 transition-all">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <h3 className="font-bold text-gray-900 truncate pr-2">{group.name}</h3>
-                                                <span className="text-[10px] uppercase font-bold bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
+                                <div key={group.id} className="bg-white p-4 md:p-5 rounded-2xl border border-gray-200 shadow-sm relative group hover:border-[#D95D1E]/30 transition-all">
+                                    <div className="flex justify-between items-start mb-4 pr-20 md:pr-0">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <h3 className="font-bold text-gray-900 truncate">{group.name}</h3>
+                                                <span className="text-[10px] uppercase font-bold bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded shrink-0">
                                                     {group.displayMode}
                                                 </span>
                                             </div>
@@ -442,13 +682,14 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                                 {group.options.length} OPTIONS
                                             </p>
                                         </div>
-                                        <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="absolute top-4 right-4 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                             <button
                                                 onClick={() => {
                                                     setEditingModifierGroup({
                                                         id: group.id,
                                                         name: group.name,
                                                         displayMode: group.displayMode,
+                                                        defaultOptionId: group.defaultOptionId || null,
                                                         options: group.options.map(o => ({
                                                             id: o.id,
                                                             name: o.name,
@@ -578,23 +819,13 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                             {/* Size Configuration Section */}
                             <div className="border-t border-gray-100 pt-4">
                                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Size Options</label>
-                                <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
-                                    <div className="flex justify-between items-center mb-2">
-                                         <p className="text-xs text-gray-500">Define sizes and their price adjustment (added to base price).</p>
-                                         <button 
-                                            type="button"
-                                            onClick={() => setEditingSizes([...editingSizes, { name: '', price: 0 }])}
-                                            className="text-xs font-bold text-[#D95D1E] hover:underline"
-                                         >
-                                            + Add Size
-                                         </button>
-                                    </div>
-                                    
+                                <p className="text-xs text-gray-500 mb-3">Define sizes and their price adjustment (added to base price).</p>
+                                <div className="bg-gray-50 rounded-2xl p-3 sm:p-4 space-y-3">
                                     {editingSizes.length === 0 ? (
                                         <p className="text-sm text-gray-400 italic text-center py-2">No sizes configured. Default size step will be skipped.</p>
                                     ) : (
                                         editingSizes.map((size, idx) => (
-                                            <div key={idx} className="flex gap-2 items-center animate-in slide-in-from-left-2 duration-100">
+                                            <div key={idx} className="bg-white rounded-xl border border-gray-200 p-3 sm:p-0 sm:border-0 sm:bg-transparent sm:flex sm:gap-2 sm:items-center animate-in slide-in-from-left-2 duration-100">
                                                 <input
                                                     type="text"
                                                     value={size.name}
@@ -603,35 +834,46 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                                         newSizes[idx].name = e.target.value;
                                                         setEditingSizes(newSizes);
                                                     }}
-                                                    placeholder="Size Name (e.g. Large)"
-                                                    className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-1 focus:ring-[#D95D1E] focus:border-[#D95D1E]"
+                                                    placeholder="Size name (e.g. Large)"
+                                                    className="w-full sm:flex-1 min-w-0 px-3 py-2.5 sm:py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium focus:ring-1 focus:ring-[#D95D1E] focus:border-[#D95D1E] mb-2 sm:mb-0"
                                                 />
-                                                <div className="relative w-24">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">+₱</span>
-                                                    <input
-                                                        type="number"
-                                                        value={size.price}
-                                                        onChange={(e) => {
-                                                            const newSizes = [...editingSizes];
-                                                            newSizes[idx].price = parseFloat(e.target.value);
+                                                <div className="flex gap-2 items-center">
+                                                    <div className="relative w-24 flex-shrink-0">
+                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">+₱</span>
+                                                        <input
+                                                            type="number"
+                                                            value={size.price}
+                                                            onChange={(e) => {
+                                                                const newSizes = [...editingSizes];
+                                                                newSizes[idx].price = parseFloat(e.target.value);
+                                                                setEditingSizes(newSizes);
+                                                            }}
+                                                            placeholder="0"
+                                                            className="w-full pl-9 pr-2 py-2.5 sm:py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold focus:ring-1 focus:ring-[#D95D1E] focus:border-[#D95D1E]"
+                                                        />
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const newSizes = editingSizes.filter((_, i) => i !== idx);
                                                             setEditingSizes(newSizes);
                                                         }}
-                                                        className="w-full pl-8 pr-2 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold focus:ring-1 focus:ring-[#D95D1E] focus:border-[#D95D1E]"
-                                                    />
+                                                        className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                        title="Remove size"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
                                                 </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const newSizes = editingSizes.filter((_, i) => i !== idx);
-                                                        setEditingSizes(newSizes);
-                                                    }}
-                                                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
                                             </div>
                                         ))
                                     )}
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditingSizes([...editingSizes, { name: '', price: 0 }])}
+                                        className="w-full sm:w-auto text-sm font-bold text-[#D95D1E] hover:bg-orange-50 py-2.5 sm:py-2 px-3 rounded-xl border border-orange-100 hover:border-[#D95D1E]/30 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        + Add Size
+                                    </button>
                                 </div>
                             </div>
                             <div className="flex justify-between gap-3 pt-4 sticky bottom-0 bg-white border-t border-gray-50 mt-auto">
@@ -697,16 +939,30 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Display Visibility</label>
-                                        <label className="flex items-center gap-3 p-3.5 bg-gray-50 rounded-2xl cursor-pointer hover:bg-white transition-all border border-transparent hover:border-gray-100">
-                                            <input 
-                                                name="isHidden" 
-                                                type="checkbox" 
-                                                defaultChecked={editingProduct?.isHidden}
-                                                className="w-5 h-5 rounded-lg border-gray-300 text-[#D95D1E] focus:ring-[#D95D1E]" 
-                                            />
-                                            <span className="text-sm font-semibold text-gray-600">Hide from Customer Menu</span>
-                                        </label>
+                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Display Visibility & Promotion</label>
+                                        <div className="flex flex-col gap-2">
+                                            <label className="flex items-center gap-3 p-3.5 bg-gray-50 rounded-2xl cursor-pointer hover:bg-white transition-all border border-transparent hover:border-gray-100">
+                                                <input 
+                                                    name="isHidden" 
+                                                    type="checkbox" 
+                                                    defaultChecked={editingProduct?.isHidden}
+                                                    className="w-5 h-5 rounded-lg border-gray-300 text-[#D95D1E] focus:ring-[#D95D1E]" 
+                                                />
+                                                <span className="text-sm font-semibold text-gray-600">Hide from Customer Menu</span>
+                                            </label>
+                                            <label className="flex items-center gap-3 p-3.5 bg-orange-50/50 rounded-2xl cursor-pointer hover:bg-orange-50 transition-all border border-transparent hover:border-orange-100">
+                                                <input 
+                                                    name="isFeatured" 
+                                                    type="checkbox" 
+                                                    defaultChecked={editingProduct?.isFeatured}
+                                                    className="w-5 h-5 rounded-lg border-orange-300 text-[#D95D1E] focus:ring-[#D95D1E]" 
+                                                />
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-semibold text-gray-900">Featured Product</span>
+                                                    <span className="text-[10px] text-gray-500 font-medium">Shows at the top of the menu with a badge</span>
+                                                </div>
+                                            </label>
+                                        </div>
                                     </div>
                                 </div>
                                 
@@ -734,30 +990,64 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
 
                             <div className="border-t border-gray-100 pt-6">
                                 <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-4">Linked Modifiers</label>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="space-y-4">
                                     {modifierGroups.length === 0 ? (
-                                        <p className="col-span-full text-xs text-gray-400 italic bg-gray-50 p-6 rounded-2xl text-center border border-dashed border-gray-200">
+                                        <p className="text-xs text-gray-400 italic bg-gray-50 p-6 rounded-2xl text-center border border-dashed border-gray-200">
                                             Go to the 'Modifiers' tab to create your first customization group.
                                         </p>
                                     ) : (
                                         modifierGroups.map((group) => {
                                             const isChecked = editingProduct?.modifierLinks?.some(link => link.modifierGroupId === group.id);
+                                            const currentDefault = defaultModifierOptions[group.id] || '';
                                             return (
-                                                <label key={group.id} className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 bg-gray-50/50 cursor-pointer hover:bg-white hover:border-[#D95D1E]/20 transition-all group">
-                                                    <input
-                                                        type="checkbox"
-                                                        name="modifierGroups"
-                                                        value={group.id}
-                                                        defaultChecked={isChecked}
-                                                        className="w-5 h-5 rounded-lg border-gray-300 text-[#D95D1E] focus:ring-[#D95D1E]"
-                                                    />
-                                                    <div>
-                                                        <span className="text-sm font-bold text-gray-700 group-hover:text-gray-900">{group.name}</span>
-                                                        <p className="text-[9px] text-gray-400 uppercase font-bold tracking-tighter mt-0.5">
-                                                            {group.options.length} OPTIONS
-                                                        </p>
-                                                    </div>
-                                                </label>
+                                                <div key={group.id} className="p-4 rounded-2xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:border-[#D95D1E]/20 transition-all">
+                                                    <label className="flex items-center gap-4 cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            name="modifierGroups"
+                                                            value={group.id}
+                                                            defaultChecked={isChecked}
+                                                            onChange={(e) => {
+                                                                if (!e.target.checked) {
+                                                                    const newDefaults = { ...defaultModifierOptions };
+                                                                    delete newDefaults[group.id];
+                                                                    setDefaultModifierOptions(newDefaults);
+                                                                }
+                                                            }}
+                                                            className="w-5 h-5 rounded-lg border-gray-300 text-[#D95D1E] focus:ring-[#D95D1E]"
+                                                        />
+                                                        <div className="flex-1">
+                                                            <span className="text-sm font-bold text-gray-700">{group.name}</span>
+                                                            <p className="text-[9px] text-gray-400 uppercase font-bold tracking-tighter mt-0.5">
+                                                                {group.options.length} OPTIONS
+                                                            </p>
+                                                            {isChecked && group.options.length > 0 && (
+                                                                <div className="mt-3">
+                                                                    <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">
+                                                                        Default Option
+                                                                    </label>
+                                                                    <select
+                                                                        value={currentDefault}
+                                                                        onChange={(e) => {
+                                                                            setDefaultModifierOptions({
+                                                                                ...defaultModifierOptions,
+                                                                                [group.id]: e.target.value || '',
+                                                                            });
+                                                                        }}
+                                                                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-[#D95D1E] focus:border-[#D95D1E]"
+                                                                    >
+                                                                        <option value="">None (no default)</option>
+                                                                        {group.options.map((opt) => (
+                                                                            <option key={opt.id} value={opt.id}>
+                                                                                {opt.name} {parseFloat(opt.price) > 0 ? `(+₱${opt.price})` : ''}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </label>
+                                                </div>
                                             );
                                         })
                                     )}
@@ -835,19 +1125,19 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
 
             {/* Modifier Modal */}
             {isModifierModalOpen && editingModifierGroup && (
-                <div className="fixed inset-0 flex items-center justify-center z-[110] p-4 animate-in zoom-in-95 duration-200">
-                    <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-                        <div className="p-6 border-b border-gray-50 flex justify-between items-center">
-                            <h2 className="text-xl font-bold text-gray-900 tracking-tight">
+                <div className="fixed inset-0 flex items-end md:items-center justify-center z-[110] p-0 md:p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-t-3xl md:rounded-3xl w-full md:max-w-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+                        <div className="p-4 md:p-6 border-b border-gray-50 flex justify-between items-center shrink-0">
+                            <h2 className="text-lg md:text-xl font-bold text-gray-900 tracking-tight min-w-0 pr-2">
                                 {editingModifierGroup.id 
                                     ? (activeTab === 'toppings' ? 'Edit Toppings Group' : 'Edit Modifier Group')
                                     : (activeTab === 'toppings' ? 'New Toppings Group' : 'New Modifier Group')}
                             </h2>
-                            <button onClick={() => setIsModifierModalOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+                            <button onClick={() => setIsModifierModalOpen(false)} className="p-2.5 -m-2.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 shrink-0" aria-label="Close"><X size={24} /></button>
                         </div>
-                        <form onSubmit={handleSaveModifier} className="flex-1 flex flex-col overflow-hidden">
-                            <div className="p-6 overflow-y-auto space-y-6 custom-scrollbar">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <form onSubmit={handleSaveModifier} className="flex-1 flex flex-col overflow-hidden min-h-0">
+                            <div className="p-4 md:p-6 overflow-y-auto space-y-6 custom-scrollbar flex-1 min-h-0">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                                     <div>
                                         <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Group Name</label>
                                         <input
@@ -861,7 +1151,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Display Mode</label>
-                                        <div className="flex bg-gray-50 rounded-xl p-1">
+                                        <div className="flex flex-wrap sm:flex-nowrap bg-gray-50 rounded-xl p-1 gap-0.5">
                                             {[
                                                 { id: 'list', label: 'List' },
                                                 { id: 'buttons', label: 'Buttons' },
@@ -871,7 +1161,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                                     type="button"
                                                     key={mode.id}
                                                     onClick={() => setEditingModifierGroup({ ...editingModifierGroup, displayMode: mode.id })}
-                                                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${editingModifierGroup.displayMode === mode.id ? 'bg-white shadow text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                                                    className={`flex-1 min-w-0 py-2.5 sm:py-2 text-xs font-bold rounded-lg transition-all ${editingModifierGroup.displayMode === mode.id ? 'bg-white shadow text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
                                                 >
                                                     {mode.label}
                                                 </button>
@@ -881,61 +1171,139 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-4">Options</label>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-400">Options</label>
+                                        <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 border border-orange-100 rounded-lg">
+                                            <span className="text-[10px] text-[#D95D1E] font-bold">⭐</span>
+                                            <span className="text-[10px] text-[#D95D1E] font-semibold">Click star to set default</span>
+                                        </div>
+                                    </div>
                                     <div className="space-y-3">
-                                        {editingModifierGroup.options.map((opt, idx) => (
-                                            <div key={idx} className="flex gap-3 items-start animate-in slide-in-from-left-2 duration-200">
-                                                <div className="flex-1 space-y-2">
-                                                    <div className="flex gap-3">
-                                                        <input
-                                                            value={opt.name}
-                                                            onChange={(e) => {
-                                                                const newOpts = [...editingModifierGroup.options];
-                                                                newOpts[idx].name = e.target.value;
-                                                                setEditingModifierGroup({ ...editingModifierGroup, options: newOpts });
-                                                            }}
-                                                            placeholder="Option Name"
-                                                            className="flex-1 px-4 py-2 bg-gray-50 border-none rounded-xl text-sm font-medium focus:ring-2 focus:ring-[#D95D1E]"
-                                                        />
-                                                        <div className="relative w-24">
-                                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">₱</span>
+                                        {editingModifierGroup.options.map((opt, idx) => {
+                                            const isDefault = editingModifierGroup.defaultOptionId === opt.id || 
+                                                             (editingModifierGroup.defaultOptionIndex === idx && !opt.id);
+                                            return (
+                                                <div 
+                                                    key={idx} 
+                                                    className={`flex gap-3 items-start p-4 rounded-2xl border-2 transition-all animate-in slide-in-from-left-2 duration-200 ${
+                                                        isDefault 
+                                                            ? 'bg-orange-50 border-[#D95D1E] shadow-sm' 
+                                                            : 'bg-gray-50 border-gray-100 hover:border-gray-200'
+                                                    }`}
+                                                >
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (opt.id) {
+                                                                setEditingModifierGroup({ 
+                                                                    ...editingModifierGroup, 
+                                                                    defaultOptionId: isDefault ? null : opt.id,
+                                                                    defaultOptionIndex: null
+                                                                });
+                                                            } else {
+                                                                setEditingModifierGroup({ 
+                                                                    ...editingModifierGroup, 
+                                                                    defaultOptionId: null,
+                                                                    defaultOptionIndex: isDefault ? null : idx
+                                                                });
+                                                            }
+                                                        }}
+                                                        className={`flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+                                                            isDefault 
+                                                                ? 'bg-[#D95D1E] text-white shadow-md' 
+                                                                : 'bg-white border-2 border-gray-200 text-gray-400 hover:border-[#D95D1E] hover:text-[#D95D1E]'
+                                                        }`}
+                                                        title={isDefault ? "Remove as default" : "Set as default option"}
+                                                    >
+                                                        {isDefault ? (
+                                                            <span className="text-lg">⭐</span>
+                                                        ) : (
+                                                            <span className="text-sm opacity-50">☆</span>
+                                                        )}
+                                                    </button>
+                                                    <div className="flex-1 min-w-0 space-y-2">
+                                                        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
                                                             <input
-                                                                type="number"
-                                                                value={opt.price}
+                                                                value={opt.name}
                                                                 onChange={(e) => {
                                                                     const newOpts = [...editingModifierGroup.options];
-                                                                    newOpts[idx].price = parseFloat(e.target.value);
+                                                                    newOpts[idx].name = e.target.value;
                                                                     setEditingModifierGroup({ ...editingModifierGroup, options: newOpts });
                                                                 }}
-                                                                className="w-full pl-6 pr-3 py-2 bg-gray-50 border-none rounded-xl text-sm font-bold focus:ring-2 focus:ring-[#D95D1E]"
+                                                                placeholder="Option Name"
+                                                                className={`flex-1 min-w-0 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                                                                    isDefault 
+                                                                        ? 'bg-white border-2 border-[#D95D1E]/30 focus:border-[#D95D1E]' 
+                                                                        : 'bg-white border border-gray-200 focus:border-[#D95D1E] focus:ring-2 focus:ring-[#D95D1E]/20'
+                                                                }`}
                                                             />
+                                                            <div className="relative w-full sm:w-28 shrink-0">
+                                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">₱</span>
+                                                                <input
+                                                                    type="number"
+                                                                    value={opt.price}
+                                                                    onChange={(e) => {
+                                                                        const newOpts = [...editingModifierGroup.options];
+                                                                        newOpts[idx].price = parseFloat(e.target.value) || 0;
+                                                                        setEditingModifierGroup({ ...editingModifierGroup, options: newOpts });
+                                                                    }}
+                                                                    className={`w-full pl-7 pr-3 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                                                                        isDefault 
+                                                                            ? 'bg-white border-2 border-[#D95D1E]/30 focus:border-[#D95D1E]' 
+                                                                            : 'bg-white border border-gray-200 focus:border-[#D95D1E] focus:ring-2 focus:ring-[#D95D1E]/20'
+                                                                    }`}
+                                                                />
+                                                            </div>
                                                         </div>
+                                                        {editingModifierGroup.displayMode === 'cards' && (
+                                                            <input
+                                                                value={opt.imageUrl || ''}
+                                                                onChange={(e) => {
+                                                                    const newOpts = [...editingModifierGroup.options];
+                                                                    newOpts[idx].imageUrl = e.target.value;
+                                                                    setEditingModifierGroup({ ...editingModifierGroup, options: newOpts });
+                                                                }}
+                                                                placeholder="Image URL (https://...)"
+                                                                className={`w-full px-4 py-2 rounded-xl text-xs font-medium transition-all ${
+                                                                    isDefault 
+                                                                        ? 'bg-white border-2 border-[#D95D1E]/30 focus:border-[#D95D1E]' 
+                                                                        : 'bg-white border border-gray-200 focus:border-[#D95D1E] focus:ring-2 focus:ring-[#D95D1E]/20'
+                                                                }`}
+                                                            />
+                                                        )}
+                                                        {isDefault && (
+                                                            <div className="flex items-center gap-1.5 mt-1">
+                                                                <span className="text-[10px] font-bold text-[#D95D1E] uppercase tracking-wider bg-orange-100 px-2 py-0.5 rounded-full">
+                                                                    Default Option
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                    {editingModifierGroup.displayMode === 'cards' && (
-                                                        <input
-                                                            value={opt.imageUrl || ''}
-                                                            onChange={(e) => {
-                                                                const newOpts = [...editingModifierGroup.options];
-                                                                newOpts[idx].imageUrl = e.target.value;
-                                                                setEditingModifierGroup({ ...editingModifierGroup, options: newOpts });
-                                                            }}
-                                                            placeholder="Image URL (https://...)"
-                                                            className="w-full px-4 py-2 bg-gray-50 border-none rounded-xl text-xs font-medium text-gray-500 focus:ring-2 focus:ring-[#D95D1E]"
-                                                        />
-                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const newOpts = editingModifierGroup.options.filter((_, i) => i !== idx);
+                                                            // Clear defaultOptionId/defaultOptionIndex if the deleted option was the default
+                                                            const wasDefault = editingModifierGroup.defaultOptionId === opt.id || editingModifierGroup.defaultOptionIndex === idx;
+                                                            const newDefaultOptionId = wasDefault ? null : editingModifierGroup.defaultOptionId;
+                                                            const newDefaultOptionIndex = wasDefault ? null : 
+                                                                (editingModifierGroup.defaultOptionIndex !== null && editingModifierGroup.defaultOptionIndex !== undefined && editingModifierGroup.defaultOptionIndex > idx
+                                                                    ? editingModifierGroup.defaultOptionIndex - 1 
+                                                                    : editingModifierGroup.defaultOptionIndex);
+                                                            setEditingModifierGroup({ 
+                                                                ...editingModifierGroup, 
+                                                                options: newOpts, 
+                                                                defaultOptionId: newDefaultOptionId,
+                                                                defaultOptionIndex: newDefaultOptionIndex
+                                                            });
+                                                        }}
+                                                        className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all flex-shrink-0"
+                                                    >
+                                                        <Trash size={16} />
+                                                    </button>
                                                 </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const newOpts = editingModifierGroup.options.filter((_, i) => i !== idx);
-                                                        setEditingModifierGroup({ ...editingModifierGroup, options: newOpts });
-                                                    }}
-                                                    className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                                                >
-                                                    <Trash size={16} />
-                                                </button>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                     <button
                                         type="button"
@@ -943,24 +1311,24 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                             ...editingModifierGroup,
                                             options: [...editingModifierGroup.options, { name: '', price: 0 }]
                                         })}
-                                        className="mt-4 flex items-center gap-2 text-sm font-bold text-[#D95D1E] hover:bg-orange-50 px-3 py-2 rounded-lg transition-all"
+                                        className="mt-4 flex items-center gap-2 text-sm font-bold text-[#D95D1E] hover:bg-orange-50 px-4 py-2.5 rounded-xl transition-all border border-orange-100 hover:border-[#D95D1E]/30"
                                     >
                                         <Plus size={16} />
                                         Add Option
                                     </button>
                                 </div>
                             </div>
-                            <div className="p-6 border-t border-gray-50 flex justify-end gap-3 bg-white">
+                            <div className="p-4 md:p-6 border-t border-gray-50 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 bg-white shrink-0">
                                 <button
                                     type="button"
                                     onClick={() => setIsModifierModalOpen(false)}
-                                    className="px-6 py-3 text-gray-600 font-bold hover:bg-gray-100 rounded-2xl transition-all"
+                                    className="w-full sm:w-auto px-6 py-3 text-gray-600 font-bold hover:bg-gray-100 rounded-2xl transition-all"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-8 py-3 bg-[#D95D1E] text-white rounded-2xl font-bold shadow-lg shadow-orange-100 hover:bg-[#bf4f18] transition-all active:scale-95"
+                                    className="w-full sm:w-auto px-8 py-3 bg-[#D95D1E] text-white rounded-2xl font-bold shadow-lg shadow-orange-100 hover:bg-[#bf4f18] transition-all active:scale-95"
                                 >
                                     {editingModifierGroup.id ? 'Save Changes' : 'Create Group'}
                                 </button>
@@ -969,6 +1337,26 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                     </div>
                 </div>
             )}
+
+            <AlertModal 
+                isOpen={alertConfig.isOpen}
+                onClose={() => setAlertConfig({ ...alertConfig, isOpen: false })}
+                message={alertConfig.message}
+            />
+
+            <ConfirmModal 
+                isOpen={confirmConfig.isOpen}
+                onClose={() => setConfirmConfig({ ...confirmConfig, isOpen: false, action: null })}
+                onConfirm={() => {
+                    if (confirmConfig.action) {
+                        confirmConfig.action();
+                        setConfirmConfig({ ...confirmConfig, isOpen: false, action: null });
+                    }
+                }}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                variant="danger"
+            />
         </div>
     );
 }

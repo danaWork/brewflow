@@ -50,7 +50,7 @@ export default async function AdminDashboard({
     : [];
 
   return (
-    <div className="min-h-screen bg-neutral-50 p-6 md:p-10">
+    <div className="min-h-screen bg-neutral-50 p-4 md:p-10">
       <div className="max-w-7xl mx-auto">
         <DashboardHeader />
 

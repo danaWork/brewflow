@@ -7,11 +7,11 @@ export const dynamicParams = true;
 export default async function MenuPage({
   params,
 }: {
-  params: Promise<{ tableId: string }>;
+  params: Promise<{ branchId: string; tableId: string }>;
 }) {
-  const { tableId } = await params;
+  const { branchId, tableId } = await params;
 
-  const result = await getMenuData(tableId);
+  const result = await getMenuData(branchId, tableId);
 
   if (!result.success) {
     return (
@@ -25,7 +25,7 @@ export default async function MenuPage({
     <MenuClient
       tableId={result.tableId || tableId}
       tableName={result.tableName || `Table ${tableId}`}
-      branchId={result.branchId || ''}
+      branchId={result.branchId || branchId}
       categories={result.categories || []}
       products={result.products || []}
       promotions={result.promotions || []}

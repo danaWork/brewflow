@@ -3,11 +3,13 @@
 import { useState } from 'react';
 import { createShop, createManagerAccount } from '@/app/actions/admin';
 import { Plus, Store, UserPlus, X, Loader2 } from 'lucide-react';
+import { AlertModal } from '@/components/ui/AlertModal';
 
 export function AdminActionButtons({ shops }: { shops: any[] }) {
     const [showShopModal, setShowShopModal] = useState(false);
     const [showUserModal, setShowUserModal] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [alertConfig, setAlertConfig] = useState<{isOpen: boolean, message: string}>({ isOpen: false, message: '' });
 
     const handleCreateShop = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -20,7 +22,7 @@ export function AdminActionButtons({ shops }: { shops: any[] }) {
         const res = await createShop(name, email, passwordLabel);
         setLoading(false);
         if (res.success) setShowShopModal(false);
-        else alert(res.error || 'Failed to create shop');
+        else setAlertConfig({ isOpen: true, message: res.error || 'Failed to create shop' });
     };
 
     const handleCreateUser = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -34,23 +36,23 @@ export function AdminActionButtons({ shops }: { shops: any[] }) {
         const res = await createManagerAccount(email, passwordLabel, companyId, null);
         setLoading(false);
         if (res.success) setShowUserModal(false);
-        else alert(res.error || 'Failed to create user');
+        else setAlertConfig({ isOpen: true, message: res.error || 'Failed to create user' });
     };
 
     return (
-        <div className="flex gap-4 mb-8">
+        <div className="flex flex-wrap gap-2 md:gap-4 mb-6 md:mb-8">
             <button
                 onClick={() => setShowShopModal(true)}
-                className="flex items-center gap-2 bg-[#D46215] text-white px-6 py-3 rounded-2xl font-bold hover:bg-[#B75311] transition-all shadow-md active:scale-95"
+                className="flex items-center gap-1.5 md:gap-2 bg-[#D46215] text-white px-4 py-2 md:px-6 md:py-3 rounded-xl md:rounded-2xl text-sm md:text-base font-bold hover:bg-[#B75311] transition-all shadow-md active:scale-95"
             >
-                <Plus size={20} />
+                <Plus size={18} className="md:w-5 md:h-5" />
                 Add New Shop
             </button>
             <button
                 onClick={() => setShowUserModal(true)}
-                className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-6 py-3 rounded-2xl font-bold hover:bg-gray-50 transition-all shadow-sm active:scale-95"
+                className="flex items-center gap-1.5 md:gap-2 bg-white border border-gray-200 text-gray-700 px-4 py-2 md:px-6 md:py-3 rounded-xl md:rounded-2xl text-sm md:text-base font-bold hover:bg-gray-50 transition-all shadow-sm active:scale-95"
             >
-                <UserPlus size={20} />
+                <UserPlus size={18} className="md:w-5 md:h-5" />
                 Add Manager
             </button>
 
@@ -126,6 +128,12 @@ export function AdminActionButtons({ shops }: { shops: any[] }) {
                     </div>
                 </div>
             )}
+
+            <AlertModal 
+                isOpen={alertConfig.isOpen}
+                onClose={() => setAlertConfig({ ...alertConfig, isOpen: false })}
+                message={alertConfig.message}
+            />
         </div>
     );
 }
