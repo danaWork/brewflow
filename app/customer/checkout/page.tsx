@@ -14,7 +14,7 @@ import FloatingOrderTabs from '@/components/customer/FloatingOrderTabs';
 export default function CheckoutPage() {
     const { items, cartTotal, clearCart } = useCart();
     const { createOrder } = useOrder();
-    const { tableId } = useTable();
+    const { tableId, branchId } = useTable();
     const router = useRouter();
     const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'GCASH' | 'PAYMAYA'>('CASH');
     const [note, setNote] = useState('');
@@ -49,12 +49,12 @@ export default function CheckoutPage() {
 
     const handleCloseConfirmation = () => {
         setShowConfirmation(false);
-        router.push(`/customer/table/${tableId || '1'}`);
+        router.push(`/customer/table/${branchId || ''}/${tableId || '1'}`);
     };
 
     useEffect(() => {
         if (items.length === 0 && !showConfirmation) {
-            router.push(`/customer/table/${tableId || '1'}`);
+            router.push(`/customer/table/${branchId || ''}/${tableId || '1'}`);
         }
     }, [items, router, showConfirmation, tableId]);
 

@@ -2,7 +2,7 @@
 
 import { db } from '@/lib/db';
 import { orders as ordersSchema, tables as tablesSchema, orderItems as orderItemsSchema } from '@/db/schema';
-import { eq, inArray, desc, and, sql, gt, or } from 'drizzle-orm';
+import { eq, inArray, desc, and } from 'drizzle-orm';
 
 export interface OrderData {
     id: string;
@@ -62,13 +62,7 @@ export async function getActiveOrdersAction(branchId: string) {
         const activeOrders = await db.query.orders.findMany({
             where: and(
                 eq(ordersSchema.branchId, branchId),
-                or(
-                    inArray(ordersSchema.status, ['PENDING', 'PREPARING', 'READY']),
-                    and(
-                        eq(ordersSchema.status, 'COMPLETED'),
-                        sql`DATE(${ordersSchema.completedAt}) = CURRENT_DATE`
-                    )
-                )
+                inArray(ordersSchema.status, ['PENDING', 'PREPARING', 'READY'])
             ),
             with: {
                 table: true,
@@ -120,6 +114,53 @@ export async function getActiveOrdersAction(branchId: string) {
     } catch (error) {
         console.error('getActiveOrdersAction error:', error);
         return { success: false, error: 'Failed to fetch active orders' };
+    }
+}
+
+export async function getPastOrdersAction(branchId: string, limit = 100) {
+    try {
+        const pastOrders = await db.query.orders.findMany({
+            where: and(
+                eq(ordersSchema.branchId, branchId),
+                inArray(ordersSchema.status, ['COMPLETED', 'CANCELLED'])
+            ),
+            with: {
+                table: true,
+                items: {
+                    with: {
+                        product: true
+                    }
+                }
+            },
+            orderBy: [desc(ordersSchema.createdAt)],
+            limit,
+        });
+
+        return {
+            success: true,
+            orders: pastOrders.map((o: any) => ({
+                id: o.id,
+                orderNumber: o.orderNumber,
+                status: o.status as 'COMPLETED' | 'CANCELLED',
+                totalAmount: parseFloat(o.totalAmount as string),
+                tableId: o.tableId,
+                tableNumber: o.table?.tableNumber || 'Unknown Table',
+                createdAt: o.createdAt,
+                completedAt: o.completedAt,
+                paymentMethod: o.paymentMethod,
+                note: o.note,
+                items: o.items.map((item: any) => ({
+                    productId: item.productId,
+                    name: item.product?.name || 'Unknown Product',
+                    quantity: item.quantity,
+                    price: parseFloat(item.priceAtTime as string),
+                    options: item.customizations ? JSON.parse(item.customizations) : undefined
+                }))
+            }))
+        };
+    } catch (error) {
+        console.error('getPastOrdersAction error:', error);
+        return { success: false, error: 'Failed to fetch activity log' };
     }
 }
 

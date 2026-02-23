@@ -2,7 +2,8 @@
 
 import { Pause, Play, Trash2, Crown } from 'lucide-react';
 import { toggleShopStatus, deleteShop } from '@/app/actions/admin';
-import { useTransition } from 'react';
+import { useTransition, useState } from 'react';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 
 interface Shop {
     id: string;
@@ -14,6 +15,7 @@ interface Shop {
 
 export function ShopCard({ shop }: { shop: Shop }) {
     const [isPending, startTransition] = useTransition();
+    const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
     const handleToggleStatus = () => {
         startTransition(async () => {
@@ -21,12 +23,14 @@ export function ShopCard({ shop }: { shop: Shop }) {
         });
     };
 
-    const handleDelete = async () => {
-        if (confirm(`Are you sure you want to delete ${shop.name}?`)) {
-            startTransition(async () => {
-                await deleteShop(shop.id);
-            });
-        }
+    const handleDeleteClick = () => {
+        setIsConfirmOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        startTransition(async () => {
+            await deleteShop(shop.id);
+        });
     };
 
     return (
@@ -73,13 +77,22 @@ export function ShopCard({ shop }: { shop: Shop }) {
                 </button>
 
                 <button
-                    onClick={handleDelete}
+                    onClick={handleDeleteClick}
                     disabled={isPending}
                     className="p-2 md:p-2.5 border border-gray-100 rounded-lg md:rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
                 >
                     <Trash2 size={16} className="md:w-[18px] md:h-[18px]" />
                 </button>
             </div>
+
+            <ConfirmModal 
+                isOpen={isConfirmOpen}
+                onClose={() => setIsConfirmOpen(false)}
+                onConfirm={handleConfirmDelete}
+                title="Delete Shop"
+                message={`Are you sure you want to delete ${shop.name}?`}
+                variant="danger"
+            />
         </div>
     );
 }

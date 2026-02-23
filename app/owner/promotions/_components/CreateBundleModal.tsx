@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Search, Check, Save } from 'lucide-react';
 import { savePromotionAction } from '@/app/actions/promotions';
+import { AlertModal } from '@/components/ui/AlertModal';
 
 interface Product {
     id: string;
@@ -31,6 +32,7 @@ export default function CreateBundleModal({ isOpen, onClose, products, branchId,
     const [triggerSearch, setTriggerSearch] = useState('');
     const [pairSearch, setPairSearch] = useState('');
     const [loading, setLoading] = useState(false);
+    const [alertConfig, setAlertConfig] = useState<{isOpen: boolean, message: string}>({ isOpen: false, message: '' });
 
     useEffect(() => {
         if (!isOpen) {
@@ -97,7 +99,7 @@ export default function CreateBundleModal({ isOpen, onClose, products, branchId,
             onSuccess();
             onClose();
         } else {
-            alert(res.error || 'Failed to save promotion');
+            setAlertConfig({ isOpen: true, message: res.error || 'Failed to save promotion' });
         }
     };
 
@@ -274,6 +276,12 @@ export default function CreateBundleModal({ isOpen, onClose, products, branchId,
                     </button>
                 </div>
             </div>
+
+            <AlertModal 
+                isOpen={alertConfig.isOpen}
+                onClose={() => setAlertConfig({ ...alertConfig, isOpen: false })}
+                message={alertConfig.message}
+            />
         </div>
     );
 }

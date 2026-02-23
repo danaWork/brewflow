@@ -5,6 +5,7 @@ import { TrendingUp, Package, ChevronDown, Save, CheckCircle2, X } from 'lucide-
 import { savePromotionAction } from '@/app/actions/promotions';
 import { useRouter } from 'next/navigation';
 import CrossSellSelect from './CrossSellSelect';
+import { AlertModal } from '@/components/ui/AlertModal';
 
 interface Product {
     id: string;
@@ -141,6 +142,7 @@ export default function CrossSell({ products, promotions, branchId }: CrossSellP
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
+    const [alertConfig, setAlertConfig] = useState<{isOpen: boolean, message: string}>({ isOpen: false, message: '' });
 
     const drinkPromo = promotions.find(p => p.type === 'CROSS_SELL' && p.triggerValue === 'drink');
     const snackPromo = promotions.find(p => p.type === 'CROSS_SELL' && p.triggerValue === 'snack');
@@ -186,11 +188,11 @@ export default function CrossSell({ products, promotions, branchId }: CrossSellP
                 router.refresh();
                 setTimeout(() => setShowSuccess(false), 3000);
             } else {
-                alert('Failed to save cross-sell configuration');
+                setAlertConfig({ isOpen: true, message: 'Failed to save cross-sell configuration' });
             }
         } catch (error) {
             console.error(error);
-            alert('An error occurred while saving');
+            setAlertConfig({ isOpen: true, message: 'An error occurred while saving' });
         } finally {
             setLoading(false);
         }
@@ -260,6 +262,12 @@ export default function CrossSell({ products, promotions, branchId }: CrossSellP
                     onItemsChange={(val: any) => setSnackState(prev => ({ ...prev, productIds: val }))}
                 />
             </div>
+
+            <AlertModal 
+                isOpen={alertConfig.isOpen}
+                onClose={() => setAlertConfig({ ...alertConfig, isOpen: false })}
+                message={alertConfig.message}
+            />
         </div>
     );
 }

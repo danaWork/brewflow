@@ -226,7 +226,7 @@ export default function QRCodesPage() {
   };
 
   const getMenuUrl = (qrIdentifier: string) => {
-    return `${getBaseUrl()}/customer/table/${qrIdentifier}`;
+    return `${getBaseUrl()}/customer/table/${branchId}/${qrIdentifier}`;
   };
 
   const downloadQRCode = async (table: TableData) => {

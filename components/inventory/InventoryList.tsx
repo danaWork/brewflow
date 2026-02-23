@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { InventoryItem, deleteInventoryItemAction, updateInventoryItemAction } from '@/app/actions/inventory';
 import { Edit, Trash2, AlertTriangle, Check, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { AlertModal } from '@/components/ui/AlertModal';
 
 interface InventoryListProps {
     initialItems: InventoryItem[];
@@ -14,17 +16,22 @@ export default function InventoryList({ initialItems, branchId }: InventoryListP
     const [items, setItems] = useState(initialItems);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editForm, setEditForm] = useState<Partial<InventoryItem>>({});
+    const [confirmConfig, setConfirmConfig] = useState<{isOpen: boolean, id: string | null}>({ isOpen: false, id: null });
+    const [alertConfig, setAlertConfig] = useState<{isOpen: boolean, message: string}>({ isOpen: false, message: '' });
     const router = useRouter();
 
-    const handleDelete = async (id: string) => {
-        if (confirm('Are you sure you want to delete this item?')) {
-            const res = await deleteInventoryItemAction(id);
-            if (res.success) {
-                setItems(items.filter(i => i.id !== id));
-                router.refresh();
-            } else {
-                alert('Failed to delete item');
-            }
+    const handleDeleteClick = (id: string) => {
+        setConfirmConfig({ isOpen: true, id });
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!confirmConfig.id) return;
+        const res = await deleteInventoryItemAction(confirmConfig.id);
+        if (res.success) {
+            setItems(items.filter(i => i.id !== confirmConfig.id));
+            router.refresh();
+        } else {
+            setAlertConfig({ isOpen: true, message: 'Failed to delete item' });
         }
     };
 
@@ -46,7 +53,7 @@ export default function InventoryList({ initialItems, branchId }: InventoryListP
             setEditingId(null);
             router.refresh();
         } else {
-            alert('Failed to update item');
+            setAlertConfig({ isOpen: true, message: 'Failed to update item' });
         }
     };
 
@@ -134,7 +141,7 @@ export default function InventoryList({ initialItems, branchId }: InventoryListP
                                     ) : (
                                         <div className="flex justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button onClick={() => startEdit(item)} className="p-2 text-gray-400 hover:text-[#D95D1E] hover:bg-orange-50 rounded-lg transition-colors"><Edit size={16} /></button>
-                                            <button onClick={() => handleDelete(item.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
+                                            <button onClick={() => handleDeleteClick(item.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
                                         </div>
                                     )}
                                 </td>
@@ -146,6 +153,21 @@ export default function InventoryList({ initialItems, branchId }: InventoryListP
             {items.length === 0 && (
                 <div className="text-center py-12 text-gray-400 italic">No inventory items found. Add one to get started.</div>
             )}
+
+            <ConfirmModal 
+                isOpen={confirmConfig.isOpen}
+                onClose={() => setConfirmConfig({ isOpen: false, id: null })}
+                onConfirm={handleConfirmDelete}
+                title="Delete Inventory Item"
+                message="Are you sure you want to delete this item?"
+                variant="danger"
+            />
+
+            <AlertModal 
+                isOpen={alertConfig.isOpen}
+                onClose={() => setAlertConfig({ ...alertConfig, isOpen: false })}
+                message={alertConfig.message}
+            />
         </div>
     );
 }

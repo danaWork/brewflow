@@ -36,13 +36,10 @@ export default function LiveOrdersTabsMobile({
   const activeCol = columns.find((c) => c.id === activeTab) ?? columns[0];
   const orders = activeCol ? getOrdersByStatus(activeCol.id) : [];
 
-  /* Status accent color for content area top bar only */
-  const statusAccentBar: Record<OrderStatus, string> = {
+  const statusAccentBar: Partial<Record<OrderStatus, string>> = {
     PENDING: 'bg-amber-400',
     PREPARING: 'bg-orange-400',
     READY: 'bg-emerald-500',
-    COMPLETED: 'bg-gray-300',
-    CANCELLED: 'bg-gray-200',
   };
   const accentBar = statusAccentBar[activeCol.id] ?? 'bg-gray-200';
 
@@ -90,26 +87,18 @@ export default function LiveOrdersTabsMobile({
           {orders.map((order) => (
             <div
               key={order.id}
-              className={`
-                p-4 rounded-xl shadow-sm border transition-shadow
-                ${order.status === 'COMPLETED'
-                  ? 'bg-gray-50 border-gray-200 opacity-75 hover:opacity-100'
-                  : 'bg-white border-gray-100 hover:shadow-md'
-                }
-              `}
+                className="p-4 rounded-xl shadow-sm border transition-shadow bg-white border-gray-100 hover:shadow-md"
             >
               <div className="flex justify-between items-center mb-3">
                 <span className="font-bold text-xl text-gray-900">#{order.orderNumber}</span>
-                {order.status !== 'COMPLETED' && (
-                  <button
-                    type="button"
-                    onClick={() => onCancelClick(order)}
-                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
-                    title="Cancel order"
-                  >
-                    <X size={18} />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => onCancelClick(order)}
+                  className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                  title="Cancel order"
+                >
+                  <X size={18} />
+                </button>
               </div>
 
               <div className="flex flex-wrap items-center gap-2 mb-3">

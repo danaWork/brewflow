@@ -57,6 +57,7 @@ export const products = pgTable('products', {
   basePrice: decimal('base_price', { precision: 10, scale: 2 }).notNull(),
   imageUrl: text('image_url'),
   isHidden: boolean('is_hidden').default(false).notNull(),
+  isFeatured: boolean('is_featured').default(false).notNull(),
 });
 
 // Circular ref with modifierOptions; TypeScript cannot infer type. See modifierOptions below.

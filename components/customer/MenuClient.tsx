@@ -64,10 +64,17 @@ export default function MenuClient({ tableId, tableName, branchId, categories, p
     const visibleCategoryIds = filteredCategories.map(c => c.id);
     const productsInType = products.filter(p => visibleCategoryIds.includes(p.categoryId));
 
-    if (activeCategory === 'all') {
-      return productsInType;
+    let finalProducts = productsInType;
+    if (activeCategory !== 'all') {
+      finalProducts = productsInType.filter((p) => p.categoryId === activeCategory);
     }
-    return productsInType.filter((p) => p.categoryId === activeCategory);
+
+    // Sort so featured products (isSignature true) appear at the top
+    return finalProducts.sort((a, b) => {
+      if (a.isSignature && !b.isSignature) return -1;
+      if (!a.isSignature && b.isSignature) return 1;
+      return 0; // maintain original relative order otherwise
+    });
   }, [activeCategory, products, filteredCategories]);
 
   return (

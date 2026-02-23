@@ -7,6 +7,7 @@ import QuickChangeSelect from './QuickChangeSelect';
 import ConfirmationModal from './ConfirmationModal';
 import { savePromotionAction, deletePromotionAction } from '@/app/actions/promotions';
 import { useRouter } from 'next/navigation';
+import { AlertModal } from '@/components/ui/AlertModal';
 
 interface Product {
     id: string;
@@ -48,6 +49,7 @@ export default function PerfectPairBundles({ products, promotions, branchId }: P
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [editingPromotion, setEditingPromotion] = useState<any>(null);
     const [confirmingAction, setConfirmingAction] = useState<{ type: 'quick-change' | 'delete', data: any } | null>(null);
+    const [alertConfig, setAlertConfig] = useState<{isOpen: boolean, message: string}>({ isOpen: false, message: '' });
 
     const toggleGroup = (id: string) => {
         setExpandedGroups(prev =>
@@ -87,7 +89,8 @@ export default function PerfectPairBundles({ products, promotions, branchId }: P
             setConfirmingAction(null);
             router.refresh();
         } else {
-            alert(res.error || 'Failed to update bundle');
+            setAlertConfig({ isOpen: true, message: res.error || 'Failed to update bundle' });
+            setConfirmingAction(null);
         }
     };
 
@@ -101,7 +104,8 @@ export default function PerfectPairBundles({ products, promotions, branchId }: P
             setConfirmingAction(null);
             router.refresh();
         } else {
-            alert(res.error || 'Failed to delete bundle');
+            setAlertConfig({ isOpen: true, message: res.error || 'Failed to delete bundle' });
+            setConfirmingAction(null);
         }
     };
 
@@ -246,6 +250,12 @@ export default function PerfectPairBundles({ products, promotions, branchId }: P
                     : 'This action cannot be undone. Are you sure you want to delete this bundle rule?'}
                 confirmText={confirmingAction?.type === 'quick-change' ? 'Save Changes' : 'Delete Rule'}
                 type={confirmingAction?.type === 'delete' ? 'danger' : 'warning'}
+            />
+
+            <AlertModal 
+                isOpen={alertConfig.isOpen}
+                onClose={() => setAlertConfig({ ...alertConfig, isOpen: false })}
+                message={alertConfig.message}
             />
         </div>
     );

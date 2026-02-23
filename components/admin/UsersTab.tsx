@@ -3,6 +3,7 @@
 import { UserCircle, Trash2, Key, ChevronDown, Search, ArrowUpDown } from 'lucide-react';
 import { useTransition, useState, useMemo } from 'react';
 import { deleteUser, updateUserNotes } from '@/app/actions/admin';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 
 interface AdminUser {
     id: string;
@@ -19,12 +20,18 @@ export function UsersTab({ users }: { users: AdminUser[] }) {
     const [sortBy, setSortBy] = useState<'username' | 'shopName' | 'created'>('username');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-    const handleDelete = (userId: string) => {
-        if (confirm('Are you sure you want to delete this user?')) {
-            startTransition(async () => {
-                await deleteUser(userId);
-            });
-        }
+    const [confirmConfig, setConfirmConfig] = useState<{isOpen: boolean, userId: string | null}>({ isOpen: false, userId: null });
+
+    const handleDeleteClick = (userId: string) => {
+        setConfirmConfig({ isOpen: true, userId });
+    };
+
+    const handleConfirmDelete = () => {
+        if (!confirmConfig.userId) return;
+        startTransition(async () => {
+            await deleteUser(confirmConfig.userId!);
+            setConfirmConfig({ isOpen: false, userId: null });
+        });
     };
 
     const filteredAndSortedUsers = useMemo(() => {
@@ -99,7 +106,7 @@ export function UsersTab({ users }: { users: AdminUser[] }) {
             {/* Mobile: card list */}
             <div className="md:hidden space-y-3">
                 {filteredAndSortedUsers.map((user) => (
-                    <UserCard key={user.id} user={user} onDelete={() => handleDelete(user.id)} />
+                    <UserCard key={user.id} user={user} onDelete={() => handleDeleteClick(user.id)} />
                 ))}
                 {filteredAndSortedUsers.length === 0 && (
                     <div className="py-10 text-center text-gray-400 italic text-sm">
@@ -122,7 +129,7 @@ export function UsersTab({ users }: { users: AdminUser[] }) {
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                         {filteredAndSortedUsers.map((user) => (
-                            <UserRow key={user.id} user={user} onDelete={() => handleDelete(user.id)} />
+                            <UserRow key={user.id} user={user} onDelete={() => handleDeleteClick(user.id)} />
                         ))}
                         {filteredAndSortedUsers.length === 0 && (
                             <tr>
@@ -134,6 +141,15 @@ export function UsersTab({ users }: { users: AdminUser[] }) {
                     </tbody>
                 </table>
             </div>
+
+            <ConfirmModal 
+                isOpen={confirmConfig.isOpen}
+                onClose={() => setConfirmConfig({ isOpen: false, userId: null })}
+                onConfirm={handleConfirmDelete}
+                title="Delete User"
+                message="Are you sure you want to delete this user?"
+                variant="danger"
+            />
         </div>
     );
 }

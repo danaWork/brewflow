@@ -12,18 +12,19 @@ import {
 import { eq, asc, desc, and, or, isNull } from 'drizzle-orm';
 import { branchProductAvailability } from '@/db/schema';
 
-export async function getMenuData(qrIdentifier: string) {
+export async function getMenuData(branchId: string, qrIdentifier: string) {
     if (process.env.DATABASE_URL?.includes('placeholder') || !process.env.DATABASE_URL) {
         return { success: false, error: "Database not configured" };
     }
     try {
-        // Fetch Table by QR identifier or ID (only if valid UUID)
+        // Fetch Table by QR identifier, scoped to the specific branch.
+        // Also accept a bare table UUID for legacy/direct links.
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(qrIdentifier);
 
-        const conditions = [eq(tablesSchema.qrIdentifier, qrIdentifier)];
-        if (isUuid) {
-            conditions.push(eq(tablesSchema.id, qrIdentifier));
-        }
+        const branchCondition = eq(tablesSchema.branchId, branchId);
+        const identifierCondition = isUuid
+            ? or(eq(tablesSchema.qrIdentifier, qrIdentifier), eq(tablesSchema.id, qrIdentifier))
+            : eq(tablesSchema.qrIdentifier, qrIdentifier);
 
         const [tableData] = await db
             .select({
@@ -32,7 +33,7 @@ export async function getMenuData(qrIdentifier: string) {
                 branchId: tablesSchema.branchId
             })
             .from(tablesSchema)
-            .where(or(...conditions))
+            .where(and(branchCondition, identifierCondition!))
             .limit(1);
 
         if (!tableData) {
@@ -147,7 +148,7 @@ export async function getMenuData(qrIdentifier: string) {
                     categoryId: p.categoryId,
                     categoryIdReal: c.id, 
                     description: '', 
-                    isSignature: false,
+                    isSignature: p.isFeatured, // Use isFeatured instead
                     isInStock: isInStock, // This will be false if ingredients missing
                     categoryType: (c.type || 'drink').toLowerCase(),
                     modifiers: p.modifierLinks.map((ml: { modifierGroup: { id: string; name: string; displayMode: string; options: Array<{ id: string; name: string; price?: string; imageUrl?: string }> }; defaultModifierOptionId?: string | null }) => ({
@@ -216,10 +217,10 @@ export async function getMenuData(qrIdentifier: string) {
     }
 }
 
-export async function getProductsByTableId(tableId: string) {
-    const result = await getMenuData(tableId);
+export async function getProductsByTableId(branchId: string, tableId: string) {
+    const result = await getMenuData(branchId, tableId);
     if (!result.success) {
-        return { success: false, error: result.error, products: [] };
+        return { success: false, error: result.error, products: [], categories: [] };
     }
-    return { success: true, products: result.products || [] };
+    return { success: true, products: result.products || [], categories: result.categories || [] };
 }

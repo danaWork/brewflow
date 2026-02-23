@@ -13,7 +13,7 @@ import { getProductsByTableId } from '@/app/actions/menu';
 
 export default function CartPage() {
   const { items, cartTotal, cartCount, addItem, updateQuantity } = useCart();
-  const { tableName, tableId } = useTable();
+  const { tableName, tableId, branchId } = useTable();
   const router = useRouter();
   const [products, setProducts] = useState<any[]>([]);
   const [waterBottleItem, setWaterBottleItem] = useState<any>(null);
@@ -21,18 +21,25 @@ export default function CartPage() {
   // Fetch products to find water bottle
   useEffect(() => {
     if (tableId) {
-      getProductsByTableId(tableId).then(result => {
+      getProductsByTableId(branchId || '', tableId).then(result => {
         if (result.success) {
           setProducts(result.products || []);
-          // Find water bottle product (case-insensitive search, more flexible)
-          const waterBottle = result.products?.find((p: any) => {
+          const otherCategory = result.categories?.find((c: any) => c.name.toLowerCase() === 'other');
+
+          // Find water bottle product, prioritizing the "Other" category
+          let waterBottle = result.products?.find((p: any) => {
             const nameLower = p.name.toLowerCase();
-            return nameLower.includes('water') && (nameLower.includes('bottle') || nameLower.includes('bottled'));
-          }) || result.products?.find((p: any) => {
-            // Fallback: just search for "water"
-            const nameLower = p.name.toLowerCase();
-            return nameLower === 'water' || nameLower === 'bottled water' || nameLower === 'water bottle';
+            const isWater = nameLower.includes('water') && (nameLower.includes('bottle') || nameLower.includes('bottled'));
+            return isWater && (!otherCategory || p.categoryId === otherCategory.id);
           });
+
+          if (!waterBottle) {
+            // Fallback: search for other water bottle if not in "Other" category, or simple exact match
+            waterBottle = result.products?.find((p: any) => {
+              const nameLower = p.name.toLowerCase();
+              return nameLower === 'water' || nameLower === 'bottled water' || nameLower === 'water bottle';
+            });
+          }
           if (waterBottle) {
             setWaterBottleItem(waterBottle);
           }
@@ -106,7 +113,7 @@ export default function CartPage() {
           Looks like you haven't added anything yet. Go ahead and explore our menu!
         </p>
         <Link 
-          href={`/customer/table/${tableId || '1'}`} 
+          href={`/customer/table/${branchId || ''}/${tableId || '1'}`} 
           className="bg-[#D95D1E] text-white font-bold py-3 px-8 rounded-xl shadow-lg shadow-orange-200"
         >
           Browse Menu
@@ -120,7 +127,7 @@ export default function CartPage() {
       {/* Header */}
       <div className="bg-white sticky top-0 z-10 shadow-sm">
         <div className="flex items-center justify-between p-4">
-            <Link href={`/customer/table/${tableId || '1'}`} className="p-2 -ml-2 text-gray-600 hover:bg-gray-50 rounded-lg">
+            <Link href={`/customer/table/${branchId || ''}/${tableId || '1'}`} className="p-2 -ml-2 text-gray-600 hover:bg-gray-50 rounded-lg">
                 <ArrowLeft size={24} />
             </Link>
             

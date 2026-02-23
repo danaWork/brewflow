@@ -24,11 +24,8 @@ export default async function MenuCategoriesPage() {
   return (
     <div className="p-4 md:p-8">
       <MenuManagementClient 
-        initialCategories={categories as unknown as ComponentProps<typeof MenuManagementClient>['initialCategories']} 
-        modifierGroups={modifierGroups.map(g => ({
-          ...g,
-          displayMode: g.displayMode as 'list' | 'buttons' | 'cards'
-        })) as ComponentProps<typeof MenuManagementClient>['modifierGroups']}
+        initialCategories={categories as any} 
+        modifierGroups={modifierGroups as any}
         inventoryItems={inventoryRes.items || []}
         branchId={branchId}
       />

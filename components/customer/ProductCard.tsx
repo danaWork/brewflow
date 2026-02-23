@@ -57,30 +57,11 @@ export default function ProductCard({ product, onClick, type = 'drinks' }: Produ
         <div className="flex justify-between items-start mb-2">
           <h3 className="font-bold text-gray-900 text-lg leading-tight">{product.name}</h3>
           
-          {/* Drinks Badge: Star + Signature */}
-          {product.isSignature && type === 'drinks' && (
-            <span className="flex items-center gap-1 bg-gray-100 text-black text-[10px] font-bold px-3 py-1 border border-black rounded-[4px]">
-              <Image 
-                src="/icons/star-shape-1-svgrepo-com.svg" 
-                alt="Signature" 
-                width={14} 
-                height={14} 
-              />
-              Signature
-            </span>
-          )}
-
-          {/* Snacks Badge: Most Popular + Fire */}
-          {product.isSignature && type === 'snacks' && (
-            <span className="flex items-center gap-1 bg-[#D95D1E] text-white text-[10px] font-bold px-3 py-1 rounded-md">
-              <Image 
-                src="/icons/fire-minimalistic-svgrepo-com.svg" 
-                alt="Most Popular" 
-                width={12} 
-                height={12}
-                className="brightness-0 invert" 
-              />
-              Most Popular
+          {/* Featured Badge */}
+          {product.isSignature && (
+            <span className="flex items-center gap-1 bg-yellow-100 text-yellow-800 text-[10px] font-bold px-3 py-1 border border-yellow-200 rounded-[4px]">
+              <span className="text-yellow-600">★</span>
+              Featured
             </span>
           )}
         </div>

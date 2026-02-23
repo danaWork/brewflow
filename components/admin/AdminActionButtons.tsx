@@ -3,11 +3,13 @@
 import { useState } from 'react';
 import { createShop, createManagerAccount } from '@/app/actions/admin';
 import { Plus, Store, UserPlus, X, Loader2 } from 'lucide-react';
+import { AlertModal } from '@/components/ui/AlertModal';
 
 export function AdminActionButtons({ shops }: { shops: any[] }) {
     const [showShopModal, setShowShopModal] = useState(false);
     const [showUserModal, setShowUserModal] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [alertConfig, setAlertConfig] = useState<{isOpen: boolean, message: string}>({ isOpen: false, message: '' });
 
     const handleCreateShop = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -20,7 +22,7 @@ export function AdminActionButtons({ shops }: { shops: any[] }) {
         const res = await createShop(name, email, passwordLabel);
         setLoading(false);
         if (res.success) setShowShopModal(false);
-        else alert(res.error || 'Failed to create shop');
+        else setAlertConfig({ isOpen: true, message: res.error || 'Failed to create shop' });
     };
 
     const handleCreateUser = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -34,7 +36,7 @@ export function AdminActionButtons({ shops }: { shops: any[] }) {
         const res = await createManagerAccount(email, passwordLabel, companyId, null);
         setLoading(false);
         if (res.success) setShowUserModal(false);
-        else alert(res.error || 'Failed to create user');
+        else setAlertConfig({ isOpen: true, message: res.error || 'Failed to create user' });
     };
 
     return (
@@ -126,6 +128,12 @@ export function AdminActionButtons({ shops }: { shops: any[] }) {
                     </div>
                 </div>
             )}
+
+            <AlertModal 
+                isOpen={alertConfig.isOpen}
+                onClose={() => setAlertConfig({ ...alertConfig, isOpen: false })}
+                message={alertConfig.message}
+            />
         </div>
     );
 }

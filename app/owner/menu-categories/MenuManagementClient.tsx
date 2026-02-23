@@ -9,6 +9,8 @@ import {
     createModifierGroup, updateModifierGroup, deleteModifierGroup 
 } from '@/app/actions/menu-management';
 import { InventoryItem, linkProductToIngredientsAction } from '@/app/actions/inventory';
+import { AlertModal } from '@/components/ui/AlertModal';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 
 type Product = {
     id: string;
@@ -17,6 +19,7 @@ type Product = {
     imageUrl: string | null;
     categoryId: string;
     isHidden?: boolean;
+    isFeatured?: boolean;
     modifierLinks?: { modifierGroupId: string; defaultModifierOptionId?: string | null }[];
     productIngredients?: { inventoryItemId: string; quantityRequired: string }[];
 };
@@ -114,6 +117,14 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
         };
     }, [mobileActionsProductId]);
 
+    const [alertConfig, setAlertConfig] = useState<{isOpen: boolean, message: string}>({ isOpen: false, message: '' });
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        action: (() => void) | null;
+    }>({ isOpen: false, title: '', message: '', action: null });
+
     const toggleCategory = (id: string) => {
         setExpandedCategories(prev =>
             prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
@@ -166,11 +177,16 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
         window.location.reload();
     };
 
-    const handleDeleteCategory = async (id: string) => {
-        if (confirm('Are you sure you want to delete this category? All products in it will be affected.')) {
-            await deleteCategory(id);
-            window.location.reload();
-        }
+    const handleDeleteCategory = (id: string) => {
+        setConfirmConfig({
+            isOpen: true,
+            title: 'Delete Category',
+            message: 'Are you sure you want to delete this category? All products in it will be affected.',
+            action: async () => {
+                await deleteCategory(id);
+                window.location.reload();
+            }
+        });
     };
 
     const handleSaveProduct = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -184,6 +200,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
         if (!categoryId) return;
 
         const isHidden = formData.get('isHidden') === 'on';
+        const isFeatured = formData.get('isFeatured') === 'on';
 
         // Build modifier groups with default options
         const modifierGroupIds = formData.getAll('modifierGroups') as string[];
@@ -199,6 +216,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
             imageUrl: imageUrl || undefined,
             modifierGroups,
             isHidden,
+            isFeatured,
         };
 
         let productId = editingProduct?.id;
@@ -219,11 +237,16 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
         window.location.reload();
     };
 
-    const handleDeleteProduct = async (id: string) => {
-        if (confirm('Are you sure you want to delete this product?')) {
-            await deleteProduct(id);
-            window.location.reload();
-        }
+    const handleDeleteProduct = (id: string) => {
+        setConfirmConfig({
+            isOpen: true,
+            title: 'Delete Product',
+            message: 'Are you sure you want to delete this product?',
+            action: async () => {
+                await deleteProduct(id);
+                window.location.reload();
+            }
+        });
     };
     
     // ... helpers for ingredients ...
@@ -245,7 +268,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
         if (!editingModifierGroup) return;
         
         if (!editingModifierGroup.name.trim()) {
-            alert("Please enter a group name");
+            setAlertConfig({ isOpen: true, message: "Please enter a group name" });
             return;
         }
 
@@ -275,23 +298,28 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
         window.location.reload();
     };
 
-    const handleDeleteModifier = async (id: string) => {
-        if (confirm('Are you sure? This will remove this modifier group from all products.')) {
-            await deleteModifierGroup(id);
-            window.location.reload();
-        }
+    const handleDeleteModifier = (id: string) => {
+        setConfirmConfig({
+            isOpen: true,
+            title: 'Delete Modifier Group',
+            message: 'Are you sure? This will remove this modifier group from all products.',
+            action: async () => {
+                await deleteModifierGroup(id);
+                window.location.reload();
+            }
+        });
     };
 
     const handleSaveWaterProduct = async () => {
         if (!waterName.trim()) {
-            alert('Please enter a product name');
+            setAlertConfig({ isOpen: true, message: 'Please enter a product name' });
             return;
         }
         if (!waterProduct) {
             // Create water product if it doesn't exist
             const drinkCategory = categories.find(c => c.type === 'drink');
             if (!drinkCategory) {
-                alert('Please create a drink category first');
+                setAlertConfig({ isOpen: true, message: 'Please create a drink category first' });
                 return;
             }
             const newProduct = await createProduct({
@@ -911,16 +939,30 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Display Visibility</label>
-                                        <label className="flex items-center gap-3 p-3.5 bg-gray-50 rounded-2xl cursor-pointer hover:bg-white transition-all border border-transparent hover:border-gray-100">
-                                            <input 
-                                                name="isHidden" 
-                                                type="checkbox" 
-                                                defaultChecked={editingProduct?.isHidden}
-                                                className="w-5 h-5 rounded-lg border-gray-300 text-[#D95D1E] focus:ring-[#D95D1E]" 
-                                            />
-                                            <span className="text-sm font-semibold text-gray-600">Hide from Customer Menu</span>
-                                        </label>
+                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Display Visibility & Promotion</label>
+                                        <div className="flex flex-col gap-2">
+                                            <label className="flex items-center gap-3 p-3.5 bg-gray-50 rounded-2xl cursor-pointer hover:bg-white transition-all border border-transparent hover:border-gray-100">
+                                                <input 
+                                                    name="isHidden" 
+                                                    type="checkbox" 
+                                                    defaultChecked={editingProduct?.isHidden}
+                                                    className="w-5 h-5 rounded-lg border-gray-300 text-[#D95D1E] focus:ring-[#D95D1E]" 
+                                                />
+                                                <span className="text-sm font-semibold text-gray-600">Hide from Customer Menu</span>
+                                            </label>
+                                            <label className="flex items-center gap-3 p-3.5 bg-orange-50/50 rounded-2xl cursor-pointer hover:bg-orange-50 transition-all border border-transparent hover:border-orange-100">
+                                                <input 
+                                                    name="isFeatured" 
+                                                    type="checkbox" 
+                                                    defaultChecked={editingProduct?.isFeatured}
+                                                    className="w-5 h-5 rounded-lg border-orange-300 text-[#D95D1E] focus:ring-[#D95D1E]" 
+                                                />
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-semibold text-gray-900">Featured Product</span>
+                                                    <span className="text-[10px] text-gray-500 font-medium">Shows at the top of the menu with a badge</span>
+                                                </div>
+                                            </label>
+                                        </div>
                                     </div>
                                 </div>
                                 
@@ -1295,6 +1337,26 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                     </div>
                 </div>
             )}
+
+            <AlertModal 
+                isOpen={alertConfig.isOpen}
+                onClose={() => setAlertConfig({ ...alertConfig, isOpen: false })}
+                message={alertConfig.message}
+            />
+
+            <ConfirmModal 
+                isOpen={confirmConfig.isOpen}
+                onClose={() => setConfirmConfig({ ...confirmConfig, isOpen: false, action: null })}
+                onConfirm={() => {
+                    if (confirmConfig.action) {
+                        confirmConfig.action();
+                        setConfirmConfig({ ...confirmConfig, isOpen: false, action: null });
+                    }
+                }}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                variant="danger"
+            />
         </div>
     );
 }

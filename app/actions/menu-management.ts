@@ -70,6 +70,7 @@ export async function createProduct(data: {
     modifierGroupIds?: string[];
     modifierGroups?: { modifierGroupId: string; defaultModifierOptionId?: string }[];
     isHidden?: boolean;
+    isFeatured?: boolean;
 }) {
     const session = await getUserSession();
     if (!session?.companyId) throw new Error('Unauthorized');
@@ -80,6 +81,7 @@ export async function createProduct(data: {
         basePrice: data.basePrice,
         imageUrl: data.imageUrl,
         isHidden: data.isHidden || false,
+        isFeatured: data.isFeatured || false,
     }).returning();
 
     // Support both old format (modifierGroupIds) and new format (modifierGroups with defaults)
@@ -112,6 +114,7 @@ export async function updateProduct(id: string, data: {
     modifierGroupIds?: string[];
     modifierGroups?: { modifierGroupId: string; defaultModifierOptionId?: string }[];
     isHidden?: boolean;
+    isFeatured?: boolean;
 }) {
     if (!id) throw new Error('Product ID is required');
     const session = await getUserSession();
@@ -124,6 +127,7 @@ export async function updateProduct(id: string, data: {
             basePrice: data.basePrice,
             imageUrl: data.imageUrl,
             isHidden: data.isHidden ?? false,
+            isFeatured: data.isFeatured ?? false,
         })
         .where(eq(products.id, id));
 

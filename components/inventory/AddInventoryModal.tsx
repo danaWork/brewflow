@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { addInventoryItemAction } from '@/app/actions/inventory';
 import { Plus, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { AlertModal } from '@/components/ui/AlertModal';
 
 export default function AddInventoryModal({ branchId }: { branchId: string }) {
     const [isOpen, setIsOpen] = useState(false);
@@ -14,6 +15,7 @@ export default function AddInventoryModal({ branchId }: { branchId: string }) {
         lowStockThreshold: '10',
         costPerUnit: ''
     });
+    const [alertConfig, setAlertConfig] = useState<{isOpen: boolean, message: string}>({ isOpen: false, message: '' });
     const router = useRouter();
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -32,7 +34,7 @@ export default function AddInventoryModal({ branchId }: { branchId: string }) {
             setFormData({ name: '', quantity: '', unit: 'pcs', lowStockThreshold: '10', costPerUnit: '' });
             router.refresh();
         } else {
-            alert('Failed to add item');
+            setAlertConfig({ isOpen: true, message: 'Failed to add item' });
         }
     };
 
@@ -134,6 +136,12 @@ export default function AddInventoryModal({ branchId }: { branchId: string }) {
                     </div>
                 </form>
             </div>
+
+            <AlertModal 
+                isOpen={alertConfig.isOpen}
+                onClose={() => setAlertConfig({ ...alertConfig, isOpen: false })}
+                message={alertConfig.message}
+            />
         </div>
     );
 }
