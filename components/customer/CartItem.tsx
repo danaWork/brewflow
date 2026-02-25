@@ -9,23 +9,10 @@ interface CartItemProps {
 }
 
 export default function CartItem({ item }: CartItemProps) {
-  const { updateQuantity, updateExtraQuantity, removeItem, addItem } = useCart();
+  const { updateQuantity, removeItem } = useCart();
 
   const isBundle = item.extras && item.extras.length > 0;
-  
-  const removeBundle = () => {
-      removeItem(item.id);
-      addItem({
-          ...item,
-          extras: [] // Remove all extras
-      });
-  };
 
-  const removeExtra = (extraIndex: number) => {
-      // Use the context function to handle removal logic (qty 0)
-      // We pass a large negative delta to ensure it hits 0
-      updateExtraQuantity(item.id, extraIndex, -9999);
-  };
 
   // Helper for Quantity Controls
   const QuantityControls = ({ id, qty, isSmall = false, onUpdate }: { id: string, qty: number, isSmall?: boolean, onUpdate?: (delta: number) => void }) => (
@@ -120,22 +107,12 @@ export default function CartItem({ item }: CartItemProps) {
                        <div className="flex-1 min-w-0 flex flex-col justify-between">
                           <div className="flex justify-between items-start">
                               <h4 className="font-bold text-gray-900 text-base">{extra.name}</h4>
-                              <button 
-                                  onClick={() => removeExtra(idx)} 
-                                  className="text-gray-300 hover:text-red-500 p-1"
-                              >
-                                  <X size={16} />
-                              </button>
                           </div>
 
                           <div className="flex justify-between items-end mt-2">
-                              {/* Decoupled Quantity Control for Extra */}
-                              <QuantityControls 
-                                  id={item.id} 
-                                  qty={extra.quantity || 1} 
-                                  isSmall 
-                                  onUpdate={(delta) => updateExtraQuantity(item.id, idx, delta)}
-                              />
+                              <div className="text-gray-500 font-medium text-sm flex items-center h-8">
+                                  Qty: {extra.quantity || 1}
+                              </div>
                               
                               <div className="text-right leading-none">
                                   <div className="text-gray-300 line-through text-xs mb-1">
@@ -222,8 +199,7 @@ export default function CartItem({ item }: CartItemProps) {
                               </div>
                               
                               <button 
-                                  onClick={() => removeExtra(idx)} 
-                                  className="text-gray-300 hover:text-red-500 p-1"
+                                  className="text-gray-300 p-1 invisible"
                                   title="Remove this item"
                               >
                                   <X size={16} />
@@ -231,13 +207,9 @@ export default function CartItem({ item }: CartItemProps) {
                           </div>
 
                           <div className="flex justify-between items-end mt-2">
-                              {/* Decoupled Quantity Control for Extra */}
-                              <QuantityControls 
-                                  id={item.id} 
-                                  qty={extra.quantity || 1} 
-                                  isSmall={false} /* Larger controls for split layout? or keep small? Original had just text Qty. Let's use controls */ 
-                                  onUpdate={(delta) => updateExtraQuantity(item.id, idx, delta)}
-                              />
+                              <div className="text-gray-500 font-medium text-sm flex items-center h-10">
+                                  Qty: {extra.quantity || 1}
+                              </div>
                               
                               <div className="text-right leading-none">
                                   <div className="text-gray-300 line-through text-xs mb-1">

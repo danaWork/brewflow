@@ -50,8 +50,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       // Create a unique ID based on product and options
       const cartItemId = `${newItem.productId}-${Date.now()}`;
       
-      // Ensure extras have quantity initialized if not present
-      const extrasWithQty = newItem.extras?.map(e => ({ ...e, quantity: e.quantity || 1 })) || [];
+      // Ensure extras have quantity synced to main item quantity
+      const extrasWithQty = newItem.extras?.map(e => ({ ...e, quantity: newItem.quantity })) || [];
 
       return [...prev, { ...newItem, id: cartItemId, extras: extrasWithQty }];
     });
@@ -66,7 +66,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       prev.map((item) => {
         if (item.id === id) {
           const newQuantity = Math.max(0, item.quantity + delta);
-          return { ...item, quantity: newQuantity };
+          const newExtras = item.extras?.map(ext => ({ ...ext, quantity: newQuantity }));
+          return { ...item, quantity: newQuantity, extras: newExtras };
         }
         return item;
       }).filter(item => item.quantity > 0)
