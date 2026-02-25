@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Montserrat } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -58,10 +58,10 @@ export const metadata: Metadata = {
       "Real-time orders, QR table menus, and everything you need to run your coffee shop from one dashboard.",
     images: ["/og-image.png"],
   },
-  icons: {
-    icon: "/favicon.ico",
-  },
-  themeColor: "#D46215",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#D95D1E",
 };
 
 export default function RootLayout({
