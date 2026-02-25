@@ -110,11 +110,13 @@ export default function CartPage() {
       {/* Header */}
       <div className="bg-white sticky top-0 z-10 shadow-sm">
         <div className="flex items-center justify-between p-4">
-            <Link href={`/customer/table/${branchId || ''}/${tableId || '1'}`} className="p-2 -ml-2 text-gray-600 hover:bg-gray-50 rounded-lg">
-                <ArrowLeft size={24} />
-            </Link>
+            <div className="flex flex-1 justify-start">
+                <Link href={`/customer/table/${branchId || ''}/${tableId || '1'}`} className="p-2 -ml-2 text-gray-600 hover:bg-gray-50 rounded-lg">
+                    <ArrowLeft size={24} />
+                </Link>
+            </div>
             
-            <div className="flex flex-col items-center">
+            <div className="flex flex-col items-center flex-shrink-0 whitespace-nowrap">
                 <div className="flex items-center gap-2">
                     <Image src="/icons/cart-3-svgrepo-com.svg" width={24} height={24} alt="Cart" className="w-6 h-6" />
                     <h1 className="text-lg font-bold text-gray-900">Your Order</h1>
@@ -125,32 +127,40 @@ export default function CartPage() {
                 <span className="text-sm text-gray-500">{tableName || 'Table ...'}</span>
             </div>
 
-            {waterBottleItem && (
-              <div className="relative flex-shrink-0">
-                <button
-                  onClick={handleWaterBottleClick}
-                  className="relative w-12 h-12 rounded-xl transition-all flex-shrink-0 border border-orange-200 hover:border-2 hover:border-[#D95D1E] hover:scale-105 active:scale-95 shadow-sm hover:shadow-orange-200 hover:shadow-md"
-                  title="Add Water Bottle"
-                >
-                  {waterBottleItem.image ? (
-                    <Image
-                      src={waterBottleItem.image}
-                      alt={waterBottleItem.name}
-                      fill
-                      className="object-cover rounded-xl"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <span className="w-full h-full flex items-center justify-center bg-orange-50 text-xl rounded-xl">💧</span>
-                  )}
-                </button>
-                {waterBottleInCart && (
-                  <span className="absolute -top-1.5 -right-1.5 bg-[#D95D1E] text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-md ring-2 ring-white z-10 pointer-events-none">
-                    {waterBottleInCart.quantity}
-                  </span>
+            <div className="flex flex-1 justify-end">
+                {waterBottleItem && (
+                  <div className="relative flex-shrink-0">
+                    <button
+                      onClick={handleWaterBottleClick}
+                      className="relative w-12 h-12 rounded-xl transition-all flex-shrink-0 border border-orange-200 hover:border-2 hover:border-[#D95D1E] hover:scale-105 active:scale-95 shadow-sm hover:shadow-orange-200 hover:shadow-md"
+                      title="Add Water Bottle"
+                    >
+                      {waterBottleItem.image ? (
+                        <Image
+                          src={waterBottleItem.image}
+                          alt={waterBottleItem.name}
+                          fill
+                          className="object-cover rounded-xl"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <span className="w-full h-full flex items-center justify-center bg-orange-50 text-xl rounded-xl">💧</span>
+                      )}
+                    </button>
+                    {waterBottleInCart && (
+                      <span className="absolute -top-1.5 -right-1.5 bg-[#D95D1E] text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-md ring-2 ring-white z-10 pointer-events-none">
+                        {waterBottleInCart.quantity}
+                      </span>
+                    )}
+                    <div className="absolute -bottom-8 right-0 pointer-events-none z-20">
+                      <div className="relative bg-[#D95D1E] text-white text-[10px] font-medium whitespace-nowrap px-2 py-1 rounded-md shadow-md animate-bounce">
+                        <div className="absolute -top-1 right-4 w-2 h-2 bg-[#D95D1E] rotate-45" />
+                        Do you want water?
+                      </div>
+                    </div>
+                  </div>
                 )}
-              </div>
-            )}
+            </div>
         </div>
       </div>
 

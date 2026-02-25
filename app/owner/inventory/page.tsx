@@ -21,12 +21,14 @@ export default async function InventoryPage() {
 
   return (
     <div className="p-4 md:p-8">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6 md:mb-8">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6 md:mb-8">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">Inventory Management</h1>
           <p className="text-gray-500 text-sm md:text-base">Track stock levels and costs</p>
         </div>
-        <AddInventoryModal branchId={branchId} />
+        <div className="pt-2 md:pt-8">
+          <AddInventoryModal branchId={branchId} />
+        </div>
       </div>
 
       {error ? (
