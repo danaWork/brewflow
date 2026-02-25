@@ -1,6 +1,6 @@
 import { useOrder, Order } from '@/context/OrderContext';
 import { Clock, ChefHat, Bell, CheckCircle2, X, XCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import OrderStatusModal from './OrderStatusModal';
 
 export default function FloatingOrderTabs() {
@@ -28,6 +28,29 @@ export default function FloatingOrderTabs() {
             default: return 'bg-gray-400';
         }
     };
+
+    // Auto-dismiss completed or cancelled orders after 10 seconds of them reaching this state
+    useEffect(() => {
+        if (userOrders.length === 0) return;
+        
+        const timers: NodeJS.Timeout[] = [];
+        
+        userOrders.forEach(order => {
+            if (order.status === 'COMPLETED' || order.status === 'CANCELLED') {
+                const timer = setTimeout(() => {
+                    dismissOrder(order.id);
+                    if (selectedOrder?.id === order.id) {
+                        setSelectedOrder(null);
+                    }
+                }, 10000);
+                timers.push(timer);
+            }
+        });
+
+        return () => {
+            timers.forEach(clearTimeout);
+        };
+    }, [userOrders, dismissOrder, selectedOrder]);
 
     if (userOrders.length === 0) return null;
 

@@ -131,6 +131,55 @@ export async function deleteShop(companyId: string) {
     }
 }
 
+export async function updateShop(companyId: string, newName: string) {
+    try {
+        const session = await getUserSession();
+        if (!session || !newName.trim()) {
+            return { success: false, error: 'Invalid input or unauthorized' };
+        }
+
+        // Get old company name for logging
+        const [company] = await db.select({ name: companies.name })
+            .from(companies)
+            .where(eq(companies.id, companyId))
+            .limit(1);
+
+        if (!company) {
+            return { success: false, error: 'Shop not found' };
+        }
+
+        // Update company name
+        await db.update(companies)
+            .set({ name: newName.trim() })
+            .where(eq(companies.id, companyId));
+
+        // Update branch name 
+        // We assume the first branch or main branch should be updated. 
+        // We'll just append " - Main" to match the creation logic
+        await db.update(branches)
+            .set({ branchName: `${newName.trim()} - Main` })
+            .where(eq(branches.companyId, companyId));
+
+        // Log activity
+        await logActivity(
+            null,
+            session.userId,
+            'Shop Updated',
+            {
+                oldName: company.name,
+                newName: newName.trim(),
+                companyId,
+            }
+        );
+
+        revalidatePath('/admin/dashboard');
+        return { success: true };
+    } catch (error) {
+        console.error('Error updating shop:', error);
+        return { success: false, error: 'Failed to update shop' };
+    }
+}
+
 export async function getAdminUsers() {
     try {
         const allUsers = await db.select({

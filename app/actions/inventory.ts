@@ -12,6 +12,8 @@ export async function updateProductPrice(
     productId: string,
     newPrice: number
 ) {
+    if (!branchId || !productId) return { success: false, error: 'Invalid branch or product ID' };
+
     try {
         const session = await getUserSession();
         if (!session) {
@@ -87,6 +89,8 @@ export async function updateProductStock(
     productId: string,
     isInStock: boolean
 ) {
+    if (!branchId || !productId) return { success: false, error: 'Invalid branch or product ID' };
+
     try {
         const session = await getUserSession();
         if (!session) {
@@ -164,6 +168,8 @@ export type NewInventoryItem = typeof inventoryItems.$inferInsert;
 
 export async function getInventoryItemsAction(branchId: string) {
     try {
+        if (!branchId) return { success: true, items: [] };
+
         const items = await db.query.inventoryItems.findMany({
             where: eq(inventoryItems.branchId, branchId),
             orderBy: [desc(inventoryItems.updatedAt)]
@@ -210,6 +216,8 @@ export async function deleteInventoryItemAction(id: string) {
 
 export async function getLowStockItemsAction(branchId: string) {
     try {
+        if (!branchId) return { success: true, items: [] };
+
         const items = await db.select().from(inventoryItems)
             .where(and(
                 eq(inventoryItems.branchId, branchId),
@@ -232,6 +240,8 @@ import { sql, inArray } from 'drizzle-orm';
 
 export async function linkProductToIngredientsAction(branchId: string, productId: string, ingredients: { inventoryItemId: string; quantityRequired: number }[]) {
     try {
+        if (!branchId || !productId) return { success: false, error: 'Invalid branch or product ID' };
+
         await db.transaction(async (tx) => {
             // Find existing ingredients linked to this product AND this branch's inventory
             // We can't join in a delete statement easily in all dialects, so we select first.
@@ -269,6 +279,8 @@ export async function linkProductToIngredientsAction(branchId: string, productId
 
 export async function getProductIngredientsAction(branchId: string, productId: string) {
     try {
+        if (!branchId || !productId) return { success: true, ingredients: [] };
+
         const ingredients = await db.select({
             inventoryItemId: productIngredients.inventoryItemId,
             quantityRequired: productIngredients.quantityRequired,

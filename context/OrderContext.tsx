@@ -45,7 +45,10 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     if (!saved) return [];
     try {
       const parsed = JSON.parse(saved);
-      return parsed.map((o: any) => ({ ...o, timestamp: new Date(o.timestamp) }));
+      // Filter out items that are already COMPLETED or CANCELLED from previous sessions
+      return parsed
+        .map((o: any) => ({ ...o, timestamp: new Date(o.timestamp) }))
+        .filter((o: Order) => o.status !== 'COMPLETED' && o.status !== 'CANCELLED');
     } catch (e) {
       return [];
     }
@@ -119,7 +122,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         table: o.tableNumber || 'Unknown Table',
         tableId: o.tableId || undefined,
         timestamp: o.createdAt ? new Date(o.createdAt) : new Date(),
-        paymentMethod: (o.paymentMethod as any) || 'CASH'
+        paymentMethod: (o.paymentMethod as any) || 'CASH',
+        note: o.note
       }));
 
       setActiveOrders(orders);
@@ -133,13 +137,19 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         const statusResult = await getOrdersStatusAction(userOrderIds);
 
         if (statusResult.success && statusResult.orders) {
-          setUserOrders(prev => prev.map(userOrder => {
-            const match = statusResult.orders?.find(so => so.id === userOrder.id);
-            if (match && match.status !== userOrder.status) {
-              return { ...userOrder, status: match.status as OrderStatus };
-            }
-            return userOrder;
-          }));
+          setUserOrders(prev => {
+            const updated = prev.map(userOrder => {
+              const match = statusResult.orders?.find(so => so.id === userOrder.id);
+              if (match && match.status !== userOrder.status) {
+                return { ...userOrder, status: match.status as OrderStatus };
+              }
+              return userOrder;
+            });
+            // Auto dismiss if it's already completed or cancelled from a previous check
+            // We keep them if they JUST turned completed, but maybe user wants them gone on refresh?
+            // Actually, if we refresh and they are already completed/cancelled, just filter them when setting userOrders
+            return updated;
+          });
         }
       }
     } finally {
@@ -249,7 +259,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         tableId: currentTableId,
         timestamp: new Date(),
         paymentMethod,
-        note
+        note: note
       };
 
       setUserOrders(prev => [newOrder, ...prev]);

@@ -97,7 +97,7 @@ export default forwardRef<{ open: () => void }, CrossSellSelectProps>(function C
                                     >
                                         <div className="w-10 h-10 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
                                             {opt.imageUrl ? (
-                                                <img src={opt.imageUrl} alt={opt.name} className="w-full h-full object-cover" />
+                                                <img src={opt.imageUrl} alt={opt.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center">
                                                     <Package size={16} className="text-gray-300" />

@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     "real-time orders",
     "brew flow",
     "café POS",
-    "table ordering system",
+    "table ordering system",``
   ],
   authors: [{ name: "BrewFlow" }],
   creator: "BrewFlow",

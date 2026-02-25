@@ -150,8 +150,9 @@ export async function getMenuData(branchId: string, qrIdentifier: string) {
                     description: '', 
                     isSignature: p.isFeatured, // Use isFeatured instead
                     isInStock: isInStock, // This will be false if ingredients missing
+                    isQuickCartItem: p.isQuickCartItem,
                     categoryType: (c.type || 'drink').toLowerCase(),
-                    modifiers: p.modifierLinks.map((ml: { modifierGroup: { id: string; name: string; displayMode: string; options: Array<{ id: string; name: string; price?: string; imageUrl?: string }> }; defaultModifierOptionId?: string | null }) => ({
+                    modifiers: p.modifierLinks.map((ml: { modifierGroup: { id: string; name: string; displayMode: string; options: Array<{ id: string; name: string; price?: string; imageUrl?: string }>}; defaultModifierOptionId?: string | null }) => ({
                         id: ml.modifierGroup.id,
                         name: ml.modifierGroup.name,
                         displayMode: ml.modifierGroup.displayMode,
@@ -223,4 +224,31 @@ export async function getProductsByTableId(branchId: string, tableId: string) {
         return { success: false, error: result.error, products: [], categories: [] };
     }
     return { success: true, products: result.products || [], categories: result.categories || [] };
+}
+
+/**
+ * Dedicated action to get the quick-cart product (water bottle).
+ * Returns the product only when isQuickCartItem is explicitly true in the DB.
+ * Returns null when admin has disabled it.
+ */
+export async function getQuickCartProduct(branchId: string, tableId: string) {
+    try {
+        const result = await getMenuData(branchId, tableId);
+        if (!result.success || !result.products) return null;
+
+        // First find the primary water product (to align with the one managed in admin UI)
+        const waterBottle = result.products.find((p: any) => {
+            const nameLower = (p.name as string).toLowerCase();
+            return nameLower.includes('water') &&
+                (nameLower.includes('bottle') || nameLower.includes('bottled'));
+        });
+
+        if (waterBottle && waterBottle.isQuickCartItem === true && waterBottle.isInStock !== false) {
+            return waterBottle;
+        }
+
+        return null;
+    } catch {
+        return null;
+    }
 }

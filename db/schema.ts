@@ -58,6 +58,7 @@ export const products = pgTable('products', {
   imageUrl: text('image_url'),
   isHidden: boolean('is_hidden').default(false).notNull(),
   isFeatured: boolean('is_featured').default(false).notNull(),
+  isQuickCartItem: boolean('is_quick_cart_item').default(false).notNull(),
 });
 
 // Circular ref with modifierOptions; TypeScript cannot infer type. See modifierOptions below.
@@ -153,6 +154,16 @@ export const promotionItems = pgTable('promotion_items', {
   productId: uuid('product_id').references(() => products.id).notNull(),
 });
 
+export const notifications = pgTable('notifications', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  branchId: uuid('branch_id').references(() => branches.id).notNull(),
+  productId: uuid('product_id').references(() => products.id),
+  type: text('type').notNull(),
+  message: text('message').notNull(),
+  isRead: boolean('is_read').default(false).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 
 // Inventory System Tables
 
@@ -190,6 +201,7 @@ export const branchesRelations = relations(branches, ({ one, many }) => ({
   orders: many(orders),
   productAvailability: many(branchProductAvailability),
   promotions: many(promotions),
+  notifications: many(notifications),
 }));
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -210,6 +222,7 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   branchAvailability: many(branchProductAvailability),
   promotionItems: many(promotionItems),
   productIngredients: many(productIngredients),
+  notifications: many(notifications),
 }));
 
 export const branchProductAvailabilityRelations = relations(branchProductAvailability, ({ one }) => ({
@@ -291,4 +304,9 @@ export const inventoryItemsRelations = relations(inventoryItems, ({ one, many })
 export const productIngredientsRelations = relations(productIngredients, ({ one }) => ({
   product: one(products, { fields: [productIngredients.productId], references: [products.id] }),
   inventoryItem: one(inventoryItems, { fields: [productIngredients.inventoryItemId], references: [inventoryItems.id] }),
+}));
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  branch: one(branches, { fields: [notifications.branchId], references: [branches.id] }),
+  product: one(products, { fields: [notifications.productId], references: [products.id] }),
 }));
