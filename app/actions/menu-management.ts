@@ -71,6 +71,7 @@ export async function createProduct(data: {
     modifierGroups?: { modifierGroupId: string; defaultModifierOptionId?: string }[];
     isHidden?: boolean;
     isFeatured?: boolean;
+    isQuickCartItem?: boolean;
 }) {
     const session = await getUserSession();
     if (!session?.companyId) throw new Error('Unauthorized');
@@ -82,6 +83,7 @@ export async function createProduct(data: {
         imageUrl: data.imageUrl,
         isHidden: data.isHidden || false,
         isFeatured: data.isFeatured || false,
+        isQuickCartItem: data.isQuickCartItem || false,
     }).returning();
 
     // Support both old format (modifierGroupIds) and new format (modifierGroups with defaults)
@@ -115,6 +117,7 @@ export async function updateProduct(id: string, data: {
     modifierGroups?: { modifierGroupId: string; defaultModifierOptionId?: string }[];
     isHidden?: boolean;
     isFeatured?: boolean;
+    isQuickCartItem?: boolean;
 }) {
     if (!id) throw new Error('Product ID is required');
     const session = await getUserSession();
@@ -128,6 +131,7 @@ export async function updateProduct(id: string, data: {
             imageUrl: data.imageUrl,
             isHidden: data.isHidden ?? false,
             isFeatured: data.isFeatured ?? false,
+            isQuickCartItem: data.isQuickCartItem ?? false,
         })
         .where(eq(products.id, id));
 
@@ -261,11 +265,14 @@ export async function updateModifierGroup(
 
     // Delete removed options
     if (optionsToDelete.length > 0) {
-        // Note: distinct from "blind delete", this only deletes options explicitly removed by user.
-        // If these options are linked to orders, this might fail if foreign keys enforce integrity without cascade.
-        // Assuming standard behavior or that we want to stop these from being used.
-        // For safety in this MVP, we try delete.
-        await db.delete(modifierOptions).where(inArray(modifierOptions.id, optionsToDelete));
+        try {
+            await db.delete(modifierOptions).where(inArray(modifierOptions.id, optionsToDelete));
+        } catch (e: any) {
+            if (e.message?.includes('violates foreign key constraint') || e.message?.includes('order_item_modifiers')) {
+                throw new Error('Cannot delete some of these options because they have already been used in historical orders.');
+            }
+            throw e;
+        }
     }
 
     // Upsert options
@@ -297,9 +304,26 @@ export async function deleteModifierGroup(id: string) {
     const session = await getUserSession();
     if (!session?.companyId) throw new Error('Unauthorized');
 
-    await db.delete(modifierOptions).where(eq(modifierOptions.modifierGroupId, id));
-    await db.delete(productModifierLinks).where(eq(productModifierLinks.modifierGroupId, id));
-    await db.delete(modifierGroups).where(and(eq(modifierGroups.id, id), eq(modifierGroups.companyId, session.companyId)));
+    try {
+        // 1. Break the circular reference: remove defaultOptionId so options can be deleted
+        await db.update(modifierGroups)
+            .set({ defaultOptionId: null })
+            .where(eq(modifierGroups.id, id));
+
+        // 2. Delete product links which also reference modifier options
+        await db.delete(productModifierLinks).where(eq(productModifierLinks.modifierGroupId, id));
+
+        // 3. Delete the options themselves
+        await db.delete(modifierOptions).where(eq(modifierOptions.modifierGroupId, id));
+
+        // 4. Finally, delete the group
+        await db.delete(modifierGroups).where(and(eq(modifierGroups.id, id), eq(modifierGroups.companyId, session.companyId)));
+    } catch (e: any) {
+        if (e.message?.includes('violates foreign key constraint') || e.message?.includes('order_item_modifiers')) {
+            throw new Error('Cannot delete this modifier group because its options have already been used in historical orders.');
+        }
+        throw e;
+    }
 
     revalidatePath('/owner/menu-categories');
 }

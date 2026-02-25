@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react';
 import React from 'react';
-import { Plus, ChevronDown, ChevronRight, Edit2, Trash2, Image as ImageIcon, Settings2, X, Trash, Droplet, MoreVertical } from 'lucide-react';
+import Image from 'next/image';
+import { Plus, ChevronDown, ChevronRight, Edit2, Trash2, Image as ImageIcon, Settings2, X, Trash, Droplet, MoreVertical, HelpCircle } from 'lucide-react';
 import { 
     createCategory, updateCategory, deleteCategory, 
     createProduct, updateProduct, deleteProduct,
@@ -20,6 +21,7 @@ type Product = {
     categoryId: string;
     isHidden?: boolean;
     isFeatured?: boolean;
+    isQuickCartItem?: boolean;
     modifierLinks?: { modifierGroupId: string; defaultModifierOptionId?: string | null }[];
     productIngredients?: { inventoryItemId: string; quantityRequired: string }[];
 };
@@ -47,6 +49,61 @@ interface Props {
     branchId: string;
 }
 
+const GoogleDriveImageGuide = () => {
+    const [isOpen, setIsOpen] = useState(false);
+    return (
+        <>
+            <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(true); }}
+                className="inline-flex items-center justify-center ml-2 text-[#D95D1E] hover:text-[#bf4f18] transition-colors bg-orange-50 p-1 rounded-full align-middle normal-case"
+                title="Google Drive Link Guide"
+            >
+                <HelpCircle size={14} />
+            </button>
+            {isOpen && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 normal-case">
+                    <div 
+                        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" 
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(false); }} 
+                    />
+                    <div className="relative w-full max-w-sm bg-gray-900 text-white text-xs rounded-2xl shadow-2xl p-6 border border-gray-700/50 animate-in zoom-in-95 duration-200">
+                        <button 
+                            type="button"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(false); }} 
+                            className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white transition-colors rounded-full hover:bg-white/10"
+                        >
+                            <X size={16} />
+                        </button>
+                        <h4 className="font-bold text-base mb-4 text-[#D95D1E] flex items-center gap-2">
+                            <ImageIcon size={18} /> Google Drive Links
+                        </h4>
+                        <ol className="list-decimal list-outside ml-4 space-y-4 font-medium text-gray-300">
+                            <li>
+                                <span className="text-white text-[13px]">Copy the File ID</span><br/>
+                                In a Google Drive link, the ID is the long string of letters and numbers:<br/>
+                                <div className="bg-black/50 p-2.5 rounded-lg mt-1.5 font-mono text-[10px] break-all border border-gray-700 tracking-tighter leading-snug">
+                                    drive.google.com/file/d/<span className="text-white bg-gray-600 px-1 py-0.5 rounded">1A2b3C...</span>/view
+                                </div>
+                            </li>
+                            <li>
+                                <span className="text-white text-[13px]">Create the Direct Link</span><br/>
+                                Paste that ID at the very end of this format:<br/>
+                                <div className="bg-black/50 p-2.5 rounded-lg mt-1.5 font-mono text-[10px] border border-gray-700 tracking-tighter leading-snug break-all text-blue-300">
+                                    https://drive.google.com/uc?export=view&amp;id=<span className="text-white bg-gray-600 px-1 py-0.5 rounded">1A2b3C...</span>
+                                </div>
+                            </li>
+                            <li>
+                                Use that final link in the Image URL field!
+                            </li>
+                        </ol>
+                    </div>
+                </div>
+            )}
+        </>
+    );
+};
+
 export default function MenuManagementClient({ initialCategories, modifierGroups, inventoryItems, branchId }: Props) {
     const [activeTab, setActiveTab] = useState<'menu' | 'modifiers' | 'toppings'>('menu');
     const [categories, setCategories] = useState<Category[]>(initialCategories);
@@ -65,6 +122,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                     setWaterPrice(water.basePrice);
                     setWaterName(water.name);
                     setWaterImageUrl(water.imageUrl || '');
+                    setWaterIsQuickCartItem(water.isQuickCartItem !== false); // default true if undefined
                     return;
                 }
             }
@@ -90,6 +148,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
     const [waterPrice, setWaterPrice] = useState('1.50');
     const [waterName, setWaterName] = useState('Bottled Water');
     const [waterImageUrl, setWaterImageUrl] = useState('');
+    const [waterIsQuickCartItem, setWaterIsQuickCartItem] = useState(true);
 
     const [editingModifierGroup, setEditingModifierGroup] = useState<{
         id?: string;
@@ -217,6 +276,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
             modifierGroups,
             isHidden,
             isFeatured,
+            isQuickCartItem: editingProduct?.isQuickCartItem,
         };
 
         let productId = editingProduct?.id;
@@ -317,17 +377,18 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
         }
         if (!waterProduct) {
             // Create water product if it doesn't exist
-            const drinkCategory = categories.find(c => c.type === 'drink');
-            if (!drinkCategory) {
-                setAlertConfig({ isOpen: true, message: 'Please create a drink category first' });
+            const othersCategory = categories.find(c => c.type === 'others' || c.name.toLowerCase() === 'others');
+            if (!othersCategory) {
+                setAlertConfig({ isOpen: true, message: 'Please create an "Others" category first' });
                 return;
             }
             const newProduct = await createProduct({
-                categoryId: drinkCategory.id,
+                categoryId: othersCategory.id,
                 name: waterName,
                 basePrice: waterPrice,
                 imageUrl: waterImageUrl || undefined,
                 isHidden: false,
+                isQuickCartItem: waterIsQuickCartItem,
             });
             setWaterProduct(newProduct);
         } else {
@@ -339,6 +400,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                 imageUrl: waterImageUrl || undefined,
                 modifierGroups: [],
                 isHidden: waterProduct.isHidden || false,
+                isQuickCartItem: waterIsQuickCartItem,
             });
         }
         window.location.reload();
@@ -350,22 +412,44 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
             <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-6 shadow-sm">
                 <div className="flex items-start gap-4">
                     {/* Image preview */}
-                    <div className="w-16 h-16 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                    <div className="relative w-16 h-16 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center overflow-hidden flex-shrink-0">
                         {waterImageUrl ? (
-                            <img src={waterImageUrl} alt={waterName} className="w-full h-full object-cover" />
+                            <Image src={waterImageUrl} alt={waterName} fill className="object-cover" referrerPolicy="no-referrer" />
                         ) : (
                             <Droplet className="text-blue-400" size={24} />
                         )}
                     </div>
 
                     <div className="flex-1 space-y-3">
-                        <div className="flex items-center gap-2">
-                            <Droplet className="text-blue-500" size={16} />
-                            <div>
-                                <h3 className="text-sm font-bold text-gray-900">Water Bottle Product</h3>
-                                <p className="text-xs text-gray-500">Quick cart access product</p>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Droplet className="text-blue-500" size={16} />
+                                <div>
+                                    <h3 className="text-sm font-bold text-gray-900">Water Bottle Product</h3>
+                                    <p className="text-xs text-gray-500">Quick cart access product shown in Cart header</p>
+                                </div>
                             </div>
+                            {/* Visibility Toggle */}
+                            <button
+                                type="button"
+                                onClick={() => setWaterIsQuickCartItem(prev => !prev)}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none flex-shrink-0 ${
+                                    waterIsQuickCartItem ? 'bg-[#D95D1E]' : 'bg-gray-200'
+                                }`}
+                                title={waterIsQuickCartItem ? 'Hide quick-cart button on cart page' : 'Show quick-cart button on cart page'}
+                            >
+                                <span
+                                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                                        waterIsQuickCartItem ? 'translate-x-6' : 'translate-x-1'
+                                    }`}
+                                />
+                            </button>
                         </div>
+
+                        {/* Visibility label */}
+                        <p className={`text-[11px] font-semibold ${ waterIsQuickCartItem ? 'text-emerald-600' : 'text-gray-400' }`}>
+                            {waterIsQuickCartItem ? '✓ Quick-cart button visible on cart page' : '✕ Quick-cart button hidden on cart page'}
+                        </p>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             {/* Name */}
@@ -382,7 +466,9 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
 
                             {/* Image URL */}
                             <div className="md:col-span-1">
-                                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Image URL</label>
+                                <label className="flex items-center text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">
+                                    Image URL <GoogleDriveImageGuide />
+                                </label>
                                 <input
                                     type="text"
                                     value={waterImageUrl}
@@ -553,9 +639,9 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                                         className="product-row p-4 pl-4 md:pl-14 flex items-center justify-between gap-3 hover:bg-white transition-colors group"
                                                     >
                                                         <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
-                                                            <div className="w-12 h-12 md:w-14 md:h-14 shrink-0 bg-white rounded-xl flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm transition-transform group-hover:scale-105">
+                                                            <div className="relative w-12 h-12 md:w-14 md:h-14 shrink-0 bg-white rounded-xl flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm transition-transform group-hover:scale-105">
                                                                 {product.imageUrl ? (
-                                                                    <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                                                                    <Image src={product.imageUrl} alt={product.name} fill className="object-cover" referrerPolicy="no-referrer" />
                                                                 ) : (
                                                                     <ImageIcon size={24} className="text-gray-300" />
                                                                 )}
@@ -715,7 +801,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                         {group.options.slice(0, 5).map((opt) => (
                                             <span key={opt.id} className="px-2.5 py-1 bg-gray-50 text-gray-600 text-xs font-medium rounded-full border border-gray-100 flex items-center gap-1">
                                                 {activeTab === 'toppings' && opt.imageUrl && (
-                                                    <img src={opt.imageUrl} className="w-4 h-4 rounded-full object-cover" />
+                                                    <img src={opt.imageUrl} className="w-4 h-4 rounded-full object-cover" referrerPolicy="no-referrer" />
                                                 )}
                                                 {opt.name}
                                                 {parseFloat(opt.price) > 0 && <span className="text-[#D95D1E] font-bold">+{opt.price}</span>}
@@ -967,10 +1053,12 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                 </div>
                                 
                                 <div className="flex flex-col gap-2">
-                                    <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Cover Image</label>
+                                    <label className="flex items-center text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
+                                        Cover Image <GoogleDriveImageGuide />
+                                    </label>
                                     <div className="flex-1 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center p-4 group hover:border-[#D95D1E]/30 transition-all cursor-pointer overflow-hidden relative">
                                         {editingProduct?.imageUrl ? (
-                                            <img src={editingProduct.imageUrl} className="absolute inset-0 w-full h-full object-cover" alt="" />
+                                            <Image src={editingProduct.imageUrl} alt="" fill className="object-cover" referrerPolicy="no-referrer" />
                                         ) : (
                                             <>
                                                 <ImageIcon size={32} className="text-gray-300 mb-2 group-hover:text-[#D95D1E]/50" />
@@ -1172,7 +1260,10 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
 
                                 <div>
                                     <div className="flex items-center justify-between mb-4">
-                                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-400">Options</label>
+                                        <label className="flex items-center text-xs font-bold uppercase tracking-wider text-gray-400">
+                                            Options
+                                            {editingModifierGroup.displayMode === 'cards' && <GoogleDriveImageGuide />}
+                                        </label>
                                         <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 border border-orange-100 rounded-lg">
                                             <span className="text-[10px] text-[#D95D1E] font-bold">⭐</span>
                                             <span className="text-[10px] text-[#D95D1E] font-semibold">Click star to set default</span>

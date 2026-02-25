@@ -58,6 +58,7 @@ export const products = pgTable('products', {
   imageUrl: text('image_url'),
   isHidden: boolean('is_hidden').default(false).notNull(),
   isFeatured: boolean('is_featured').default(false).notNull(),
+  isQuickCartItem: boolean('is_quick_cart_item').default(false).notNull(),
 });
 
 // Circular ref with modifierOptions; TypeScript cannot infer type. See modifierOptions below.

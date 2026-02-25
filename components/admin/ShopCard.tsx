@@ -1,9 +1,10 @@
 'use client';
 
-import { Pause, Play, Trash2, Crown } from 'lucide-react';
+import { Pause, Play, Trash2, Crown, Pencil } from 'lucide-react';
 import { toggleShopStatus, deleteShop } from '@/app/actions/admin';
 import { useTransition, useState } from 'react';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { EditShopModal } from '@/components/admin/EditShopModal';
 
 interface Shop {
     id: string;
@@ -16,6 +17,7 @@ interface Shop {
 export function ShopCard({ shop }: { shop: Shop }) {
     const [isPending, startTransition] = useTransition();
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+    const [isEditOpen, setIsEditOpen] = useState(false);
 
     const handleToggleStatus = () => {
         startTransition(async () => {
@@ -72,7 +74,14 @@ export function ShopCard({ shop }: { shop: Shop }) {
                     )}
                 </button>
 
-                <button className="p-2 md:p-2.5 border border-gray-100 rounded-lg md:rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-50">
+                <button 
+                    onClick={() => setIsEditOpen(true)}
+                    className="p-2 md:p-2.5 border border-gray-100 rounded-lg md:rounded-xl text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+                >
+                    <Pencil size={16} className="md:w-[18px] md:h-[18px]" />
+                </button>
+
+                <button className="p-2 md:p-2.5 border border-gray-100 rounded-lg md:rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors">
                     <Crown size={16} className="md:w-[18px] md:h-[18px]" />
                 </button>
 
@@ -92,6 +101,12 @@ export function ShopCard({ shop }: { shop: Shop }) {
                 title="Delete Shop"
                 message={`Are you sure you want to delete ${shop.name}?`}
                 variant="danger"
+            />
+
+            <EditShopModal
+                isOpen={isEditOpen}
+                onClose={() => setIsEditOpen(false)}
+                shop={shop}
             />
         </div>
     );

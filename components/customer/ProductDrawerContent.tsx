@@ -118,11 +118,9 @@ export default function ProductDrawerContent({
   const hasToppings = (product.modifiers || []).some((g: any) => g.displayMode === "cards");
 
   // Set initial step based on flow
-  const initialStep = isSnack
-    ? "quantity"
-    : flow === "simple_choice" || flow === "fixed_meal"
+  const initialStep = flow === "simple_choice" || flow === "fixed_meal"
       ? "dynamic_options"
-      : (hasSizes ? "size" : (hasModifiers ? "customization" : (hasToppings ? "toppings" : "quantity")));
+      : "quantity";
       
   const [step, setStep] = useState<Step>(initialStep);
   // --- STATE ---
@@ -213,7 +211,10 @@ export default function ProductDrawerContent({
 
   const handleAddToCart = (overrideExtras?: any[], overrideLabel?: string) => {
     // Construct readable options object
-    const readableOptions: Record<string, any> = { Size: size };
+    const readableOptions: Record<string, any> = {};
+    if (hasSizes) {
+      readableOptions.Size = size;
+    }
 
     (product.modifiers || []).forEach((group: any) => {
       const selection = selectedOptions[group.id];
@@ -238,7 +239,7 @@ export default function ProductDrawerContent({
       price: currentPrice,
       quantity: quantity,
       image: product.image,
-      options: isSnack ? {} : readableOptions,
+      options: readableOptions,
       bundleLabel: overrideLabel,
       extras: overrideExtras,
     });
@@ -325,11 +326,18 @@ export default function ProductDrawerContent({
   const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
 
   const handleQuantityContinue = () => {
-    if (bundlePromo) setStep("upsell");
-    else setStep("frequentlyBought");
+    if (hasSizes) setStep("size");
+    else if (hasModifiers) setStep("customization");
+    else if (hasToppings) setStep("toppings");
+    else if (bundlePromo) setStep("upsell");
+    else if (crossSellPromo && crossSellPromo.items.length > 0) setStep("frequentlyBought");
+    else handleAddToCart();
   };
 
-  const handleUpsellSkip = () => setStep("frequentlyBought");
+  const handleUpsellSkip = () => {
+    if (crossSellPromo && crossSellPromo.items.length > 0) setStep("frequentlyBought");
+    else handleAddToCart();
+  };
 
   // --- Helper to render Common Header Image ---
   const HeaderImage = ({ compact = false }: { compact?: boolean }) => (
@@ -346,31 +354,33 @@ export default function ProductDrawerContent({
         className="object-cover"
       />
       <div className="absolute top-4 left-4 right-4 flex justify-between z-20">
-        {step !== "size" &&
-        step !== "quantity" &&
-        step !== "dynamic_options" ? (
+        {step !== initialStep ? (
           <button
             onClick={() => {
-              if (step === "customization") setStep("size");
+              if (step === "size") {
+                setStep("quantity");
+              }
+              if (step === "customization") {
+                if (hasSizes) setStep("size");
+                else setStep("quantity");
+              }
               if (step === "toppings") {
-                if (hasModifiers) {
-                  setStep("customization");
-                } else if (hasSizes) {
-                  setStep("size");
-                } else {
-                  setStep("quantity");
-                }
+                if (hasModifiers) setStep("customization");
+                else if (hasSizes) setStep("size");
+                else setStep("quantity");
               }
               if (step === "upsell") {
-                if (hasToppings) {
-                  setStep("toppings");
-                } else if (hasModifiers) {
-                  setStep("customization");
-                } else if (hasSizes) {
-                  setStep("size");
-                } else {
-                  setStep("quantity");
-                }
+                if (hasToppings) setStep("toppings");
+                else if (hasModifiers) setStep("customization");
+                else if (hasSizes) setStep("size");
+                else setStep("quantity");
+              }
+              if (step === "frequentlyBought") {
+                if (bundlePromo) setStep("upsell");
+                else if (hasToppings) setStep("toppings");
+                else if (hasModifiers) setStep("customization");
+                else if (hasSizes) setStep("size");
+                else setStep("quantity");
               }
             }}
             className="bg-white p-2 rounded-lg shadow-sm text-gray-900 transition-transform active:scale-95"
@@ -447,8 +457,10 @@ export default function ProductDrawerContent({
             setStep("toppings");
           } else if (bundlePromo) {
             setStep("upsell");
-          } else {
+          } else if (crossSellPromo && crossSellPromo.items.length > 0) {
             setStep("frequentlyBought");
+          } else {
+            handleAddToCart();
           }
         }} />
       </div>
@@ -494,8 +506,10 @@ export default function ProductDrawerContent({
         setStep("toppings");
       } else if (bundlePromo) {
         setStep("upsell");
-      } else {
+      } else if (crossSellPromo && crossSellPromo.items.length > 0) {
         setStep("frequentlyBought");
+      } else {
+        handleAddToCart();
       }
       return null;
     }
@@ -612,13 +626,12 @@ export default function ProductDrawerContent({
         <StickyFooter onClick={() => {
           if (hasToppings) {
             setStep("toppings");
+          } else if (bundlePromo) {
+            setStep("upsell");
+          } else if (crossSellPromo && crossSellPromo.items.length > 0) {
+            setStep("frequentlyBought");
           } else {
-            // Skip toppings step, go to next available step
-            if (bundlePromo) {
-              setStep("upsell");
-            } else {
-              setStep("frequentlyBought");
-            }
+            handleAddToCart();
           }
         }} />
         {activeInfoKey && MODIFIER_INFO[activeInfoKey] && (
@@ -653,8 +666,10 @@ export default function ProductDrawerContent({
     if (!hasToppings) {
       if (bundlePromo) {
         setStep("upsell");
-      } else {
+      } else if (crossSellPromo && crossSellPromo.items.length > 0) {
         setStep("frequentlyBought");
+      } else {
+        handleAddToCart();
       }
       return null;
     }
@@ -742,8 +757,10 @@ export default function ProductDrawerContent({
           onClick={() => {
             if (bundlePromo) {
               setStep("upsell");
-            } else {
+            } else if (crossSellPromo && crossSellPromo.items.length > 0) {
               setStep("frequentlyBought");
+            } else {
+              handleAddToCart();
             }
           }}
         />
@@ -761,7 +778,11 @@ export default function ProductDrawerContent({
 
     if (!pairedProduct) {
       // Fallback if product not found
-      setStep("frequentlyBought");
+      if (crossSellPromo && crossSellPromo.items.length > 0) {
+        setStep("frequentlyBought");
+      } else {
+        handleAddToCart();
+      }
       return null; // or render nothing while switching
     }
 
