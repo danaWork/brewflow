@@ -243,7 +243,7 @@ export async function getQuickCartProduct(branchId: string, tableId: string) {
                 (nameLower.includes('bottle') || nameLower.includes('bottled'));
         });
 
-        if (waterBottle && waterBottle.isQuickCartItem === true) {
+        if (waterBottle && waterBottle.isQuickCartItem === true && waterBottle.isInStock !== false) {
             return waterBottle;
         }
 

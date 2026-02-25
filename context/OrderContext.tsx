@@ -122,7 +122,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         table: o.tableNumber || 'Unknown Table',
         tableId: o.tableId || undefined,
         timestamp: o.createdAt ? new Date(o.createdAt) : new Date(),
-        paymentMethod: (o.paymentMethod as any) || 'CASH'
+        paymentMethod: (o.paymentMethod as any) || 'CASH',
+        note: o.note
       }));
 
       setActiveOrders(orders);
@@ -258,7 +259,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         tableId: currentTableId,
         timestamp: new Date(),
         paymentMethod,
-        note
+        note: note
       };
 
       setUserOrders(prev => [newOrder, ...prev]);
