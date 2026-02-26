@@ -2,7 +2,7 @@
 
 import { db } from '@/lib/db';
 import { companies, branches, orders, users, orderItems, orderItemModifiers, categories, products, activityLogs } from '@/db/schema';
-import { count, eq, sql, desc, like, and, gte, lte } from 'drizzle-orm';
+import { count, eq, sql, desc, like, and, gte, lte, inArray } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { logActivity } from '@/lib/activity';
 import { getUserSession } from './auth';
@@ -321,7 +321,7 @@ export async function getUpsellAnalytics(): Promise<UpsellStats> {
         })
             .from(companies)
             .leftJoin(branches, eq(companies.id, branches.companyId))
-            .leftJoin(orders, eq(branches.id, orders.branchId))
+            .leftJoin(orders, and(eq(branches.id, orders.branchId), inArray(orders.status, ['PREPARING', 'READY', 'COMPLETED'])))
             .groupBy(companies.id, companies.name);
 
         // 2. Calculate Bundle (Orders with > 1 item of same category type)
@@ -339,10 +339,7 @@ export async function getUpsellAnalytics(): Promise<UpsellStats> {
                 'productId', ${orderItems.productId},
                 'quantity', ${orderItems.quantity},
                 'categoryType', ${categories.type},
-                'hasModifiers', EXISTS(
-                    SELECT 1 FROM ${orderItemModifiers}
-                    WHERE ${orderItemModifiers.orderItemId} = ${orderItems.id}
-                )
+                'hasModifiers', ${orderItems.customizations} IS NOT NULL
             ))`
         })
             .from(orders)
@@ -350,6 +347,7 @@ export async function getUpsellAnalytics(): Promise<UpsellStats> {
             .innerJoin(orderItems, eq(orders.id, orderItems.orderId))
             .innerJoin(products, eq(orderItems.productId, products.id))
             .innerJoin(categories, eq(products.categoryId, categories.id))
+            .where(inArray(orders.status, ['PREPARING', 'READY', 'COMPLETED']))
             .groupBy(orders.id, branches.companyId);
 
 

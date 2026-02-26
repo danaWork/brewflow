@@ -1,15 +1,33 @@
 'use client';
 
-import { Package, ShoppingCart, Sparkles, DollarSign, ShoppingBag, TrendingUp } from 'lucide-react';
+import { Package, ShoppingCart, Sparkles, DollarSign, ShoppingBag, TrendingUp, Info } from 'lucide-react';
 import type { OwnerAnalytics } from '@/app/actions/owner';
 import { RevenueChart } from './RevenueChart';
-import { useMemo } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 
 interface OwnerAnalyticsProps {
     analytics: OwnerAnalytics;
 }
 
 export function OwnerAnalytics({ analytics }: OwnerAnalyticsProps) {
+    const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
+    const tooltipRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (tooltipRef.current && !tooltipRef.current.contains(event.target as Node)) {
+                setActiveTooltip(null);
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const toggleTooltip = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setActiveTooltip(activeTooltip === id ? null : id);
+    };
+
     // Format currency - memoized to prevent recreation
     const formatCurrency = useMemo(() => {
         return (value: number) => {
@@ -88,9 +106,28 @@ export function OwnerAnalytics({ analytics }: OwnerAnalyticsProps) {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {/* Bundle Acceptance */}
                         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                            <div className="flex items-center gap-2 mb-4 text-gray-500">
+                            <div className="flex items-center gap-2 mb-4 text-gray-500 relative">
                                 <Package size={20} className="text-[#D46215]" />
                                 <span className="text-sm font-medium">Bundle Acceptance</span>
+                                <div 
+                                    className="cursor-pointer text-gray-300 hover:text-gray-500 transition-colors"
+                                    onClick={(e) => toggleTooltip('bundle', e)}
+                                    onMouseEnter={() => setActiveTooltip('bundle')}
+                                    onMouseLeave={() => setActiveTooltip(null)}
+                                >
+                                    <Info size={14} />
+                                </div>
+                                {activeTooltip === 'bundle' && (
+                                    <div 
+                                        ref={tooltipRef}
+                                        className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-xl z-50 animate-in fade-in zoom-in-95 duration-200"
+                                    >
+                                        <p className="font-semibold mb-1 text-gray-100">Bundle Acceptance Rate</p>
+                                        <p className="text-gray-300">(Bundle Orders / Total Orders) * 100%</p>
+                                        <p className="text-gray-400 mt-2">A Bundle Order is an order where the customer bought more than 1 item in total.</p>
+                                        <div className="absolute left-6 -bottom-1 w-2 h-2 bg-gray-900 rotate-45 transform origin-center"></div>
+                                    </div>
+                                )}
                             </div>
                             <h3 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
                                 {analytics.bundleAcceptanceRate}%
@@ -106,9 +143,28 @@ export function OwnerAnalytics({ analytics }: OwnerAnalyticsProps) {
 
                         {/* Cross-Sell Acceptance */}
                         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                            <div className="flex items-center gap-2 mb-4 text-gray-500">
+                            <div className="flex items-center gap-2 mb-4 text-gray-500 relative">
                                 <ShoppingCart size={20} className="text-[#D46215]" />
                                 <span className="text-sm font-medium">Cross-Sell Acceptance</span>
+                                <div 
+                                    className="cursor-pointer text-gray-300 hover:text-gray-500 transition-colors"
+                                    onClick={(e) => toggleTooltip('crossSell', e)}
+                                    onMouseEnter={() => setActiveTooltip('crossSell')}
+                                    onMouseLeave={() => setActiveTooltip(null)}
+                                >
+                                    <Info size={14} />
+                                </div>
+                                {activeTooltip === 'crossSell' && (
+                                    <div 
+                                        ref={tooltipRef}
+                                        className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-xl z-50 animate-in fade-in zoom-in-95 duration-200"
+                                    >
+                                        <p className="font-semibold mb-1 text-gray-100">Cross-Sell Acceptance Rate</p>
+                                        <p className="text-gray-300">(Cross-Sell Orders / Total Orders) * 100%</p>
+                                        <p className="text-gray-400 mt-2">A Cross-Sell Order contains items from more than one distinct category type (e.g., mixing a "drink" and a "snack").</p>
+                                        <div className="absolute left-6 -bottom-1 w-2 h-2 bg-gray-900 rotate-45 transform origin-center"></div>
+                                    </div>
+                                )}
                             </div>
                             <h3 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
                                 {analytics.crossSellAcceptanceRate}%
@@ -124,9 +180,28 @@ export function OwnerAnalytics({ analytics }: OwnerAnalyticsProps) {
 
                         {/* Customization Rate */}
                         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                            <div className="flex items-center gap-2 mb-4 text-gray-500">
+                            <div className="flex items-center gap-2 mb-4 text-gray-500 relative">
                                 <Sparkles size={20} className="text-[#D46215]" />
                                 <span className="text-sm font-medium">Customization Rate</span>
+                                <div 
+                                    className="cursor-pointer text-gray-300 hover:text-gray-500 transition-colors"
+                                    onClick={(e) => toggleTooltip('customization', e)}
+                                    onMouseEnter={() => setActiveTooltip('customization')}
+                                    onMouseLeave={() => setActiveTooltip(null)}
+                                >
+                                    <Info size={14} />
+                                </div>
+                                {activeTooltip === 'customization' && (
+                                    <div 
+                                        ref={tooltipRef}
+                                        className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-xl z-50 animate-in fade-in zoom-in-95 duration-200"
+                                    >
+                                        <p className="font-semibold mb-1 text-gray-100">Customization Rate</p>
+                                        <p className="text-gray-300">(Customized Orders / Total Orders) * 100%</p>
+                                        <p className="text-gray-400 mt-2">A Customized Order is any order where at least one item includes modifiers or customizations.</p>
+                                        <div className="absolute left-6 -bottom-1 w-2 h-2 bg-gray-900 rotate-45 transform origin-center"></div>
+                                    </div>
+                                )}
                             </div>
                             <h3 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
                                 {analytics.customizationRate}%

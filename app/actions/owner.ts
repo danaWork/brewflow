@@ -2,7 +2,7 @@
 
 import { db } from '@/lib/db';
 import { orders, orderItems, orderItemModifiers, categories, products } from '@/db/schema';
-import { eq, sql, and, gte } from 'drizzle-orm';
+import { eq, sql, and, gte, inArray } from 'drizzle-orm';
 
 export type OwnerAnalytics = {
     bundleAcceptanceRate: number;
@@ -31,10 +31,7 @@ export async function getOwnerAnalytics(branchId: string, days: number = 30): Pr
                 'productId', ${orderItems.productId},
                 'quantity', ${orderItems.quantity},
                 'categoryType', ${categories.type},
-                'hasModifiers', EXISTS(
-                    SELECT 1 FROM ${orderItemModifiers}
-                    WHERE ${orderItemModifiers.orderItemId} = ${orderItems.id}
-                )
+                'hasModifiers', ${orderItems.customizations} IS NOT NULL
             ))`
         })
             .from(orders)
@@ -44,7 +41,8 @@ export async function getOwnerAnalytics(branchId: string, days: number = 30): Pr
             .where(
                 and(
                     eq(orders.branchId, branchId),
-                    gte(orders.createdAt, startDate)
+                    gte(orders.createdAt, startDate),
+                    inArray(orders.status, ['PREPARING', 'READY', 'COMPLETED'])
                 )
             )
             .groupBy(orders.id, orders.totalAmount, orders.createdAt);
