@@ -222,7 +222,7 @@ export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: 
                                                 </div>
                                             </div>
                                         </div>
-                                        <span className="text-gray-900 font-bold">₱{item.price.toFixed(2)}</span>
+                                        <span className="text-gray-900 font-bold">₱{(item.price * item.quantity).toFixed(2)}</span>
                                     </div>
 
                                     {/* Secondary check for nested extras in legacy data */}
@@ -241,7 +241,7 @@ export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: 
                                                             )}
                                                         </div>
                                                     </div>
-                                                    <span className="text-gray-600 font-medium">₱{extra.price.toFixed(2)}</span>
+                                                    <span className="text-gray-600 font-medium">₱{(extra.price * (extra.quantity || 1)).toFixed(2)}</span>
                                                 </div>
                                             ))}
                                         </div>
