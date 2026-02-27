@@ -17,18 +17,18 @@ export default function PromotionsTabs({ initialProducts, initialPromotions, bra
     const [activeTab, setActiveTab] = useState<Tab>('perfect-pair');
 
     const hasPerfectPairOutOfStock = initialPromotions
-        .filter(p => p.type === 'PERFECT_PAIR')
-        .some(promo => {
-            const triggerProduct = initialProducts.find(p => p.id === promo.triggerValue);
-            const pairProducts = promo.items.map((i: any) => initialProducts.find(p => p.id === i.productId));
-            return triggerProduct?.isInStock === false || pairProducts.some(p => p?.isInStock === false);
+        .filter((p: any) => p.type === 'PERFECT_PAIR')
+        .some((promo: any) => {
+            const triggerProduct = initialProducts.find((p: any) => p.id === promo.triggerValue);
+            const pairProducts = promo.items.map((i: any) => initialProducts.find((p: any) => p.id === i.productId));
+            return triggerProduct?.isInStock === false || pairProducts.some((p: any) => p?.isInStock === false);
         });
 
     const hasCrossSellOutOfStock = initialPromotions
-        .filter(p => p.type === 'CROSS_SELL')
-        .some(promo => {
-            const pairProducts = promo.items.map((i: any) => initialProducts.find(p => p.id === i.productId));
-            return pairProducts.some(p => p?.isInStock === false);
+        .filter((p: any) => p.type === 'CROSS_SELL')
+        .some((promo: any) => {
+            const pairProducts = promo.items.map((i: any) => initialProducts.find((p: any) => p.id === i.productId));
+            return pairProducts.some((p: any) => p?.isInStock === false);
         });
 
     return (

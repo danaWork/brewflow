@@ -21,7 +21,7 @@ export async function getProductsAction(branchId: string) {
             with: {
                 category: true,
                 branchAvailability: {
-                    where: (fields, { eq }) => eq(fields.branchId, branchId)
+                    where: (fields: any, { eq }: any) => eq(fields.branchId, branchId)
                 },
                 productIngredients: {
                     with: {
@@ -29,7 +29,7 @@ export async function getProductsAction(branchId: string) {
                     }
                 }
             },
-            where: (fields, { exists }) => exists(
+            where: (fields: any, { exists }: any) => exists(
                 db.select().from(categories)
                     .where(and(eq(categories.id, fields.categoryId), eq(categories.companyId, session.companyId)))
             )
@@ -41,7 +41,7 @@ export async function getProductsAction(branchId: string) {
 
             if (isInStock && p.productIngredients.length > 0) {
                 const branchIngredients = p.productIngredients.filter(
-                    pi => pi.inventoryItem && pi.inventoryItem.branchId === branchId
+                    (pi: any) => pi.inventoryItem && pi.inventoryItem.branchId === branchId
                 );
 
                 for (const pi of branchIngredients) {
@@ -61,8 +61,8 @@ export async function getProductsAction(branchId: string) {
                 name: p.name,
                 basePrice: p.basePrice,
                 imageUrl: p.imageUrl,
-                categoryName: p.category.name,
-                categoryType: p.category.type,
+                categoryName: (p.category as { name: string; type: string }).name,
+                categoryType: (p.category as { name: string; type: string }).type,
                 isInStock: isInStock,
             };
         });
@@ -87,7 +87,7 @@ export async function getPromotionsAction(branchId: string) {
                         product: {
                             with: {
                                 branchAvailability: {
-                                    where: (fields, { eq }) => eq(fields.branchId, branchId)
+                                    where: (fields: any, { eq }: any) => eq(fields.branchId, branchId)
                                 },
                                 productIngredients: {
                                     with: {
@@ -110,7 +110,7 @@ export async function getPromotionsAction(branchId: string) {
 
                 if (isInStock && p.productIngredients.length > 0) {
                     const branchIngredients = p.productIngredients.filter(
-                        pi => pi.inventoryItem && pi.inventoryItem.branchId === branchId
+                        (pi: any) => pi.inventoryItem && pi.inventoryItem.branchId === branchId
                     );
 
                     for (const pi of branchIngredients) {
@@ -250,7 +250,7 @@ export async function getPromotionsStockStatusAction(branchId: string) {
                         product: {
                             with: {
                                 branchAvailability: {
-                                    where: (fields, { eq }) => eq(fields.branchId, branchId)
+                                    where: (fields: any, { eq }: any) => eq(fields.branchId, branchId)
                                 },
                                 productIngredients: {
                                     with: {
@@ -270,10 +270,10 @@ export async function getPromotionsStockStatusAction(branchId: string) {
             .map(p => p.triggerValue);
         
         const triggerProducts = triggerProductIds.length > 0 ? await db.query.products.findMany({
-            where: (fields, { inArray }) => inArray(fields.id, triggerProductIds),
+            where: (fields: any, { inArray }: any) => inArray(fields.id, triggerProductIds),
             with: {
                 branchAvailability: {
-                    where: (fields, { eq }) => eq(fields.branchId, branchId)
+                    where: (fields: any, { eq }: any) => eq(fields.branchId, branchId)
                 },
                 productIngredients: {
                     with: {
@@ -289,7 +289,7 @@ export async function getPromotionsStockStatusAction(branchId: string) {
 
             if (isInStock && p.productIngredients.length > 0) {
                 const branchIngredients = p.productIngredients.filter(
-                    pi => pi.inventoryItem && pi.inventoryItem.branchId === branchId
+                    (pi: any) => pi.inventoryItem && pi.inventoryItem.branchId === branchId
                 );
                 for (const pi of branchIngredients) {
                     const required = parseFloat(pi.quantityRequired);
@@ -320,7 +320,7 @@ export async function getPromotionsStockStatusAction(branchId: string) {
 
                 if (isInStock && p.productIngredients.length > 0) {
                     const branchIngredients = p.productIngredients.filter(
-                        pi => pi.inventoryItem && pi.inventoryItem.branchId === branchId
+                        (pi: any) => pi.inventoryItem && pi.inventoryItem.branchId === branchId
                     );
                     for (const pi of branchIngredients) {
                         const required = parseFloat(pi.quantityRequired);
