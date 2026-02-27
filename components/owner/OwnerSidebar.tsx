@@ -14,7 +14,10 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  AlertCircle
 } from 'lucide-react';
+import { getPromotionsStockStatusAction } from '@/app/actions/promotions';
+import { getInventoryStockStatusAction } from '@/app/actions/inventory';
 
 type NavItem = {
   label: string;
@@ -53,9 +56,10 @@ const navGroups: NavGroup[] = [
 
 const STORAGE_KEY = 'brewflow-sidebar-collapsed';
 
-export default function OwnerSidebar({ shopName = 'Admin Panel' }: { shopName?: string }) {
+export default function OwnerSidebar({ shopName = 'Admin Panel', branchId }: { shopName?: string, branchId: string }) {
   const pathname = usePathname();
-
+  const [hasPromoOutOfStock, setHasPromoOutOfStock] = useState(false);
+  const [hasInventoryLowStock, setHasInventoryLowStock] = useState(false);
   // Start from a server-safe default; hydrate from localStorage on mount
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -64,7 +68,27 @@ export default function OwnerSidebar({ shopName = 'Admin Panel' }: { shopName?: 
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === 'true') setCollapsed(true);
     setMounted(true);
-  }, []);
+
+    if (branchId) {
+      const checkStock = async () => {
+        const [promoRes, invRes] = await Promise.all([
+          getPromotionsStockStatusAction(branchId),
+          getInventoryStockStatusAction(branchId)
+        ]);
+        
+        if (promoRes.success) {
+          setHasPromoOutOfStock(!!promoRes.hasOutOfStock);
+        }
+        if (invRes.success) {
+          setHasInventoryLowStock(!!invRes.hasLowStock);
+        }
+      };
+      checkStock();
+      // Poll every 5 minutes
+      const interval = setInterval(checkStock, 5 * 60 * 1000);
+      return () => clearInterval(interval);
+    }
+  }, [branchId]);
 
   const toggle = () => {
     setCollapsed(prev => {
@@ -139,6 +163,18 @@ export default function OwnerSidebar({ shopName = 'Admin Panel' }: { shopName?: 
                         size={18}
                         className={`shrink-0 ${isActive ? 'text-white' : 'text-gray-500 group-hover:text-gray-700'}`}
                       />
+
+                      {item.label === 'Promotions' && hasPromoOutOfStock && (
+                        <div className={`absolute ${collapsed ? 'top-1.5 right-1.5' : 'right-3'} flex items-center justify-center w-4 h-4 bg-red-600 text-white rounded-full ring-2 ring-white z-10`}>
+                          <span className="text-[10px] font-bold">!</span>
+                        </div>
+                      )}
+
+                      {item.label === 'Inventory' && hasInventoryLowStock && (
+                        <div className={`absolute ${collapsed ? 'top-1.5 right-1.5' : 'right-3'} flex items-center justify-center w-4 h-4 bg-red-600 text-white rounded-full ring-2 ring-white z-10`}>
+                          <span className="text-[10px] font-bold">!</span>
+                        </div>
+                      )}
 
                       {/* Label */}
                       <span

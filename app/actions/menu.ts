@@ -116,29 +116,10 @@ export async function getMenuData(branchId: string, qrIdentifier: string) {
                     }
                 }
 
-                if (!isInStock && availability?.isInStock === false) return; // If manually hidden OR out of stock, decide logic. 
                 // Requirement: "if an inventory item is over there should be an out of stock tag"
-                // Usually this means we still SHOW it but mark it out of stock?
-                // Or if the user meant "hidden"? 
-                // "out of stock tag in the menu items" suggests showing it.
+                // Usually this means we still SHOW it but mark it out of stock.
                 
-                // Existing logic: `if (availability?.isInStock === false) return;` skips it entirely.
-                // I should probably change this to allow showing but with `isInStock: false`.
-                // However, let's respect the manual override "isInStock === false" means HIDE? 
-                // Or "Out of Stock"?
-                // `productsSchema.isHidden` is the "Hide" flag. `isInStock` is availability.
-                // If `availability.isInStock` is false, it usually means "Sold Out" in UI, not hidden.
-                // But the code had `if (availability?.isInStock === false) return;`.
-                // This implies "Don't send to frontend if out of stock".
-                // I will change this to INCLUDE it but set `isInStock: false`.
-
-                // Wait, if I change existing behavior I might break things.
-                // "inventory item is over there should be an out of stock tag"
-                // If I skip it, there is no tag. So I MUST include it.
-                
-                // Let's remove the skip, unless `isHidden` is true (handled in query).
-                // But wait, `isInStock` from DB override vs calculated.
-                // Calculated overrides DB if calculated says NO.
+                // Removed the skip so we can show "Sold Out" in UI.
                 
                 transformedProducts.push({
                     id: p.id,

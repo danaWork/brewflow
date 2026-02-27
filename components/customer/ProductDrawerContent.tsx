@@ -275,7 +275,7 @@ export default function ProductDrawerContent({
     const pairedProductId = bundlePromo.items[0]?.productId;
     const pairedProduct = allProducts.find((p) => p.id === pairedProductId);
 
-    if (!pairedProduct) {
+    if (!pairedProduct || pairedProduct.isInStock === false) {
       handleAddToCart();
       return;
     }
@@ -307,7 +307,7 @@ export default function ProductDrawerContent({
     const extrasToAdd = selectedExtras
       .map((id) => {
         const item = allProducts.find((i) => i.id === id);
-        if (!item) return null;
+        if (!item || item.isInStock === false) return null;
         const discountedPrice = calculateDiscountedPrice(item, crossSellPromo);
         return {
           productId: item.id,
@@ -857,10 +857,10 @@ export default function ProductDrawerContent({
 
         <div className="p-4 bg-white border-t border-gray-100 mt-auto shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] z-20">
           <button
-            onClick={handleUpsellAndAdd}
-            className="w-full bg-[#D95D1E] text-white font-bold py-4 rounded-xl shadow-lg shadow-orange-200 hover:bg-[#bf4f18] transition-all active:scale-95 text-lg"
+            onClick={pairedProduct.isInStock === false ? handleUpsellSkip : handleUpsellAndAdd}
+            className={`w-full ${pairedProduct.isInStock === false ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#D95D1E] hover:bg-[#bf4f18]'} text-white font-bold py-4 rounded-xl shadow-lg shadow-orange-200 transition-all active:scale-95 text-lg`}
           >
-            Yes, Perfect!
+            {pairedProduct.isInStock === false ? "Paired Item Out of Stock" : "Yes, Perfect!"}
           </button>
         </div>
       </div>
@@ -969,9 +969,11 @@ export default function ProductDrawerContent({
               return (
                 <button
                   key={item.id}
-                  onClick={() => toggleExtra(item.id)}
+                  onClick={() => item.isInStock !== false && toggleExtra(item.id)}
                   className={`bg-white rounded-2xl p-3 shadow-sm border text-left flex flex-col h-full transition-all ${
-                    isSelected
+                    item.isInStock === false
+                      ? "opacity-60 cursor-not-allowed"
+                      : isSelected
                       ? "border-[#D95D1E] ring-1 ring-[#D95D1E] bg-orange-50/10"
                       : "border-gray-100"
                   }`}
@@ -986,7 +988,12 @@ export default function ProductDrawerContent({
                       fill
                       className="object-cover"
                     />
-                    {isSelected && (
+                    {item.isInStock === false && (
+                       <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-20">
+                         <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase">Out of Stock</span>
+                       </div>
+                    )}
+                    {isSelected && item.isInStock !== false && (
                       <div className="absolute inset-0 bg-black/5 flex items-center justify-center">
                         <div className="bg-[#D95D1E] text-white rounded-full p-1.5 shadow-sm">
                           <Check size={16} strokeWidth={3} />

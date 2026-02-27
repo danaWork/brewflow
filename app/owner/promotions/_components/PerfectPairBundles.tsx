@@ -16,6 +16,7 @@ interface Product {
     imageUrl: string | null;
     categoryName: string;
     categoryType: string;
+    isInStock?: boolean;
 }
 
 interface PromotionItem {
@@ -130,16 +131,23 @@ export default function PerfectPairBundles({ products, promotions, branchId }: P
                 <div className="grid gap-3">
                     {groupPromos.map((promo) => {
                         const triggerProduct = products.find(p => p.id === promo.triggerValue);
-                        const pairProduct = promo.items[0]?.product;
+                        const pairProductRaw = promo.items[0]?.product;
+                        const pairProduct = pairProductRaw ? products.find(p => p.id === pairProductRaw.id) : null;
+                        const isOutOfStock = (triggerProduct?.isInStock === false) || (pairProduct?.isInStock === false);
 
                         const discountLabel = promo.discountType === 'PERCENTAGE' ? `${parseFloat(promo.discountValue)}%` : `₱${parseFloat(promo.discountValue)}`;
                         return (
                             <div
                                 key={promo.id}
-                                className="bg-white border border-gray-100 rounded-lg p-3 flex flex-col sm:flex-row sm:items-center gap-3 shadow-sm group/row relative pr-14 sm:pr-3"
+                                className={`bg-white border ${isOutOfStock ? 'border-red-200 bg-red-50/20' : 'border-gray-100'} rounded-lg p-3 flex flex-col sm:flex-row sm:items-center gap-3 shadow-sm group/row relative pr-14 sm:pr-3`}
                             >
-                                <div className="flex-1 min-w-0 text-sm font-medium text-gray-700">
+                                <div className="flex-1 min-w-0 text-sm font-medium text-gray-700 flex items-center gap-2">
                                     {triggerProduct?.name || 'Unknown Product'}
+                                    {isOutOfStock && (
+                                        <div className="flex items-center justify-center w-5 h-5 bg-red-100 text-red-600 rounded-full shrink-0" title="Out of stock items in bundle">
+                                            <span className="text-xs font-bold font-mono">!</span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="flex flex-col sm:flex-row sm:flex-[1.5] sm:items-center gap-2 sm:gap-4">
