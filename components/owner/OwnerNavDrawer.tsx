@@ -14,6 +14,9 @@ import {
   X,
 } from 'lucide-react';
 import Drawer from '@/components/ui/Drawer';
+import { useState, useEffect } from 'react';
+import { getPromotionsStockStatusAction } from '@/app/actions/promotions';
+import { getInventoryStockStatusAction } from '@/app/actions/inventory';
 
 type NavItem = {
   label: string;
@@ -53,10 +56,32 @@ const navGroups: NavGroup[] = [
 interface OwnerNavDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+  branchId: string;
 }
 
-export default function OwnerNavDrawer({ isOpen, onClose }: OwnerNavDrawerProps) {
+export default function OwnerNavDrawer({ isOpen, onClose, branchId }: OwnerNavDrawerProps) {
   const pathname = usePathname();
+  const [hasPromoOutOfStock, setHasPromoOutOfStock] = useState(false);
+  const [hasInventoryLowStock, setHasInventoryLowStock] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && branchId) {
+      const checkStock = async () => {
+        const [promoRes, invRes] = await Promise.all([
+          getPromotionsStockStatusAction(branchId),
+          getInventoryStockStatusAction(branchId)
+        ]);
+        
+        if (promoRes.success) {
+          setHasPromoOutOfStock(!!promoRes.hasOutOfStock);
+        }
+        if (invRes.success) {
+          setHasInventoryLowStock(!!invRes.hasLowStock);
+        }
+      };
+      checkStock();
+    }
+  }, [isOpen, branchId]);
 
   return (
     <Drawer isOpen={isOpen} onClose={onClose} showCloseButton={false}>
@@ -108,7 +133,17 @@ export default function OwnerNavDrawer({ isOpen, onClose }: OwnerNavDrawerProps)
                         `}
                       >
                         <Icon size={18} className={isActive ? 'text-white' : 'text-gray-500'} />
-                        {item.label}
+                        <span className="flex-1">{item.label}</span>
+                        {item.label === 'Promotions' && hasPromoOutOfStock && (
+                          <div className="flex items-center justify-center w-4 h-4 bg-red-600 text-white rounded-full ring-2 ring-white">
+                            <span className="text-[10px] font-bold">!</span>
+                          </div>
+                        )}
+                        {item.label === 'Inventory' && hasInventoryLowStock && (
+                          <div className="flex items-center justify-center w-4 h-4 bg-red-600 text-white rounded-full ring-2 ring-white">
+                            <span className="text-[10px] font-bold">!</span>
+                          </div>
+                        )}
                       </Link>
                     </li>
                   );

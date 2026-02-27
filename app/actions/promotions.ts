@@ -17,17 +17,55 @@ export async function getProductsAction(branchId: string) {
         const session = await getUserSession();
         if (!session) return { success: false, error: 'Unauthorized' };
 
-        const allProducts = await db.select({
-            id: products.id,
-            name: products.name,
-            basePrice: products.basePrice,
-            imageUrl: products.imageUrl,
-            categoryName: categories.name,
-            categoryType: categories.type,
-        })
-            .from(products)
-            .innerJoin(categories, eq(products.categoryId, categories.id))
-            .where(eq(categories.companyId, session.companyId));
+        const productsData = await db.query.products.findMany({
+            with: {
+                category: true,
+                branchAvailability: {
+                    where: (fields: any, { eq }: any) => eq(fields.branchId, branchId)
+                },
+                productIngredients: {
+                    with: {
+                        inventoryItem: true
+                    }
+                }
+            },
+            where: (fields: any, { exists }: any) => exists(
+                db.select().from(categories)
+                    .where(and(eq(categories.id, fields.categoryId), eq(categories.companyId, session.companyId)))
+            )
+        });
+
+        const allProducts = productsData.map(p => {
+            const availability = p.branchAvailability[0];
+            let isInStock = availability?.isInStock !== false;
+
+            if (isInStock && p.productIngredients.length > 0) {
+                const branchIngredients = p.productIngredients.filter(
+                    (pi: any) => pi.inventoryItem && pi.inventoryItem.branchId === branchId
+                );
+
+                for (const pi of branchIngredients) {
+                    const required = parseFloat(pi.quantityRequired);
+                    const available = parseFloat(pi.inventoryItem.quantity);
+                    const threshold = pi.inventoryItem.lowStockThreshold ? parseFloat(pi.inventoryItem.lowStockThreshold) : 0;
+                    
+                    if (available < required || available <= threshold) {
+                        isInStock = false;
+                        break;
+                    }
+                }
+            }
+
+            return {
+                id: p.id,
+                name: p.name,
+                basePrice: p.basePrice,
+                imageUrl: p.imageUrl,
+                categoryName: (p.category as { name: string; type: string }).name,
+                categoryType: (p.category as { name: string; type: string }).type,
+                isInStock: isInStock,
+            };
+        });
 
         return { success: true, data: allProducts };
     } catch (error) {
@@ -41,16 +79,61 @@ export async function getPromotionsAction(branchId: string) {
         const session = await getUserSession();
         if (!session) return { success: false, error: 'Unauthorized' };
 
-        const allPromotions = await db.query.promotions.findMany({
+        const promotionsData = await db.query.promotions.findMany({
             where: eq(promotions.branchId, branchId),
             with: {
                 items: {
                     with: {
-                        product: true
+                        product: {
+                            with: {
+                                branchAvailability: {
+                                    where: (fields: any, { eq }: any) => eq(fields.branchId, branchId)
+                                },
+                                productIngredients: {
+                                    with: {
+                                        inventoryItem: true
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
         });
+
+        const allPromotions = promotionsData.map(promo => ({
+            ...promo,
+            items: promo.items.map(item => {
+                const p = item.product;
+                const availability = p.branchAvailability[0];
+                let isInStock = availability?.isInStock !== false;
+
+                if (isInStock && p.productIngredients.length > 0) {
+                    const branchIngredients = p.productIngredients.filter(
+                        (pi: any) => pi.inventoryItem && pi.inventoryItem.branchId === branchId
+                    );
+
+                    for (const pi of branchIngredients) {
+                        const required = parseFloat(pi.quantityRequired);
+                        const available = parseFloat(pi.inventoryItem.quantity);
+                        const threshold = pi.inventoryItem.lowStockThreshold ? parseFloat(pi.inventoryItem.lowStockThreshold) : 0;
+                        
+                        if (available < required || available <= threshold) {
+                            isInStock = false;
+                            break;
+                        }
+                    }
+                }
+
+                return {
+                    ...item,
+                    product: {
+                        ...p,
+                        isInStock
+                    }
+                };
+            })
+        }));
 
         return { success: true, data: allPromotions };
     } catch (error) {
@@ -150,5 +233,112 @@ export async function deletePromotionAction(branchId: string, promotionId: strin
     } catch (error) {
         console.error('Error deleting promotion:', error);
         return { success: false, error: 'Failed to delete promotion' };
+    }
+}
+
+export async function getPromotionsStockStatusAction(branchId: string) {
+    try {
+        const session = await getUserSession();
+        if (!session) return { success: false, error: 'Unauthorized' };
+
+        // 1. Get all promotions for the branch
+        const promotionsData = await db.query.promotions.findMany({
+            where: eq(promotions.branchId, branchId),
+            with: {
+                items: {
+                    with: {
+                        product: {
+                            with: {
+                                branchAvailability: {
+                                    where: (fields: any, { eq }: any) => eq(fields.branchId, branchId)
+                                },
+                                productIngredients: {
+                                    with: {
+                                        inventoryItem: true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // 2. Fetch all unique products that might be triggers (for PERFECT_PAIR)
+        const triggerProductIds = promotionsData
+            .filter(p => p.type === 'PERFECT_PAIR')
+            .map(p => p.triggerValue);
+        
+        const triggerProducts = triggerProductIds.length > 0 ? await db.query.products.findMany({
+            where: (fields: any, { inArray }: any) => inArray(fields.id, triggerProductIds),
+            with: {
+                branchAvailability: {
+                    where: (fields: any, { eq }: any) => eq(fields.branchId, branchId)
+                },
+                productIngredients: {
+                    with: {
+                        inventoryItem: true
+                    }
+                }
+            }
+        }) : [];
+
+        const triggerProductsMap = new Map(triggerProducts.map(p => {
+            const availability = p.branchAvailability[0];
+            let isInStock = availability?.isInStock !== false;
+
+            if (isInStock && p.productIngredients.length > 0) {
+                const branchIngredients = p.productIngredients.filter(
+                    (pi: any) => pi.inventoryItem && pi.inventoryItem.branchId === branchId
+                );
+                for (const pi of branchIngredients) {
+                    const required = parseFloat(pi.quantityRequired);
+                    const available = parseFloat(pi.inventoryItem.quantity);
+                    const threshold = pi.inventoryItem.lowStockThreshold ? parseFloat(pi.inventoryItem.lowStockThreshold) : 0;
+                    if (available < required || available <= threshold) {
+                        isInStock = false;
+                        break;
+                    }
+                }
+            }
+            return [p.id, isInStock];
+        }));
+
+        // 3. Check if any promotion has an out of stock item
+        const hasOutOfStock = promotionsData.some(promo => {
+            // Check trigger for PERFECT_PAIR
+            if (promo.type === 'PERFECT_PAIR') {
+                const triggerInStock = triggerProductsMap.get(promo.triggerValue);
+                if (triggerInStock === false) return true;
+            }
+
+            // Check all items in the promotion
+            return promo.items.some(item => {
+                const p = item.product;
+                const availability = p.branchAvailability[0];
+                let isInStock = availability?.isInStock !== false;
+
+                if (isInStock && p.productIngredients.length > 0) {
+                    const branchIngredients = p.productIngredients.filter(
+                        (pi: any) => pi.inventoryItem && pi.inventoryItem.branchId === branchId
+                    );
+                    for (const pi of branchIngredients) {
+                        const required = parseFloat(pi.quantityRequired);
+                        const available = parseFloat(pi.inventoryItem.quantity);
+                        const threshold = pi.inventoryItem.lowStockThreshold ? parseFloat(pi.inventoryItem.lowStockThreshold) : 0;
+                        if (available < required || available <= threshold) {
+                            isInStock = false;
+                            break;
+                        }
+                    }
+                }
+                return !isInStock;
+            });
+        });
+
+        return { success: true, hasOutOfStock };
+    } catch (error) {
+        console.error('Error checking promotion stock status:', error);
+        return { success: false, error: 'Failed' };
     }
 }

@@ -99,24 +99,32 @@ const CrossSellSection = ({
                     <div className="flex flex-wrap gap-4">
                         {selectedItems.map((itemId: string) => {
                             const item = products.find((p: any) => p.id === itemId);
+                            const isOutOfStock = item?.isInStock === false;
                             return (
-                                <div key={itemId} className="flex-1 min-w-[200px] flex items-center gap-3 bg-white border border-gray-100 rounded-xl p-3 shadow-sm group relative">
-                                    <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                                <div key={itemId} className={`flex-1 min-w-[200px] flex items-center gap-3 bg-white border ${isOutOfStock ? 'border-red-200 bg-red-50/20' : 'border-gray-100'} rounded-xl p-3 shadow-sm group relative`}>
+                                    <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 relative">
                                         {item?.imageUrl ? (
-                                            <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                            <img src={item.imageUrl} alt={item.name} className={`w-full h-full object-cover ${isOutOfStock ? 'opacity-50 grayscale' : ''}`} referrerPolicy="no-referrer" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center">
                                                 <Package size={16} className="text-gray-300" />
                                             </div>
                                         )}
+                                        {isOutOfStock && (
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                <div className="bg-red-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shadow-lg">!</div>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className="text-xs font-bold text-gray-800 truncate">{item?.name || 'Unknown'}</div>
+                                        <div className={`text-xs font-bold truncate ${isOutOfStock ? 'text-red-600' : 'text-gray-800'}`}>
+                                            {item?.name || 'Unknown'}
+                                        </div>
                                         <div className="text-[10px] text-gray-400 font-medium">₱{parseFloat(item?.basePrice || '0').toFixed(2)}</div>
                                     </div>
                                     <button
                                         onClick={(e) => handleRemoveItem(itemId, e)}
-                                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-red-600"
+                                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-red-600 z-10"
                                     >
                                         <X size={10} />
                                     </button>

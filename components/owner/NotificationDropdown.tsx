@@ -94,7 +94,7 @@ export default function NotificationDropdown({ branchId }: { branchId: string })
               <div className="px-4 py-3 text-sm text-gray-500 text-center">No new notifications</div>
             ) : (
               notifications.map((notification) => (
-                <div key={notification.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors flex justify-between items-start gap-2">
+                <div key={notification.id} className="px-4 py-3 border-b border-gray-100 bg-red-50/50 hover:bg-red-50 transition-colors flex justify-between items-start gap-2">
                   <div className="flex-1">
                     <p className="text-sm text-gray-800">{notification.message}</p>
                     <span className="text-xs text-gray-500 mt-1 block">

@@ -152,6 +152,8 @@ export async function updateProductStock(
         );
 
         revalidatePath('/owner/inventory');
+        // Trigger notification check
+        await syncStockNotificationsInternal(branchId);
         return { success: true };
     } catch (error) {
         console.error('Error updating product stock:', error);
@@ -214,20 +216,21 @@ export async function deleteInventoryItemAction(id: string) {
     }
 }
 
-export async function getLowStockItemsAction(branchId: string) {
+export async function getInventoryStockStatusAction(branchId: string) {
     try {
-        if (!branchId) return { success: true, items: [] };
+        if (!branchId) return { success: true, hasLowStock: false };
 
-        const items = await db.select().from(inventoryItems)
+        const items = await db.select({ id: inventoryItems.id }).from(inventoryItems)
             .where(and(
                 eq(inventoryItems.branchId, branchId),
                 lte(inventoryItems.quantity, inventoryItems.lowStockThreshold) 
-            ));
+            ))
+            .limit(1);
         
-        return { success: true, items };
+        return { success: true, hasLowStock: items.length > 0 };
     } catch (error) {
-        console.error('getLowStockItemsAction error:', error);
-        return { success: false, error: 'Failed to fetch low stock items' };
+        console.error('getInventoryStockStatusAction error:', error);
+        return { success: false, error: 'Failed' };
     }
 }
 
@@ -307,6 +310,8 @@ export async function getProductIngredientsAction(branchId: string, productId: s
     }
 }
 
+import { syncStockNotificationsInternal } from './notifications';
+
 export async function deductInventoryForOrder(orderId: string) {
     try {
         // Fetch order to get branchId
@@ -355,6 +360,10 @@ export async function deductInventoryForOrder(orderId: string) {
                 }
             }
         });
+
+        // Trigger notification check after deduction
+        await syncStockNotificationsInternal(order.branchId);
+
         return { success: true };
     } catch (error) {
         console.error('deductInventoryForOrder error:', error);
