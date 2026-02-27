@@ -210,13 +210,27 @@ import bcrypt from 'bcryptjs';
 
 export async function createManagerAccount(email: string, passwordPlain: string, companyId: string, branchId: string | null) {
     try {
+        let assignedBranchId = branchId;
+
+        // If no branchId is provided, get the first branch of the company
+        if (!assignedBranchId) {
+            const [companyBranch] = await db.select({ id: branches.id })
+                .from(branches)
+                .where(eq(branches.companyId, companyId))
+                .limit(1);
+            
+            if (companyBranch) {
+                assignedBranchId = companyBranch.id;
+            }
+        }
+
         const passwordHash = bcrypt.hashSync(passwordPlain, 10);
         await db.insert(users).values({
             email,
             passwordHash,
             role: 'BRANCH_MANAGER',
             companyId,
-            branchId,
+            branchId: assignedBranchId,
         });
         revalidatePath('/admin/dashboard');
         return { success: true };

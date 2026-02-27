@@ -24,9 +24,19 @@ export async function createOrderAction(data: {
     note?: string;
 }) {
     try {
+        // Calculate the next order number for this branch
+        const [latestOrder] = await db.select({ orderNumber: ordersSchema.orderNumber })
+            .from(ordersSchema)
+            .where(eq(ordersSchema.branchId, data.branchId))
+            .orderBy(desc(ordersSchema.orderNumber))
+            .limit(1);
+            
+        const nextOrderNumber = latestOrder && latestOrder.orderNumber ? latestOrder.orderNumber + 1 : 1;
+
         const [insertedOrder] = await db.insert(ordersSchema).values({
             branchId: data.branchId,
             tableId: data.tableId,
+            orderNumber: nextOrderNumber,
             status: 'PENDING',
             totalAmount: data.totalAmount.toString(),
             paymentMethod: data.paymentMethod,
