@@ -115,24 +115,33 @@ export async function getActiveOrdersAction(branchId: string) {
             orderBy: [desc(ordersSchema.createdAt)]
         });
 
-        // Fallback: If note is missing due to stale schema in db.query, fetch it manually
-        const enrichedOrders = await Promise.all(activeOrders.map(async (o: any) => {
-            if (o.note === undefined) {
-                try {
-                    const [raw] = await db.select({ note: ordersSchema.note }).from(ordersSchema).where(eq(ordersSchema.id, o.id));
-                    return { ...o, note: raw?.note || null };
-                } catch (e) {
+        // Fallback: If note is missing due to stale schema in db.query, fetch it manually in a single batch
+        let enrichedOrders = activeOrders;
+        const missingNoteIds = activeOrders.filter((o: any) => o.note === undefined).map(o => o.id);
+        
+        if (missingNoteIds.length > 0) {
+            try {
+                const notesRaw = await db.select({ id: ordersSchema.id, note: ordersSchema.note })
+                    .from(ordersSchema)
+                    .where(inArray(ordersSchema.id, missingNoteIds));
+                
+                const notesMap = new Map(notesRaw.map(r => [r.id, r.note]));
+                enrichedOrders = activeOrders.map((o: any) => {
+                    if (o.note === undefined) {
+                        return { ...o, note: notesMap.get(o.id) || null };
+                    }
                     return o;
-                }
+                });
+            } catch (e) {
+                console.error('Failed to batch fetch notes:', e);
             }
-            return o;
-        }));
+        }
 
         console.log('Fetched active orders count:', enrichedOrders.length);
 
         return {
             success: true,
-            orders: enrichedOrders.map(o => ({
+            orders: enrichedOrders.map((o: any) => ({
                 id: o.id,
                 orderNumber: o.orderNumber,
                 status: o.status as 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED',
