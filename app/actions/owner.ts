@@ -31,7 +31,7 @@ export async function getOwnerAnalytics(branchId: string, days: number = 30): Pr
                 'productId', ${orderItems.productId},
                 'quantity', ${orderItems.quantity},
                 'categoryType', ${categories.type},
-                'hasModifiers', ${orderItems.customizations} IS NOT NULL
+                'customizations', ${orderItems.customizations}
             ))`
         })
             .from(orders)
@@ -74,7 +74,19 @@ export async function getOwnerAnalytics(branchId: string, days: number = 30): Pr
 
             const items = order.items as any[];
             const types = new Set(items.map((i: any) => i.categoryType));
-            const hasModifiers = items.some((i: any) => i.hasModifiers);
+            const isItemCustomized = (i: any) => {
+                if (!i.customizations) return false;
+                try {
+                    const parsed = typeof i.customizations === 'string' ? JSON.parse(i.customizations) : i.customizations;
+                    const keys = Object.keys(parsed).filter(k => {
+                        const lowerKey = k.toLowerCase();
+                        return lowerKey !== 'size' && lowerKey !== 'bundlelabel' && lowerKey !== 'tag';
+                    });
+                    return keys.length > 0;
+                } catch(e) { return false; }
+            };
+
+            const hasModifiers = items.some(isItemCustomized);
             const totalItemCount = items.reduce((sum: number, i: any) => sum + i.quantity, 0);
 
             // Bundle: more than 1 item total
@@ -94,7 +106,7 @@ export async function getOwnerAnalytics(branchId: string, days: number = 30): Pr
             }
             if (isCustomized) {
                 customizedOrders++;
-                customizedItems += items.filter((i: any) => i.hasModifiers).length;
+                customizedItems += items.filter(isItemCustomized).length;
             }
         });
 

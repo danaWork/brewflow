@@ -1,0 +1,32 @@
+[
+  {
+    "email": "newsamplemanager@brewflow.com",
+    "role": "BRANCH_MANAGER",
+    "companyId": "aefbd4fd-6be6-4f26-a6a3-773904a94d98",
+    "branchId": null
+  },
+  {
+    "email": "Sample1@brewflow.com",
+    "role": "BRANCH_MANAGER",
+    "companyId": "aefbd4fd-6be6-4f26-a6a3-773904a94d98",
+    "branchId": null
+  },
+  {
+    "email": "Sample@brewflow.com",
+    "role": "BRANCH_MANAGER",
+    "companyId": "aefbd4fd-6be6-4f26-a6a3-773904a94d98",
+    "branchId": "fb4348af-8de7-4ffb-b180-3479ec647794"
+  },
+  {
+    "email": "manager@brewflow.com",
+    "role": "BRANCH_MANAGER",
+    "companyId": "1e94b2d8-2723-4ab5-9c77-1b8adf1f1667",
+    "branchId": "a7b7f290-b31e-4ca5-8d11-8cb6dad7b0c3"
+  },
+  {
+    "email": "admin@brewflow.com",
+    "role": "SUPERADMIN",
+    "companyId": "1e94b2d8-2723-4ab5-9c77-1b8adf1f1667",
+    "branchId": null
+  }
+]

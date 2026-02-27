@@ -2,8 +2,7 @@
 
 import { db } from '@/lib/db';
 import { orders as ordersSchema, tables as tablesSchema, orderItems as orderItemsSchema } from '@/db/schema';
-import { eq, inArray, desc, and } from 'drizzle-orm';
-
+import { eq, inArray, desc, and, gte, lte, or, sql, ilike } from 'drizzle-orm';
 export interface OrderData {
     id: string;
     orderNumber: number;
@@ -15,6 +14,30 @@ export interface OrderData {
     paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA' | null;
 }
 
+function getStartOfOperationalDay(): Date {
+    const now = new Date();
+    // Manila is UTC+8
+    const MANILA_OFFSET = 8 * 60 * 60 * 1000;
+    const manilaTime = new Date(now.getTime() + MANILA_OFFSET);
+    
+    let year = manilaTime.getUTCFullYear();
+    let month = manilaTime.getUTCMonth();
+    let date = manilaTime.getUTCDate();
+    let hour = manilaTime.getUTCHours();
+    
+    // The operational day starts at 6:00 AM Manila time.
+    // If it's before 6:00 AM, we are still on the previous day's operational day.
+    if (hour < 6) {
+        date = date - 1;
+    }
+    
+    // Construct nominal Manila 6:00 AM in UTC
+    const startOfOpDayManila = new Date(Date.UTC(year, month, date, 6, 0, 0, 0));
+    
+    // Convert back to absolute UTC by subtracting the offset
+    return new Date(startOfOpDayManila.getTime() - MANILA_OFFSET);
+}
+
 export async function createOrderAction(data: {
     branchId: string;
     tableId: string;
@@ -24,9 +47,26 @@ export async function createOrderAction(data: {
     note?: string;
 }) {
     try {
+        const startOfOperationalDay = getStartOfOperationalDay();
+
+        // Calculate the next order number for this branch for today
+        const [latestOrder] = await db.select({ orderNumber: ordersSchema.orderNumber })
+            .from(ordersSchema)
+            .where(
+                and(
+                    eq(ordersSchema.branchId, data.branchId),
+                    gte(ordersSchema.createdAt, startOfOperationalDay)
+                )
+            )
+            .orderBy(desc(ordersSchema.orderNumber))
+            .limit(1);
+            
+        const nextOrderNumber = latestOrder && latestOrder.orderNumber ? latestOrder.orderNumber + 1 : 1;
+
         const [insertedOrder] = await db.insert(ordersSchema).values({
             branchId: data.branchId,
             tableId: data.tableId,
+            orderNumber: nextOrderNumber,
             status: 'PENDING',
             totalAmount: data.totalAmount.toString(),
             paymentMethod: data.paymentMethod,
@@ -75,24 +115,33 @@ export async function getActiveOrdersAction(branchId: string) {
             orderBy: [desc(ordersSchema.createdAt)]
         });
 
-        // Fallback: If note is missing due to stale schema in db.query, fetch it manually
-        const enrichedOrders = await Promise.all(activeOrders.map(async (o: any) => {
-            if (o.note === undefined) {
-                try {
-                    const [raw] = await db.select({ note: ordersSchema.note }).from(ordersSchema).where(eq(ordersSchema.id, o.id));
-                    return { ...o, note: raw?.note || null };
-                } catch (e) {
+        // Fallback: If note is missing due to stale schema in db.query, fetch it manually in a single batch
+        let enrichedOrders = activeOrders;
+        const missingNoteIds = activeOrders.filter((o: any) => o.note === undefined).map(o => o.id);
+        
+        if (missingNoteIds.length > 0) {
+            try {
+                const notesRaw = await db.select({ id: ordersSchema.id, note: ordersSchema.note })
+                    .from(ordersSchema)
+                    .where(inArray(ordersSchema.id, missingNoteIds));
+                
+                const notesMap = new Map(notesRaw.map(r => [r.id, r.note]));
+                enrichedOrders = activeOrders.map((o: any) => {
+                    if (o.note === undefined) {
+                        return { ...o, note: notesMap.get(o.id) || null };
+                    }
                     return o;
-                }
+                });
+            } catch (e) {
+                console.error('Failed to batch fetch notes:', e);
             }
-            return o;
-        }));
+        }
 
         console.log('Fetched active orders count:', enrichedOrders.length);
 
         return {
             success: true,
-            orders: enrichedOrders.map(o => ({
+            orders: enrichedOrders.map((o: any) => ({
                 id: o.id,
                 orderNumber: o.orderNumber,
                 status: o.status as 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED',
@@ -117,13 +166,72 @@ export async function getActiveOrdersAction(branchId: string) {
     }
 }
 
-export async function getPastOrdersAction(branchId: string, limit = 100) {
+export async function getPastOrdersAction(
+    branchId: string, 
+    options?: {
+        page?: number;
+        limit?: number;
+        dateFilter?: string; // YYYY-MM-DD
+        searchQuery?: string;
+    }
+) {
     try {
+        const page = options?.page || 1;
+        const limit = options?.limit || 20;
+        const offset = (page - 1) * limit;
+
+        const conditions = [
+            eq(ordersSchema.branchId, branchId),
+            inArray(ordersSchema.status, ['COMPLETED', 'CANCELLED'])
+        ];
+
+        if (options?.dateFilter) {
+            // Options date filter comes in like "2026-02-27"
+            // The user wanted standard calendar days based on Manila time
+            // So we construct a boundary from midnight Manila to midnight next day Manila
+            const [yearStr, monthStr, dayStr] = options.dateFilter.split('-');
+            if (yearStr && monthStr && dayStr) {
+                const year = parseInt(yearStr, 10);
+                const month = parseInt(monthStr, 10) - 1;
+                const day = parseInt(dayStr, 10);
+
+                const MANILA_OFFSET = 8 * 60 * 60 * 1000;
+                
+                const startOfDayManila = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+                const endOfDayManila = new Date(Date.UTC(year, month, day + 1, 0, 0, 0, 0));
+
+                const startOfDayUTC = new Date(startOfDayManila.getTime() - MANILA_OFFSET);
+                const endOfDayUTC = new Date(endOfDayManila.getTime() - MANILA_OFFSET);
+
+                conditions.push(gte(ordersSchema.createdAt, startOfDayUTC));
+                conditions.push(lte(ordersSchema.createdAt, endOfDayUTC));
+            }
+        }
+
+        if (options?.searchQuery) {
+            const query = `%${options.searchQuery}%`;
+            
+            // First, find all tables matching the search query
+            const matchingTables = await db
+                .select({ id: tablesSchema.id })
+                .from(tablesSchema)
+                .where(sql`${tablesSchema.tableNumber} ILIKE ${query}`);
+            
+            const tableIds = matchingTables.map(t => t.id);
+            
+            if (tableIds.length > 0) {
+                // @ts-expect-error Drizzle AST strictness
+                conditions.push(or(
+                    ilike(sql`${ordersSchema.orderNumber}::text`, query),
+                    inArray(ordersSchema.tableId, tableIds)
+                ));
+            } else {
+                conditions.push(ilike(sql`${ordersSchema.orderNumber}::text`, query));
+            }
+        }
+
         const pastOrders = await db.query.orders.findMany({
-            where: and(
-                eq(ordersSchema.branchId, branchId),
-                inArray(ordersSchema.status, ['COMPLETED', 'CANCELLED'])
-            ),
+            where: and(...conditions),
             with: {
                 table: true,
                 items: {
@@ -134,10 +242,17 @@ export async function getPastOrdersAction(branchId: string, limit = 100) {
             },
             orderBy: [desc(ordersSchema.createdAt)],
             limit,
+            offset,
         });
+
+        // Get total count
+        const [{ count }] = await db.select({ count: sql`count(*)`.mapWith(Number) })
+            .from(ordersSchema)
+            .where(and(...conditions));
 
         return {
             success: true,
+            totalCount: count,
             orders: pastOrders.map((o: any) => ({
                 id: o.id,
                 orderNumber: o.orderNumber,

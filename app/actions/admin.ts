@@ -210,13 +210,27 @@ import bcrypt from 'bcryptjs';
 
 export async function createManagerAccount(email: string, passwordPlain: string, companyId: string, branchId: string | null) {
     try {
+        let assignedBranchId = branchId;
+
+        // If no branchId is provided, get the first branch of the company
+        if (!assignedBranchId) {
+            const [companyBranch] = await db.select({ id: branches.id })
+                .from(branches)
+                .where(eq(branches.companyId, companyId))
+                .limit(1);
+            
+            if (companyBranch) {
+                assignedBranchId = companyBranch.id;
+            }
+        }
+
         const passwordHash = bcrypt.hashSync(passwordPlain, 10);
         await db.insert(users).values({
             email,
             passwordHash,
             role: 'BRANCH_MANAGER',
             companyId,
-            branchId,
+            branchId: assignedBranchId,
         });
         revalidatePath('/admin/dashboard');
         return { success: true };
@@ -339,7 +353,7 @@ export async function getUpsellAnalytics(): Promise<UpsellStats> {
                 'productId', ${orderItems.productId},
                 'quantity', ${orderItems.quantity},
                 'categoryType', ${categories.type},
-                'hasModifiers', ${orderItems.customizations} IS NOT NULL
+                'customizations', ${orderItems.customizations}
             ))`
         })
             .from(orders)
@@ -385,7 +399,19 @@ export async function getUpsellAnalytics(): Promise<UpsellStats> {
 
             const items = order.items as any[];
             const types = new Set(items.map((i: any) => i.categoryType));
-            const hasModifiers = items.some((i: any) => i.hasModifiers);
+            const isItemCustomized = (i: any) => {
+                if (!i.customizations) return false;
+                try {
+                    const parsed = typeof i.customizations === 'string' ? JSON.parse(i.customizations) : i.customizations;
+                    const keys = Object.keys(parsed).filter(k => {
+                        const lowerKey = k.toLowerCase();
+                        return lowerKey !== 'size' && lowerKey !== 'bundlelabel' && lowerKey !== 'tag';
+                    });
+                    return keys.length > 0;
+                } catch(e) { return false; }
+            };
+
+            const hasModifiers = items.some(isItemCustomized);
             const totalItems = items.reduce((sum: number, i: any) => sum + i.quantity, 0);
 
             // Logic definitions:
@@ -407,7 +433,7 @@ export async function getUpsellAnalytics(): Promise<UpsellStats> {
             }
             if (isCustomized) {
                 stats.customizedOrders++;
-                stats.customizedItems += items.filter((i: any) => i.hasModifiers).length;
+                stats.customizedItems += items.filter(isItemCustomized).length;
             }
 
             shopMap.set(shopId, stats);

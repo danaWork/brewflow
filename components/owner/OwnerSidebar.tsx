@@ -53,7 +53,7 @@ const navGroups: NavGroup[] = [
 
 const STORAGE_KEY = 'brewflow-sidebar-collapsed';
 
-export default function OwnerSidebar() {
+export default function OwnerSidebar({ shopName = 'Admin Panel' }: { shopName?: string }) {
   const pathname = usePathname();
 
   // Start from a server-safe default; hydrate from localStorage on mount
@@ -95,7 +95,7 @@ export default function OwnerSidebar() {
           `}
         >
           <h1 className="font-bold text-gray-900 text-base whitespace-nowrap">BrewFlow</h1>
-          <p className="text-xs text-gray-500 whitespace-nowrap">Admin Panel</p>
+          <p className="text-xs text-gray-500 whitespace-nowrap">{shopName}</p>
         </div>
       </div>
 

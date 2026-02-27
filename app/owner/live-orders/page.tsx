@@ -2,7 +2,7 @@
 
 import { useOrder, Order, OrderStatus } from '@/context/OrderContext';
 import { useState, useEffect, useCallback } from 'react';
-import { Clock, ChefHat, CheckCircle, X, CreditCard, Banknote, Smartphone, ClipboardList, Bell, History, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import { Clock, ChefHat, CheckCircle, X, CreditCard, Banknote, Smartphone, ClipboardList, Bell, History, ChevronDown, ChevronUp, RefreshCw, Search } from 'lucide-react';
 import { useOrderNotifications } from '@/hooks/useOrderNotifications';
 import LiveOrdersTabsMobile from './LiveOrdersTabsMobile';
 import { getPastOrdersAction } from '@/app/actions/orders';
@@ -209,6 +209,12 @@ function ActivityLogSection() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'ALL' | 'COMPLETED' | 'CANCELLED'>('ALL');
 
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [dateFilter, setDateFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const limit = 20;
+
   const loadOrders = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -220,13 +226,19 @@ function ActivityLogSection() {
         setLoading(false);
         return;
       }
-      const result = await getPastOrdersAction(branchId);
+      const result = await getPastOrdersAction(branchId, {
+        page,
+        limit,
+        dateFilter,
+        searchQuery
+      });
       if (result.success && result.orders) {
         setOrders(result.orders.map((o: any) => ({
           ...o,
           createdAt: new Date(o.createdAt),
           completedAt: o.completedAt ? new Date(o.completedAt) : null,
         })));
+        setTotalCount(result.totalCount || 0);
       } else {
         setError('Failed to load activity log.');
       }
@@ -234,7 +246,7 @@ function ActivityLogSection() {
       setError('Failed to load activity log.');
     }
     setLoading(false);
-  }, []);
+  }, [page, dateFilter, searchQuery]);
 
   useEffect(() => {
     loadOrders();
@@ -263,29 +275,60 @@ function ActivityLogSection() {
         </button>
       </div>
 
-      {/* Filter pills */}
-      <div className="flex gap-2 mb-4">
-        {(['ALL', 'COMPLETED', 'CANCELLED'] as const).map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 rounded-full text-xs font-bold transition border ${
-              filter === f
-                ? f === 'ALL'
-                  ? 'bg-gray-800 text-white border-gray-800'
-                  : f === 'COMPLETED'
-                    ? 'bg-emerald-600 text-white border-emerald-600'
-                    : 'bg-red-500 text-white border-red-500'
-                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-            }`}
-          >
-            {f === 'ALL'
-              ? `All (${orders.length})`
-              : f === 'COMPLETED'
-                ? `Completed (${orders.filter(o => o.status === 'COMPLETED').length})`
-                : `Cancelled (${orders.filter(o => o.status === 'CANCELLED').length})`}
-          </button>
-        ))}
+      {/* Filters and Search Row */}
+      <div className="flex flex-col md:flex-row gap-3 mb-4 items-start md:items-center">
+        {/* Filter pills */}
+        <div className="flex gap-2">
+          {(['ALL', 'COMPLETED', 'CANCELLED'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => { setFilter(f); setPage(1); }}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold transition border ${
+                filter === f
+                  ? f === 'ALL'
+                    ? 'bg-gray-800 text-white border-gray-800'
+                    : f === 'COMPLETED'
+                      ? 'bg-emerald-600 text-white border-emerald-600'
+                      : 'bg-red-500 text-white border-red-500'
+                  : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              {f === 'ALL'
+                ? `All (${filter === 'ALL' ? totalCount : '...'})`
+                : f === 'COMPLETED'
+                  ? `Completed`
+                  : `Cancelled`}
+            </button>
+          ))}
+        </div>
+
+        {/* Right side controls */}
+        <div className="flex flex-wrap gap-2 w-full md:w-auto md:ml-auto">
+          <div className="relative flex-1 md:flex-none">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+            <input 
+              type="text" 
+              placeholder="Search table or order number..." 
+              className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg w-full md:w-56 focus:outline-none focus:border-gray-400"
+              value={searchQuery}
+              onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setPage(1);
+              }}
+            />
+          </div>
+          <div className="relative">
+            <input 
+              type="date" 
+              className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 text-gray-600 w-full"
+              value={dateFilter}
+              onChange={(e) => {
+                  setDateFilter(e.target.value);
+                  setPage(1);
+              }}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Content */}
@@ -302,10 +345,49 @@ function ActivityLogSection() {
           No {filter === 'ALL' ? '' : filter.toLowerCase() + ' '}orders in activity log yet
         </div>
       ) : (
-        <div className="space-y-2">
-          {filtered.map(order => (
-            <ActivityLogEntry key={order.id} order={order} />
-          ))}
+        <div className="space-y-4">
+          <div className="space-y-2">
+            {filtered.map(order => (
+              <ActivityLogEntry key={order.id} order={order} />
+            ))}
+          </div>
+          
+          {/* Pagination */}
+          {Math.ceil(totalCount / limit) > 1 && (
+            <div className="flex justify-center items-center gap-1.5 pt-4">
+              <button 
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none transition-colors"
+              >
+                Prev
+              </button>
+              
+              <div className="flex items-center gap-1 overflow-x-auto custom-scrollbar px-1 py-1">
+                {Array.from({ length: Math.ceil(totalCount / limit) }, (_, i) => i + 1).map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p)}
+                    className={`min-w-[32px] h-8 rounded-lg text-sm font-bold flex items-center justify-center transition-colors ${
+                      page === p 
+                        ? 'bg-gray-800 text-white border-gray-800' 
+                        : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+              
+              <button 
+                onClick={() => setPage(p => Math.min(Math.ceil(totalCount / limit), p + 1))}
+                disabled={page === Math.ceil(totalCount / limit)}
+                className="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          )}
         </div>
       )}
     </section>

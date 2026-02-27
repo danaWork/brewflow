@@ -4,9 +4,10 @@ import { Coffee, Menu } from 'lucide-react';
 
 interface OwnerMobileHeaderProps {
   onMenuClick: () => void;
+  shopName?: string;
 }
 
-export default function OwnerMobileHeader({ onMenuClick }: OwnerMobileHeaderProps) {
+export default function OwnerMobileHeader({ onMenuClick, shopName = 'Admin Panel' }: OwnerMobileHeaderProps) {
   return (
     <header className="md:hidden sticky top-0 z-40 flex items-center justify-between px-4 py-4 bg-[#FDFBF9] border-b border-gray-200">
       <div className="flex items-center gap-3">
@@ -15,7 +16,7 @@ export default function OwnerMobileHeader({ onMenuClick }: OwnerMobileHeaderProp
         </div>
         <div>
           <h1 className="font-bold text-gray-900 text-lg">BrewFlow</h1>
-          <p className="text-xs text-gray-500">Admin Panel</p>
+          <p className="text-xs text-gray-500">{shopName}</p>
         </div>
       </div>
       <button

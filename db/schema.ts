@@ -108,7 +108,7 @@ export const orders = pgTable('orders', {
   id: uuid('id').defaultRandom().primaryKey(),
   branchId: uuid('branch_id').references(() => branches.id).notNull(),
   tableId: uuid('table_id').references(() => tables.id).notNull(),
-  orderNumber: integer('order_number').generatedAlwaysAsIdentity().notNull(), // Changed to generatedAlwaysAsIdentity for safer auto-increment
+  orderNumber: integer('order_number').notNull(), // Manually computed per shop instead of global identity
   status: orderStatusEnum('status').default('PENDING').notNull(),
   paymentMethod: paymentMethodEnum('payment_method'),
   note: text('note'),
