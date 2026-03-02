@@ -141,7 +141,6 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
     const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
     const [editingIngredients, setEditingIngredients] = useState<{ inventoryItemId: string; quantityRequired: number }[]>([]);
 
-    const [editingSizes, setEditingSizes] = useState<{name: string, price: number}[]>([]);
     const [defaultModifierOptions, setDefaultModifierOptions] = useState<Record<string, string>>({});
     const [waterProduct, setWaterProduct] = useState<Product | null>(null);
     const [isWaterModalOpen, setIsWaterModalOpen] = useState(false);
@@ -224,9 +223,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
         const flow = formData.get('flow') as string;
 
 
-        // Filter out empty sizes
-        const validSizes = editingSizes.filter(s => s.name.trim() !== '');
-        const config = JSON.stringify({ flow, sizes: validSizes });
+        const config = JSON.stringify({ flow });
 
         if (editingCategory?.id) {
             await updateCategory(editingCategory.id, name, type, config);
@@ -545,7 +542,6 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                         <button
                             onClick={() => {
                                 setEditingCategory(null);
-                                setEditingSizes([{ name: 'Small', price: 0 }, { name: 'Medium', price: 25 }, { name: 'Large', price: 50 }]); // Default
                                 setIsCategoryModalOpen(true);
                             }}
                             className="bg-[#D95D1E] text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-[#bf4f18] transition-all shadow-md hover:shadow-lg active:scale-95"
@@ -590,18 +586,6 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                         <button
                                             onClick={() => {
                                                 setEditingCategory(category);
-                                                // Load config
-                                                try {
-                                                    const conf = category.config ? JSON.parse(category.config) : {};
-                                                    if (conf.sizes && Array.isArray(conf.sizes)) {
-                                                        setEditingSizes(conf.sizes);
-                                                    } else {
-                                                        // Default existing categories to standard if not present
-                                                        setEditingSizes([{ name: 'small', price: 0 }, { name: 'medium', price: 25 }, { name: 'large', price: 50 }]); 
-                                                    }
-                                                } catch (e) {
-                                                    setEditingSizes([]);
-                                                }
                                                 setIsCategoryModalOpen(true);
                                             }}
                                             className="p-2.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
@@ -902,66 +886,7 @@ export default function MenuManagementClient({ initialCategories, modifierGroups
                                 </div>
                             </div>
                             
-                            {/* Size Configuration Section */}
-                            <div className="border-t border-gray-100 pt-4">
-                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Size Options</label>
-                                <p className="text-xs text-gray-500 mb-3">Define sizes and their price adjustment (added to base price).</p>
-                                <div className="bg-gray-50 rounded-2xl p-3 sm:p-4 space-y-3">
-                                    {editingSizes.length === 0 ? (
-                                        <p className="text-sm text-gray-400 italic text-center py-2">No sizes configured. Default size step will be skipped.</p>
-                                    ) : (
-                                        editingSizes.map((size, idx) => (
-                                            <div key={idx} className="bg-white rounded-xl border border-gray-200 p-3 sm:p-0 sm:border-0 sm:bg-transparent sm:flex sm:gap-2 sm:items-center animate-in slide-in-from-left-2 duration-100">
-                                                <input
-                                                    type="text"
-                                                    value={size.name}
-                                                    onChange={(e) => {
-                                                        const newSizes = [...editingSizes];
-                                                        newSizes[idx].name = e.target.value;
-                                                        setEditingSizes(newSizes);
-                                                    }}
-                                                    placeholder="Size name (e.g. Large)"
-                                                    className="w-full sm:flex-1 min-w-0 px-3 py-2.5 sm:py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium focus:ring-1 focus:ring-[#D95D1E] focus:border-[#D95D1E] mb-2 sm:mb-0"
-                                                />
-                                                <div className="flex gap-2 items-center">
-                                                    <div className="relative w-24 flex-shrink-0">
-                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">+₱</span>
-                                                        <input
-                                                            type="number"
-                                                            value={size.price}
-                                                            onChange={(e) => {
-                                                                const newSizes = [...editingSizes];
-                                                                newSizes[idx].price = parseFloat(e.target.value);
-                                                                setEditingSizes(newSizes);
-                                                            }}
-                                                            placeholder="0"
-                                                            className="w-full pl-9 pr-2 py-2.5 sm:py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold focus:ring-1 focus:ring-[#D95D1E] focus:border-[#D95D1E]"
-                                                        />
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            const newSizes = editingSizes.filter((_, i) => i !== idx);
-                                                            setEditingSizes(newSizes);
-                                                        }}
-                                                        className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                                        title="Remove size"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
-                                    <button
-                                        type="button"
-                                        onClick={() => setEditingSizes([...editingSizes, { name: '', price: 0 }])}
-                                        className="w-full sm:w-auto text-sm font-bold text-[#D95D1E] hover:bg-orange-50 py-2.5 sm:py-2 px-3 rounded-xl border border-orange-100 hover:border-[#D95D1E]/30 transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        + Add Size
-                                    </button>
-                                </div>
-                            </div>
+
                             <div className="flex justify-between gap-3 pt-4 sticky bottom-0 bg-white border-t border-gray-50 mt-auto">
                                 <button
                                     type="button"

@@ -100,12 +100,11 @@ export default function ProductDrawerContent({
   const config = category?.config ? JSON.parse(category.config) : {};
   const flow = config.flow || 'drink_full';
 
-  // Dynamic Sizes Logic
-  const definedSizes = config.sizes;
-  const defaultSizes = [{name: 'small', price: 0}, {name: 'medium', price: 25}, {name: 'large', price: 50}];
-  // Use defined sizes if array exists (even if empty, meaning NO sizes), else defaults
-  const activeSizes = (definedSizes !== undefined && Array.isArray(definedSizes)) ? definedSizes : defaultSizes;
-  const hasSizes = activeSizes.length > 0;
+  const sortedModifiers = [...(product.modifiers || [])].sort((a: any, b: any) => {
+    if (a.name?.toLowerCase() === 'size') return -1;
+    if (b.name?.toLowerCase() === 'size') return 1;
+    return 0;
+  });
 
   // Identify if item is a snack
   const isSnack =
@@ -114,8 +113,9 @@ export default function ProductDrawerContent({
     category?.name?.toLowerCase() === "snacks";
 
   // Check if modifiers/toppings exist
-  const hasModifiers = (product.modifiers || []).some((g: any) => g.displayMode !== "cards");
-  const hasToppings = (product.modifiers || []).some((g: any) => g.displayMode === "cards");
+  const hasSize = sortedModifiers.some((g: any) => g.name?.toLowerCase() === 'size');
+  const hasModifiers = sortedModifiers.some((g: any) => g.displayMode !== "cards" && g.name?.toLowerCase() !== 'size');
+  const hasToppings = sortedModifiers.some((g: any) => g.displayMode === "cards");
 
   // Set initial step based on flow
   const initialStep = flow === "simple_choice" || flow === "fixed_meal"
@@ -125,12 +125,10 @@ export default function ProductDrawerContent({
   const [step, setStep] = useState<Step>(initialStep);
   // --- STATE ---
   const [quantity, setQuantity] = useState(1);
-  const defaultSizeName = activeSizes.find((s: any) => s.name.toLowerCase() === 'medium')?.name || activeSizes[0]?.name || '';
-  const [size, setSize] = useState(defaultSizeName);
   
   // Initialize selectedOptions with default modifier options
   const initialSelectedOptions: Record<string, string | string[]> = {};
-  (product.modifiers || []).forEach((group: any) => {
+  sortedModifiers.forEach((group: any) => {
     if (group.defaultModifierOptionId) {
       // Check if it's a multi-select (cards) or single-select
       if (group.displayMode === 'cards') {
@@ -155,10 +153,8 @@ export default function ProductDrawerContent({
 
   // Pricing Logic
   const basePrice = product.price;
-  const sizeObj = activeSizes.find((s: any) => s.name === size);
-  const sizePrice = sizeObj ? parseFloat(sizeObj.price || 0) : 0;
 
-  const modifiersPrice = (product.modifiers || []).reduce(
+  const modifiersPrice = sortedModifiers.reduce(
     (total: number, group: any) => {
       const selection = selectedOptions[group.id];
       if (!selection) return total;
@@ -181,7 +177,7 @@ export default function ProductDrawerContent({
     0,
   );
 
-  const currentPrice = basePrice + sizePrice + modifiersPrice;
+  const currentPrice = basePrice + modifiersPrice;
 
   const handleOptionSelect = (
     groupId: string,
@@ -212,11 +208,8 @@ export default function ProductDrawerContent({
   const handleAddToCart = (overrideExtras?: any[], overrideLabel?: string) => {
     // Construct readable options object
     const readableOptions: Record<string, any> = {};
-    if (hasSizes) {
-      readableOptions.Size = size;
-    }
 
-    (product.modifiers || []).forEach((group: any) => {
+    sortedModifiers.forEach((group: any) => {
       const selection = selectedOptions[group.id];
       if (selection) {
         if (Array.isArray(selection)) {
@@ -326,7 +319,7 @@ export default function ProductDrawerContent({
   const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
 
   const handleQuantityContinue = () => {
-    if (hasSizes) setStep("size");
+    if (hasSize) setStep("size");
     else if (hasModifiers) setStep("customization");
     else if (hasToppings) setStep("toppings");
     else if (bundlePromo) setStep("upsell");
@@ -361,25 +354,25 @@ export default function ProductDrawerContent({
                 setStep("quantity");
               }
               if (step === "customization") {
-                if (hasSizes) setStep("size");
+                if (hasSize) setStep("size");
                 else setStep("quantity");
               }
               if (step === "toppings") {
                 if (hasModifiers) setStep("customization");
-                else if (hasSizes) setStep("size");
+                else if (hasSize) setStep("size");
                 else setStep("quantity");
               }
               if (step === "upsell") {
                 if (hasToppings) setStep("toppings");
                 else if (hasModifiers) setStep("customization");
-                else if (hasSizes) setStep("size");
+                else if (hasSize) setStep("size");
                 else setStep("quantity");
               }
               if (step === "frequentlyBought") {
                 if (bundlePromo) setStep("upsell");
                 else if (hasToppings) setStep("toppings");
                 else if (hasModifiers) setStep("customization");
-                else if (hasSizes) setStep("size");
+                else if (hasSize) setStep("size");
                 else setStep("quantity");
               }
             }}
@@ -425,47 +418,7 @@ export default function ProductDrawerContent({
 
   // --- RENDERING ---
 
-  if (step === "size") {
-    return (
-      <div className="flex flex-col h-full bg-white">
-        <HeaderImage />
-        <div className="p-6 flex-1 overflow-y-auto pt-2">
-          <h3 className="font-semibold text-gray-900 mb-4 text-lg">
-            Choose your size
-          </h3>
-          <div className="space-y-3">
-            {activeSizes.map((s: any) => (
-              <button
-                key={s.name}
-                onClick={() => setSize(s.name)}
-                className={`w-full flex justify-between items-center p-4 rounded-xl border-2 transition-all ${size === s.name ? "bg-[#D95D1E] text-white border-black" : "border-transparent bg-gray-50 text-gray-600"}`}
-              >
-                <span className="capitalize font-medium text-lg">{s.name}</span>
-                <span className="text-sm font-medium">
-                  {parseFloat(s.price) === 0
-                    ? "Base price"
-                    : `+₱${parseFloat(s.price).toFixed(2)}`}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-        <StickyFooter onClick={() => {
-          if (hasModifiers) {
-            setStep("customization");
-          } else if (hasToppings) {
-            setStep("toppings");
-          } else if (bundlePromo) {
-            setStep("upsell");
-          } else if (crossSellPromo && crossSellPromo.items.length > 0) {
-            setStep("frequentlyBought");
-          } else {
-            handleAddToCart();
-          }
-        }} />
-      </div>
-    );
-  }
+
 
   if (step === "quantity") {
     // Snack Quantity logic...
@@ -495,6 +448,138 @@ export default function ProductDrawerContent({
           </div>
         </div>
         <StickyFooter onClick={handleQuantityContinue} />
+      </div>
+    );
+  }
+
+  // --- STEP: SIZE ---
+  if (step === "size") {
+    // Skip this step if no size modifiers exist
+    if (!hasSize) {
+      if (hasModifiers) {
+        setStep("customization");
+      } else if (hasToppings) {
+        setStep("toppings");
+      } else if (bundlePromo) {
+        setStep("upsell");
+      } else if (crossSellPromo && crossSellPromo.items.length > 0) {
+        setStep("frequentlyBought");
+      } else {
+        handleAddToCart();
+      }
+      return null;
+    }
+
+    const sizeGroup = sortedModifiers.find((g: any) => g.name?.toLowerCase() === 'size');
+
+    return (
+      <div className="flex flex-col h-full bg-white">
+        <HeaderImage compact />
+        <div className="p-6 flex-1 overflow-y-auto pb-32">
+          <div className="flex items-center gap-2 mb-6">
+            <svg
+              className="w-5 h-5 text-gray-900"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
+            </svg>
+            <span className="text-black font-bold text-sm">Choose Size</span>
+          </div>
+
+          <div className="mb-8 last:mb-0">
+            <h3 className="font-semibold text-gray-900 mb-4">
+              {sizeGroup.name}
+            </h3>
+
+            {/* BUTTONS MODE */}
+            {sizeGroup.displayMode === "buttons" && (
+              <div className="flex flex-wrap gap-2">
+                {sizeGroup.options.map((opt: any) => {
+                  const isSelected = selectedOptions[sizeGroup.id] === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      onClick={() => handleOptionSelect(sizeGroup.id, opt.id, "buttons")}
+                      className={`px-4 py-3 rounded-xl text-sm font-bold border transition-colors flex-1 min-w-[80px] ${isSelected ? "bg-[#D95D1E] text-white border-black" : "bg-white text-gray-600 border-gray-100 hover:bg-gray-50"}`}
+                    >
+                      {opt.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* LIST MODE ALREADY OR DEFAULT */}
+            {(sizeGroup.displayMode === "list" || !sizeGroup.displayMode || sizeGroup.displayMode === "cards") && (
+              <div className="space-y-3">
+                {sizeGroup.options.map((opt: any) => {
+                  const isSelected = selectedOptions[sizeGroup.id] === opt.id;
+                  const infoKey = opt.name.toLowerCase();
+                  const hasInfo = MODIFIER_INFO[infoKey];
+
+                  return (
+                    <div
+                      key={opt.id}
+                      className={`w-full flex items-center gap-2 px-2 py-2 rounded-xl border transition-all ${isSelected ? "bg-[#D95D1E] border-black" : "border-gray-100 hover:border-gray-200"}`}
+                    >
+                      {hasInfo && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleInfoClick(infoKey);
+                          }}
+                          className="p-2 shrink-0 relative z-20 opacity-80 hover:opacity-100 transition-opacity"
+                        >
+                          <img
+                            src="/icons/info-circle-svgrepo-com.svg"
+                            alt="Info"
+                            className={`w-5 h-5 block ${isSelected ? "brightness-0 invert" : ""}`}
+                          />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          setSelectedOptions({
+                            ...selectedOptions,
+                            [sizeGroup.id]: opt.id,
+                          });
+                        }}
+                        className="flex-1 flex justify-between items-center py-1 pr-2 cursor-pointer"
+                      >
+                        <span className={`font-medium ${isSelected ? "text-white" : "text-gray-600"}`}>
+                          {opt.name}
+                        </span>
+                        {parseFloat(opt.price || "0") > 0 && (
+                          <span className={`text-sm font-medium ${isSelected ? "text-white" : "text-gray-500"}`}>
+                            +₱{opt.price}
+                          </span>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+        <StickyFooter onClick={() => {
+          if (hasModifiers) {
+            setStep("customization");
+          } else if (hasToppings) {
+            setStep("toppings");
+          } else if (bundlePromo) {
+            setStep("upsell");
+          } else if (crossSellPromo && crossSellPromo.items.length > 0) {
+            setStep("frequentlyBought");
+          } else {
+            handleAddToCart();
+          }
+        }} />
       </div>
     );
   }
@@ -531,13 +616,13 @@ export default function ProductDrawerContent({
             <span className="text-black font-bold text-sm">Make it yours</span>
           </div>
 
-          {(product.modifiers || []).filter((g: any) => g.displayMode !== "cards").length === 0 ? (
+          {sortedModifiers.filter((g: any) => g.displayMode !== "cards" && g.name?.toLowerCase() !== 'size').length === 0 ? (
             <div className="text-center py-10 text-gray-400 text-sm">
               No options available for this item.
             </div>
           ) : (
-            (product.modifiers || [])
-              .filter((g: any) => g.displayMode !== "cards")
+            sortedModifiers
+              .filter((g: any) => g.displayMode !== "cards" && g.name?.toLowerCase() !== 'size')
               .map((group: any) => (
                 <div key={group.id} className="mb-8 last:mb-0">
                   <h3 className="font-semibold text-gray-900 mb-4">
@@ -674,7 +759,7 @@ export default function ProductDrawerContent({
       return null;
     }
 
-    const toppingsGroups = (product.modifiers || []).filter(
+    const toppingsGroups = sortedModifiers.filter(
       (g: any) => g.displayMode === "cards",
     );
 
