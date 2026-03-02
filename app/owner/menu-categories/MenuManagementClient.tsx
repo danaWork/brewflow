@@ -211,6 +211,7 @@ export default function MenuManagementClient({
   const [defaultModifierOptions, setDefaultModifierOptions] = useState<
     Record<string, string>
   >({});
+  const [selectedModifierGroups, setSelectedModifierGroups] = useState<string[]>([]);
   const [waterProduct, setWaterProduct] = useState<Product | null>(null);
   const [isWaterModalOpen, setIsWaterModalOpen] = useState(false);
   const [waterPrice, setWaterPrice] = useState("1.50");
@@ -285,14 +286,18 @@ export default function MenuManagementClient({
     // Initialize default modifier options from product
     if (product && product.modifierLinks) {
       const defaults: Record<string, string> = {};
+      const selected: string[] = [];
       product.modifierLinks.forEach((link) => {
+        selected.push(link.modifierGroupId);
         if (link.defaultModifierOptionId) {
           defaults[link.modifierGroupId] = link.defaultModifierOptionId;
         }
       });
       setDefaultModifierOptions(defaults);
+      setSelectedModifierGroups(selected);
     } else {
       setDefaultModifierOptions({});
+      setSelectedModifierGroups([]);
     }
     setIsProductModalOpen(true);
   };
@@ -1290,9 +1295,7 @@ export default function MenuManagementClient({
                     </p>
                   ) : (
                     modifierGroups.map((group) => {
-                      const isChecked = editingProduct?.modifierLinks?.some(
-                        (link) => link.modifierGroupId === group.id,
-                      );
+                      const isChecked = selectedModifierGroups.includes(group.id);
                       const currentDefault =
                         defaultModifierOptions[group.id] || "";
                       return (
@@ -1305,14 +1308,17 @@ export default function MenuManagementClient({
                               type="checkbox"
                               name="modifierGroups"
                               value={group.id}
-                              defaultChecked={isChecked}
+                              checked={isChecked}
                               onChange={(e) => {
                                 if (!e.target.checked) {
+                                  setSelectedModifierGroups(prev => prev.filter(id => id !== group.id));
                                   const newDefaults = {
                                     ...defaultModifierOptions,
                                   };
                                   delete newDefaults[group.id];
                                   setDefaultModifierOptions(newDefaults);
+                                } else {
+                                  setSelectedModifierGroups(prev => [...prev, group.id]);
                                 }
                               }}
                               className="w-5 h-5 rounded-lg border-gray-300 text-[#D95D1E] focus:ring-[#D95D1E]"
