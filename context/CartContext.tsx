@@ -9,6 +9,7 @@ export type CartItem = {
   price: number;
   quantity: number;
   image?: string;
+  customName?: string | null; // For POS ad-hoc items
   options?: Record<string, any>; // For size, milk, sweetness etc.
   extras?: CartItem[]; // Bundled items
   bundleLabel?: string; // e.g. "Perfect Pair Bundle"

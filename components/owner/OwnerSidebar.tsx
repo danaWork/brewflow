@@ -14,7 +14,8 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  Calculator
 } from 'lucide-react';
 import { getPromotionsStockStatusAction } from '@/app/actions/promotions';
 import { getInventoryStockStatusAction } from '@/app/actions/inventory';
@@ -31,6 +32,12 @@ type NavGroup = {
 };
 
 const navGroups: NavGroup[] = [
+  {
+    title: 'Point of Sale',
+    items: [
+      { label: 'POS Terminal', href: '/owner/pos', icon: Calculator },
+    ],
+  },
   {
     title: 'Operations',
     items: [

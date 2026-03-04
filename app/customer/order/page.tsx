@@ -3,13 +3,15 @@
 import { useOrder, OrderStatus } from '@/context/OrderContext';
 import { ArrowLeft, Wallet, ChefHat, Bell, CheckCircle2, XCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useTable } from '@/context/TableContext';
+import { toast } from 'sonner';
 
 export default function OrderStatusPage() {
-    const { userOrders } = useOrder();
+    const { userOrders, orderUpdatedOrderId, clearOrderUpdatedNotification } = useOrder();
     const { tableId } = useTable();
     const router = useRouter();
+    const notifiedRef = useRef<string | null>(null);
 
     const currentOrder = userOrders.length > 0 ? userOrders[0] : null;
 
@@ -18,6 +20,14 @@ export default function OrderStatusPage() {
             router.push(`/customer/table/${tableId || '1'}`);
         }
     }, [currentOrder, router, tableId]);
+
+    useEffect(() => {
+        if (currentOrder && orderUpdatedOrderId === currentOrder.id && notifiedRef.current !== orderUpdatedOrderId) {
+            notifiedRef.current = orderUpdatedOrderId;
+            toast.info('Your order was updated by the staff. The details below are now up to date.');
+            clearOrderUpdatedNotification();
+        }
+    }, [currentOrder, orderUpdatedOrderId, clearOrderUpdatedNotification]);
 
     if (!currentOrder) return null;
 
@@ -179,14 +189,14 @@ export default function OrderStatusPage() {
                                                 <span className="font-bold text-gray-900">{item.name}</span>
                                             </div>
 
-                                            <div className="text-xs text-gray-400 font-medium mt-0.5">
-                                                {[
-                                                    item.options?.size && `${item.options.size},`,
-                                                    item.options?.milk && `${item.options.milk} Milk,`,
-                                                    item.options?.sweetness && `${item.options.sweetness},`,
-                                                    item.options?.ice && `${item.options.ice} Ice`
-                                                ].filter(Boolean).join(' ')}
-                                            </div>
+                                            {item.options && Object.keys(item.options).length > 0 && (
+                                                <div className="text-xs text-gray-400 font-medium mt-0.5">
+                                                    {Object.entries(item.options)
+                                                        .filter(([k]) => k !== 'tag' && k !== 'bundleLabel')
+                                                        .map(([key, value]) => `${key}: ${String(value)}`)
+                                                        .join(' · ')}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                     <span className="text-gray-900 font-bold">₱{(item.price * item.quantity).toFixed(2)}</span>

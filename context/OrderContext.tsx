@@ -8,6 +8,8 @@ import {
   getActiveOrdersAction,
   updateOrderStatusAction,
   getOrdersStatusAction,
+  updateOrderPaymentStatusAction,
+  updatePOSOrderAction,
 } from '@/app/actions/orders';
 import { getSessionAction } from '@/app/actions/auth';
 
@@ -23,17 +25,23 @@ export interface Order {
   tableId?: string;
   timestamp: Date;
   paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA';
+  paymentStatus: 'UNPAID' | 'PAID';
   note?: string;
 }
 
 interface OrderContextType {
   userOrders: Order[];
   activeOrders: Order[];
-  createOrder: (items: CartItem[], total: number, paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA', note?: string) => Promise<{ id: string; orderNumber: number } | null>;
+  createOrder: (items: CartItem[], total: number, paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA', note?: string) => Promise<{ id: string; orderNumber: number } | { success: false; error: string } | null>;
+  updateOrder: (orderId: string, items: CartItem[], total: number, paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA', paymentStatus: 'UNPAID' | 'PAID', status: OrderStatus, note?: string) => Promise<{ success: boolean }>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
+  updateOrderPaymentStatus: (orderId: string, status: 'UNPAID' | 'PAID') => Promise<void>;
   dismissOrder: (orderId: string) => void;
   refreshActiveOrders: () => Promise<void>;
   isLoading: boolean;
+  /** Set when a user order was updated by staff (e.g. from POS); clear after showing notification */
+  orderUpdatedOrderId: string | null;
+  clearOrderUpdatedNotification: () => void;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
@@ -55,6 +63,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   });
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [orderUpdatedOrderId, setOrderUpdatedOrderId] = useState<string | null>(null);
   const userOrdersRef = useRef<Order[]>([]);
   const sessionRef = useRef<{ branchId: string | null; timestamp: number } | null>(null);
   const isRefreshingRef = useRef(false);
@@ -123,34 +132,69 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         tableId: o.tableId || undefined,
         timestamp: o.createdAt ? new Date(o.createdAt) : new Date(),
         paymentMethod: (o.paymentMethod as any) || 'CASH',
+        paymentStatus: o.paymentStatus || 'UNPAID',
         note: o.note
       }));
 
       setActiveOrders(orders);
       setIsLoading(false);
 
-      // Individually sync userOrders statuses, especially for those that might have been COMPLETED
-      // Use ref to avoid dependency on userOrders which would cause infinite loop
+      // Sync userOrders with full server data so table side sees manager updates (items, total, status)
       const currentUserOrders = userOrdersRef.current;
-      if (currentUserOrders.length > 0) {
-        const userOrderIds = currentUserOrders.map(o => o.id);
-        const statusResult = await getOrdersStatusAction(userOrderIds);
-
-        if (statusResult.success && statusResult.orders) {
-          setUserOrders(prev => {
-            const updated = prev.map(userOrder => {
-              const match = statusResult.orders?.find(so => so.id === userOrder.id);
-              if (match && match.status !== userOrder.status) {
-                return { ...userOrder, status: match.status as OrderStatus };
-              }
-              return userOrder;
-            });
-            // Auto dismiss if it's already completed or cancelled from a previous check
-            // We keep them if they JUST turned completed, but maybe user wants them gone on refresh?
-            // Actually, if we refresh and they are already completed/cancelled, just filter them when setting userOrders
-            return updated;
-          });
+      let orderUpdatedNotifyId: string | null = null;
+      if (currentUserOrders.length > 0 && orders.length > 0) {
+        const ordersById = new Map(orders.map((o: Order) => [o.id, o]));
+        const updatedUserOrders = currentUserOrders.map(userOrder => {
+          const serverOrder = ordersById.get(userOrder.id) as Order | undefined;
+          if (!serverOrder) return userOrder;
+          const serverItems: CartItem[] = (serverOrder.items || []).map((item: any, idx: number) => ({
+            id: item.id ?? `${item.productId ?? 'custom'}-${idx}`,
+            productId: item.productId ?? '',
+            name: item.name ?? 'Unknown',
+            price: typeof item.price === 'number' ? item.price : (item.price ?? 0),
+            quantity: item.quantity ?? 1,
+            options: item.options,
+            bundleLabel: item.options?.bundleLabel,
+            tag: item.options?.tag,
+          }));
+          const itemsChanged = JSON.stringify(userOrder.items) !== JSON.stringify(serverItems);
+          const totalChanged = userOrder.total !== serverOrder.total;
+          if (itemsChanged || totalChanged) {
+            orderUpdatedNotifyId = serverOrder.id;
+          }
+          return {
+            id: serverOrder.id,
+            orderNumber: serverOrder.orderNumber,
+            status: serverOrder.status,
+            items: serverItems,
+            total: serverOrder.total,
+            table: serverOrder.table,
+            tableId: serverOrder.tableId,
+            timestamp: serverOrder.timestamp,
+            paymentMethod: serverOrder.paymentMethod,
+            paymentStatus: serverOrder.paymentStatus,
+            note: serverOrder.note,
+          };
+        });
+        setUserOrders(updatedUserOrders);
+        if (orderUpdatedNotifyId) {
+          setOrderUpdatedOrderId(orderUpdatedNotifyId);
         }
+      }
+
+      // Sync status for user orders that might be completed/cancelled (no longer in active list)
+      const userOrderIds = currentUserOrders.map(o => o.id);
+      const statusResult = await getOrdersStatusAction(userOrderIds);
+      if (statusResult.success && statusResult.orders) {
+        setUserOrders(prev =>
+          prev.map(userOrder => {
+            const match = statusResult.orders?.find((so: { id: string; status: string }) => so.id === userOrder.id);
+            if (match && match.status !== userOrder.status) {
+              return { ...userOrder, status: match.status as OrderStatus };
+            }
+            return userOrder;
+          })
+        );
       }
     } finally {
       isRefreshingRef.current = false;
@@ -235,8 +279,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (!result.success || !result.order) {
-        console.error('Error creating order:', result.error);
-        return null;
+        const message = (result as { error?: string }).error || 'Failed to create order';
+        return { success: false as const, error: message };
       }
 
       const orderData = result.order;
@@ -259,6 +303,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         tableId: currentTableId,
         timestamp: new Date(),
         paymentMethod,
+        paymentStatus: 'UNPAID',
         note: note
       };
 
@@ -268,7 +313,62 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       return { id: orderData.id, orderNumber: orderData.orderNumber };
     } catch (e) {
       console.error('Failed to create order:', e);
-      return null;
+      return { success: false as const, error: 'Something went wrong. Please try again.' };
+    }
+  };
+
+  const updateOrder = async (orderId: string, items: CartItem[], total: number, paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA', paymentStatus: 'UNPAID' | 'PAID', status: OrderStatus, note?: string) => {
+    try {
+      const itemsToPrepare: any[] = [];
+      items.forEach(item => {
+        itemsToPrepare.push({
+          productId: item.productId,
+          customName: item.customName,
+          quantity: item.quantity,
+          priceAtTime: item.price,
+          customizations: {
+             ...item.options,
+             bundleLabel: item.bundleLabel,
+             tag: item.tag
+          }
+        });
+        if (item.extras && item.extras.length > 0) {
+          item.extras.forEach(extra => {
+            const extraQty = extra.quantity || 1;
+            itemsToPrepare.push({
+              productId: extra.productId,
+              customName: null,
+              quantity: extraQty,
+              priceAtTime: extra.price,
+              customizations: {
+                ...extra.options,
+                tag: extra.tag || 'EXTRA'
+              }
+            });
+          });
+        }
+      });
+
+      const result = await updatePOSOrderAction({
+        orderId,
+        items: itemsToPrepare,
+        subtotalAmount: total, // Passing total mapped for now as discount functionality handles logic via POS component
+        discountAmount: 0,
+        discountName: null,
+        totalAmount: total,
+        paymentMethod,
+        paymentStatus,
+        status,
+        note,
+      });
+
+      if (result.success) {
+        refreshActiveOrders();
+      }
+      return result;
+    } catch (e) {
+      console.error('Failed to update order:', e);
+      return { success: false };
     }
   };
 
@@ -286,8 +386,26 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateOrderPaymentStatus = async (orderId: string, paymentStatus: 'UNPAID' | 'PAID') => {
+    setActiveOrders(prev => prev.map(o =>
+      o.id === orderId ? { ...o, paymentStatus } : o
+    ));
+    setUserOrders(prev => prev.map(o =>
+      o.id === orderId ? { ...o, paymentStatus } : o
+    ));
+
+    const result = await updateOrderPaymentStatusAction(orderId, paymentStatus);
+    if (!result.success) {
+      console.error('Error updating payment status:', result.error);
+    }
+  };
+
   const dismissOrder = (orderId: string) => {
     setUserOrders(prev => prev.filter(o => o.id !== orderId));
+  };
+
+  const clearOrderUpdatedNotification = () => {
+    setOrderUpdatedOrderId(null);
   };
 
   return (
@@ -295,10 +413,14 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       userOrders,
       activeOrders,
       createOrder,
+      updateOrder,
       updateOrderStatus,
+      updateOrderPaymentStatus,
       dismissOrder,
       refreshActiveOrders,
-      isLoading
+      isLoading,
+      orderUpdatedOrderId,
+      clearOrderUpdatedNotification,
     }}>
       {children}
     </OrderContext.Provider>

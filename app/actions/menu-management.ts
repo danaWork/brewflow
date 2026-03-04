@@ -25,6 +25,32 @@ export async function getMenuCategories() {
     return result;
 }
 
+/** POS: categories with products including full modifier groups and options for add-item modal */
+export async function getMenuCategoriesForPOS() {
+    const session = await getUserSession();
+    if (!session?.companyId) return [];
+
+    const result = await db.query.categories.findMany({
+        where: eq(categories.companyId, session.companyId),
+        with: {
+            products: {
+                with: {
+                    modifierLinks: {
+                        with: {
+                            modifierGroup: {
+                                with: { options: true }
+                            }
+                        }
+                    },
+                    productIngredients: true
+                }
+            },
+        },
+    });
+
+    return result;
+}
+
 export async function createCategory(name: string, type: string = 'drink', config?: string) {
     const session = await getUserSession();
     if (!session?.companyId) throw new Error('Unauthorized');
