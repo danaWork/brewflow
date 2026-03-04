@@ -1,5 +1,6 @@
 'use client';
 
+import { Toaster } from 'sonner';
 import { OrderProvider } from '@/context/OrderContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { CartProvider } from '@/context/CartContext';
@@ -12,6 +13,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <CartProvider>
           <OrderProvider>
             {children}
+            <Toaster position="top-center" richColors closeButton />
           </OrderProvider>
         </CartProvider>
       </TableProvider>

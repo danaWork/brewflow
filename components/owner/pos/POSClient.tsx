@@ -1,9 +1,13 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { ShoppingCart, Plus, Minus, X, CreditCard, Banknote, HelpCircle, UtensilsCrossed, Tag, Info, Package, Search, Bell, CheckCircle } from 'lucide-react';
+import Image from 'next/image';
+import { toast } from 'sonner';
+import { ShoppingCart, Plus, Minus, X, CreditCard, Banknote, HelpCircle, UtensilsCrossed, Tag, Package, Search, Bell, CheckCircle, Pencil } from 'lucide-react';
 import { createPOSOrderAction } from '@/app/actions/orders';
 import { useOrder } from '@/context/OrderContext';
+import type { CartItem as OrderCartItem } from '@/context/CartContext';
+import { ProductAddModal } from './ProductAddModal';
 
 export type Product = {
     id: string;
@@ -11,8 +15,10 @@ export type Product = {
     name: string;
     basePrice: string | number;
     imageUrl: string | null;
+    image?: string | null;
     isHidden: boolean;
     isFeatured: boolean;
+    modifiers?: { id: string; name: string; displayMode: string; defaultModifierOptionId?: string | null; options: { id: string; name: string; price: number; image?: string | null }[] }[];
 };
 
 export type Category = {
@@ -22,6 +28,7 @@ export type Category = {
     products: Product[];
 };
 
+type CartItemExtra = { productId: string; name: string; price: number; quantity: number; options?: Record<string, any>; tag?: string };
 type CartItem = {
     uniqueId: string;
     productId: string | null;
@@ -29,6 +36,10 @@ type CartItem = {
     name: string;
     price: number;
     quantity: number;
+    options?: Record<string, any>;
+    extras?: CartItemExtra[];
+    bundleLabel?: string;
+    tag?: string;
 };
 
 const DISCOUNTS = [
@@ -39,7 +50,29 @@ const DISCOUNTS = [
     { name: 'Employee', type: 'PERCENT', value: 50 },
 ];
 
-export function POSClient({ categories, branchId }: { categories: Category[], branchId: string }) {
+type PromotionForPOS = {
+  id: string;
+  name: string;
+  type: string;
+  triggerType: string;
+  triggerValue: string;
+  discountType: string;
+  discountValue: string | number;
+  isActive?: boolean;
+  items?: { productId: string }[];
+};
+
+export function POSClient({
+  categories,
+  branchId,
+  promotions = [],
+  productIdToCategoryType = {},
+}: {
+  categories: Category[];
+  branchId: string;
+  promotions?: PromotionForPOS[];
+  productIdToCategoryType?: Record<string, string>;
+}) {
     const { activeOrders, updateOrderStatus, updateOrderPaymentStatus, updateOrder } = useOrder();
     const [cart, setCart] = useState<CartItem[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -54,6 +87,10 @@ export function POSClient({ categories, branchId }: { categories: Category[], br
     const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
     const [adHocName, setAdHocName] = useState('');
     const [adHocPrice, setAdHocPrice] = useState('');
+    const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
+    const [productModalProduct, setProductModalProduct] = useState<Product | null>(null);
+    const [editingCartItemUniqueId, setEditingCartItemUniqueId] = useState<string | null>(null);
+    const [cancelOrderModal, setCancelOrderModal] = useState<{ id: string; orderNumber: number; table: string } | null>(null);
 
     const pendingOrders = activeOrders.filter(o => o.status === 'PENDING');
     const unpaidOrders = activeOrders.filter(o => o.paymentStatus === 'UNPAID' && o.status !== 'PENDING' && o.status !== 'COMPLETED' && o.status !== 'CANCELLED');
@@ -65,21 +102,83 @@ export function POSClient({ categories, branchId }: { categories: Category[], br
         }).filter(cat => cat.products.length > 0);
     }, [categories, searchQuery]);
 
-    const addToCart = (product: Product) => {
+    const addToCart = (product: Product, payload?: { price: number; quantity: number; options?: Record<string, unknown> }) => {
+        const price = payload ? payload.price : parseFloat(product.basePrice.toString());
+        const quantity = payload?.quantity ?? 1;
+        const options = payload?.options;
+
         setCart(prev => {
-            const existing = prev.find(item => item.productId === product.id);
+            const matchKey = options ? JSON.stringify(options) : null;
+            const existing = prev.find(
+                item => item.productId === product.id && (matchKey ? JSON.stringify(item.options || {}) === matchKey : !item.options || Object.keys(item.options).length === 0)
+            );
             if (existing) {
-                return prev.map(item => item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item);
+                return prev.map(item =>
+                    item.productId === product.id && (matchKey ? JSON.stringify(item.options || {}) === matchKey : !item.options || Object.keys(item.options).length === 0)
+                        ? { ...item, quantity: item.quantity + quantity }
+                        : item
+                );
             }
             return [...prev, {
                 uniqueId: Math.random().toString(36).substring(7),
                 productId: product.id,
                 customName: null,
                 name: product.name,
-                price: parseFloat(product.basePrice.toString()),
-                quantity: 1
+                price,
+                quantity,
+                options: options && Object.keys(options).length > 0 ? options : undefined,
             }];
         });
+        setCartDrawerOpen(true);
+    };
+
+    const handleProductClick = (product: Product) => {
+        if (product.modifiers && product.modifiers.length > 0) {
+            setProductModalProduct(product);
+        } else {
+            addToCart(product);
+        }
+    };
+
+    const getProductById = (productId: string): Product | undefined => {
+        for (const cat of categories) {
+            const p = cat.products.find((pr) => pr.id === productId);
+            if (p) return p;
+        }
+        return undefined;
+    };
+
+    const handleProductModalAdd = (payload: { productId: string; name: string; price: number; quantity: number; options?: Record<string, unknown> }) => {
+        if (!productModalProduct) return;
+        if (editingCartItemUniqueId) {
+            setCart((prev) => {
+                const without = prev.filter((i) => i.uniqueId !== editingCartItemUniqueId);
+                return [
+                    ...without,
+                    {
+                        uniqueId: Math.random().toString(36).substring(7),
+                        productId: productModalProduct.id,
+                        customName: null,
+                        name: payload.name,
+                        price: payload.price,
+                        quantity: payload.quantity,
+                        options: payload.options && Object.keys(payload.options).length > 0 ? payload.options : undefined,
+                    },
+                ];
+            });
+            setEditingCartItemUniqueId(null);
+        } else {
+            addToCart(productModalProduct, { price: payload.price, quantity: payload.quantity, options: payload.options });
+        }
+        setProductModalProduct(null);
+    };
+
+    const openEditCartItem = (item: CartItem) => {
+        if (!item.productId) return;
+        const product = getProductById(item.productId);
+        if (!product) return;
+        setProductModalProduct(product);
+        setEditingCartItemUniqueId(item.uniqueId);
     };
 
     const addAdHocItem = () => {
@@ -113,84 +212,141 @@ export function POSClient({ categories, branchId }: { categories: Category[], br
 
     const subtotal = useMemo(() => cart.reduce((sum, item) => sum + (item.price * item.quantity), 0), [cart]);
 
-    const discountAmount = useMemo(() => {
+    const cartProductIds = useMemo(() => cart.filter(i => i.productId).map(i => i.productId as string), [cart]);
+
+    const appliedPromotion = useMemo(() => {
+        for (const promo of promotions) {
+            if (promo.isActive === false) continue;
+            if (promo.type === 'PERFECT_PAIR') {
+                const hasTrigger = cartProductIds.includes(promo.triggerValue);
+                const promotionProductIds = (promo.items || []).map((i: { productId: string }) => i.productId);
+                const hasPromoItem = promotionProductIds.some((id: string) => cartProductIds.includes(id));
+                if (hasTrigger && hasPromoItem) return promo;
+            } else if (promo.type === 'CROSS_SELL') {
+                const cartCategoryTypes = cartProductIds.map((id: string) => productIdToCategoryType[id]).filter(Boolean);
+                if (cartCategoryTypes.includes(promo.triggerValue)) return promo;
+            }
+        }
+        return null;
+    }, [promotions, cartProductIds, productIdToCategoryType]);
+
+    const promotionDiscountAmount = useMemo(() => {
+        if (!appliedPromotion) return 0;
+        const value = parseFloat(String(appliedPromotion.discountValue));
+        if (appliedPromotion.discountType === 'PERCENTAGE') return subtotal * (value / 100);
+        return Math.min(value, subtotal);
+    }, [appliedPromotion, subtotal]);
+
+    const manualDiscountAmount = useMemo(() => {
         const discount = DISCOUNTS.find(d => d.name === discountName);
         if (!discount || discount.value === 0) return 0;
         return subtotal * (discount.value / 100);
     }, [subtotal, discountName]);
 
+    const discountAmount = appliedPromotion ? promotionDiscountAmount : manualDiscountAmount;
+    const discountNameDisplay = appliedPromotion ? appliedPromotion.name : discountName;
     const total = subtotal - discountAmount;
 
     const handleCheckout = async () => {
         if (cart.length === 0) {
-            alert('Cart is empty');
+            toast.error('Add at least one item to the order');
             return;
         }
 
         setIsSubmitting(true);
         try {
             if (editingOrderId) {
-                // Keep the current status unless we want to bump it, for now we will just use PREPARING
-                const res = await updateOrder(editingOrderId, cart.map(item => ({
-                    ...item,
+                const editingOrder = activeOrders.find(o => o.id === editingOrderId);
+                const currentStatus = editingOrder?.status ?? 'PENDING';
+                const currentPaymentStatus = editingOrder?.paymentStatus ?? 'UNPAID';
+                const cartForUpdate = cart.map(item => ({
+                    id: item.uniqueId,
                     productId: item.productId,
-                    customName: item.customName,
+                    customName: item.customName ?? undefined,
+                    name: item.name,
                     quantity: item.quantity,
                     price: item.price,
-                })), total, paymentMethod, 'UNPAID', 'PREPARING', undefined);
+                    options: item.options,
+                    extras: item.extras,
+                    bundleLabel: item.bundleLabel,
+                    tag: item.tag,
+                })) as OrderCartItem[];
+                const res = await updateOrder(editingOrderId, cartForUpdate, total, paymentMethod, currentPaymentStatus, currentStatus, undefined);
 
                 if (res.success) {
-                    alert('Order updated successfully!');
+                    toast.success('Order updated. Customer will see the changes.');
                     setCart([]);
                     setDiscountName('None');
                     setPaymentMethod('CASH');
                     setEditingOrderId(null);
+                    setCartDrawerOpen(false);
                 } else {
-                    alert('Failed to update order');
+                    toast.error((res as { error?: string }).error || 'Failed to update order. Please try again.');
                 }
             } else {
+                const itemsToSend: { productId: string | null; customName: string | null; quantity: number; priceAtTime: number; customizations?: Record<string, unknown> }[] = [];
+                cart.forEach(item => {
+                    itemsToSend.push({
+                        productId: item.productId,
+                        customName: item.customName,
+                        quantity: item.quantity,
+                        priceAtTime: item.price,
+                        customizations: item.options || item.bundleLabel || item.tag ? { ...item.options, bundleLabel: item.bundleLabel, tag: item.tag } : undefined,
+                    });
+                    (item.extras || []).forEach(extra => {
+                        itemsToSend.push({
+                            productId: extra.productId,
+                            customName: null,
+                            quantity: extra.quantity,
+                            priceAtTime: extra.price,
+                            customizations: { ...extra.options, tag: extra.tag || 'EXTRA' },
+                        });
+                    });
+                });
                 const res = await createPOSOrderAction({
-                branchId,
-                items: cart.map(item => ({
-                    productId: item.productId,
-                    customName: item.customName,
-                    quantity: item.quantity,
-                    priceAtTime: item.price
-                })),
-                subtotalAmount: subtotal,
-                discountAmount: discountAmount,
-                discountName: discountName === 'None' ? null : discountName,
-                totalAmount: total,
-                paymentMethod
-            });
+                    branchId,
+                    items: itemsToSend,
+                    subtotalAmount: subtotal,
+                    discountAmount: discountAmount,
+                    discountName: appliedPromotion ? appliedPromotion.name : (discountName === 'None' ? null : discountName),
+                    totalAmount: total,
+                    paymentMethod,
+                });
 
-            if (res.success) {
-                alert('Order completed successfully!');
-                setCart([]);
-                setDiscountName('None');
-                setPaymentMethod('CASH');
-                setEditingOrderId(null);
-            } else {
-                alert(res.error || 'Failed to complete order');
-            }
+                if (res.success) {
+                    toast.success('Order completed successfully');
+                    setCart([]);
+                    setDiscountName('None');
+                    setPaymentMethod('CASH');
+                    setEditingOrderId(null);
+                    setCartDrawerOpen(false);
+                } else {
+                    toast.error(res.error || 'Failed to complete order. Please try again.');
+                }
             }
         } catch (err) {
-            alert('Something went wrong');
+            toast.error('Something went wrong. Please try again.');
         } finally {
             setIsSubmitting(false);
         }
     };
 
     const handleEditOrder = (order: any) => {
-        setCart(order.items.map((item: any) => ({
-            uniqueId: Math.random().toString(36).substring(7),
-            productId: item.productId,
-            customName: item.name.includes('(Custom)') ? item.name.replace(' (Custom)', '') : null,
-            name: item.name,
-            price: item.price,
-            quantity: item.quantity,
-            options: item.options
-        })));
+        setCart((order.items || []).map((item: any) => {
+            const opts = item.options || {};
+            return {
+                uniqueId: Math.random().toString(36).substring(7),
+                productId: item.productId,
+                customName: item.name?.includes('(Custom)') ? item.name.replace(' (Custom)', '') : null,
+                name: item.name,
+                price: item.price,
+                quantity: item.quantity,
+                options: Object.keys(opts).length ? opts : undefined,
+                extras: item.extras,
+                bundleLabel: opts.bundleLabel,
+                tag: opts.tag,
+            };
+        }));
         setPaymentMethod(order.paymentMethod || 'CASH');
         setEditingOrderId(order.id);
         setShowIncomingModal(false);
@@ -204,31 +360,64 @@ export function POSClient({ categories, branchId }: { categories: Category[], br
 
     const formatCurrency = (val: number) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(val);
 
+    const resolveImageUrl = (url: string | null | undefined): string | null => {
+        if (!url || typeof url !== 'string') return null;
+        const trimmed = url.trim();
+        if (!trimmed) return null;
+        if (trimmed.startsWith('/')) return typeof window !== 'undefined' ? `${window.location.origin}${trimmed}` : trimmed;
+        return trimmed;
+    };
+
+    const productImageSrc = (product: Product): string | null => resolveImageUrl(product.image ?? product.imageUrl);
+
     return (
         <div className="flex h-[calc(100vh-80px)] md:h-screen overflow-hidden bg-gray-50">
+            {/* Mobile: Cart FAB */}
+            <button
+                type="button"
+                onClick={() => setCartDrawerOpen(true)}
+                className="md:hidden fixed bottom-6 right-6 z-30 min-h-[48px] min-w-[48px] flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-[#D95D1E] text-white font-bold shadow-lg hover:bg-[#c25016] transition-colors"
+            >
+                <ShoppingCart size={22} />
+                <span>Cart</span>
+                {cart.length > 0 && (
+                    <span className="bg-white text-[#D95D1E] min-w-[22px] h-[22px] rounded-full flex items-center justify-center text-xs font-black">
+                        {cart.length}
+                    </span>
+                )}
+            </button>
+
+            {/* Mobile: Drawer backdrop */}
+            <div
+                aria-hidden
+                className={`fixed inset-0 z-40 bg-black/50 transition-opacity md:hidden ${cartDrawerOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                onClick={() => setCartDrawerOpen(false)}
+            />
+
             {/* Left Side: Menu Grid */}
             <div className="flex-1 flex flex-col min-w-0 border-r border-gray-200">
-                <div className="p-4 bg-white border-b border-gray-200 shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <div className="p-3 sm:p-4 bg-white border-b border-gray-200 shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
                         <UtensilsCrossed className="text-[#D95D1E]" />
                         Point of Sale
                     </h1>
                     
-                    <div className="flex items-center gap-3">
-                        <div className="relative w-full md:w-72">
+                    <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                        <div className="relative flex-1 min-w-[140px] md:w-72">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                             <input
                                 type="text"
                                 placeholder="Search products..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#D95D1E] focus:ring-1 focus:ring-[#D95D1E] transition-all"
+                                className="w-full pl-10 pr-4 py-2.5 md:py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#D95D1E] focus:ring-1 focus:ring-[#D95D1E] transition-all min-h-[44px]"
                             />
                         </div>
                         
                         <button 
+                            type="button"
                             onClick={() => setShowIncomingModal(true)}
-                            className="relative flex items-center gap-2 px-4 py-2 bg-yellow-50 text-yellow-700 hover:bg-yellow-100 border border-yellow-200 font-bold rounded-lg transition-colors whitespace-nowrap"
+                            className="relative flex items-center gap-2 px-4 py-2.5 md:py-2 bg-yellow-50 text-yellow-700 hover:bg-yellow-100 border border-yellow-200 font-bold rounded-lg transition-colors whitespace-nowrap min-h-[44px]"
                         >
                             <Bell size={18} />
                             Orders Data
@@ -241,15 +430,16 @@ export function POSClient({ categories, branchId }: { categories: Category[], br
                     </div>
                 </div>
 
-                <div className="p-4 bg-white border-b border-gray-200 flex gap-2 overflow-x-auto custom-scrollbar shrink-0">
+                <div className="p-3 sm:p-4 bg-white border-b border-gray-200 flex gap-2 overflow-x-auto custom-scrollbar shrink-0">
                     {categories.map(cat => (
                         <button
+                            type="button"
                             key={cat.id}
                             onClick={() => {
                                 const el = document.getElementById(`category-${cat.id}`);
                                 if (el) el.scrollIntoView({ behavior: 'smooth' });
                             }}
-                            className="px-4 py-2 rounded-xl whitespace-nowrap text-sm font-semibold transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200"
+                            className="px-4 py-2.5 min-h-[44px] rounded-xl whitespace-nowrap text-sm font-semibold transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200"
                         >
                             {cat.name}
                         </button>
@@ -269,15 +459,25 @@ export function POSClient({ categories, branchId }: { categories: Category[], br
                                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                                     {cat.products.map(product => (
                                         <button
+                                            type="button"
                                             key={product.id}
-                                            onClick={() => addToCart(product)}
+                                            onClick={() => handleProductClick(product)}
                                             className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:border-[#D95D1E] hover:shadow-md transition-all text-left flex flex-col gap-2 group"
                                         >
-                                            <div className="aspect-square bg-gray-50 rounded-xl mb-2 flex items-center justify-center overflow-hidden w-full">
-                                                {product.imageUrl ? (
-                                                    <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" referrerPolicy="no-referrer" />
+                                            <div className="relative aspect-square bg-gray-100 rounded-xl mb-2 w-full overflow-hidden">
+                                                {productImageSrc(product) ? (
+                                                    <Image
+                                                        src={productImageSrc(product)!}
+                                                        alt={product.name}
+                                                        fill
+                                                        className="object-cover group-hover:scale-105 transition-transform"
+                                                        sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 20vw"
+                                                        unoptimized={productImageSrc(product)?.startsWith('/') === true}
+                                                    />
                                                 ) : (
-                                                    <Package className="text-gray-300 w-12 h-12" />
+                                                    <div className="absolute inset-0 flex items-center justify-center">
+                                                        <Package className="text-gray-300 w-12 h-12" />
+                                                    </div>
                                                 )}
                                             </div>
                                             <h3 className="font-semibold text-gray-900 leading-tight line-clamp-2">{product.name}</h3>
@@ -293,16 +493,26 @@ export function POSClient({ categories, branchId }: { categories: Category[], br
                 </div>
             </div>
 
-            {/* Right Side: Cart Sidebar */}
-            <div className="w-full md:w-[400px] bg-white flex flex-col shrink-0 relative z-10 shadow-[-4px_0_24px_rgba(0,0,0,0.02)]">
-                <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
+            {/* Right Side: Cart Sidebar (desktop) / Drawer (mobile) */}
+            <div
+                className={`fixed md:relative inset-y-0 right-0 w-full max-w-[400px] md:max-w-none md:w-[400px] bg-white flex flex-col z-50 md:z-10 shadow-2xl md:shadow-[-4px_0_24px_rgba(0,0,0,0.02)] transition-transform duration-300 ease-out ${cartDrawerOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}`}
+            >
+                <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between shrink-0">
                     <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                         <ShoppingCart size={20} className="text-[#D95D1E]" />
                         {editingOrderId ? 'Editing Order' : 'Current Order'}
                     </h2>
                     <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setCartDrawerOpen(false)}
+                            className="md:hidden p-2 text-gray-500 hover:text-gray-700 rounded-lg"
+                            aria-label="Close cart"
+                        >
+                            <X size={20} />
+                        </button>
                         {editingOrderId && (
-                            <button onClick={cancelEdit} className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded font-bold hover:bg-red-200 transition-colors">
+                            <button type="button" onClick={cancelEdit} className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded font-bold hover:bg-red-200 transition-colors">
                                 Cancel
                             </button>
                         )}
@@ -314,17 +524,62 @@ export function POSClient({ categories, branchId }: { categories: Category[], br
                     {cart.map(item => (
                         <div key={item.uniqueId} className="flex flex-col gap-2 p-3 bg-white border border-gray-100 rounded-xl shadow-sm">
                             <div className="flex justify-between items-start">
-                                <span className="font-semibold text-gray-900 text-sm pe-4">{item.name}</span>
-                                <button onClick={() => removeItem(item.uniqueId)} className="text-gray-400 hover:text-red-500 transition-colors">
-                                    <X size={16} />
-                                </button>
+                                <div className="flex flex-col min-w-0 flex-1 pe-2">
+                                    <span className="font-semibold text-gray-900 text-sm">{item.name}</span>
+                                    {item.options && Object.keys(item.options).length > 0 && (
+                                        <div className="flex flex-wrap gap-x-1.5 gap-y-1 mt-1">
+                                            {Object.entries(item.options).map(([key, value]) => {
+                                                if (key === 'tag' || key === 'bundleLabel') return null;
+                                                return (
+                                                    <span key={key} className="text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight border border-gray-200">
+                                                        {key}: {String(value)}
+                                                    </span>
+                                                );
+                                            })}
+                                            {item.options.tag === 'TOGETHER' && (
+                                                <span className="text-[10px] bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight border border-purple-100">Together</span>
+                                            )}
+                                            {item.options.bundleLabel && (
+                                                <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight border border-indigo-100">{item.options.bundleLabel}</span>
+                                            )}
+                                            {item.options.tag === 'EXTRA' && (
+                                                <span className="text-[10px] bg-pink-50 text-pink-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight border border-pink-100">+ Extra</span>
+                                            )}
+                                        </div>
+                                    )}
+                                    {item.extras && item.extras.length > 0 && (
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                            {item.extras.map((ex, i) => (
+                                                <span key={i} className="text-[10px] bg-pink-50 text-pink-600 px-1.5 py-0.5 rounded border border-pink-100">
+                                                    + {ex.name} {ex.quantity > 1 ? `×${ex.quantity}` : ''}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                    {item.productId && getProductById(item.productId) && (
+                                        <button
+                                            type="button"
+                                            onClick={() => openEditCartItem(item)}
+                                            className="p-1.5 text-gray-500 hover:text-[#D95D1E] hover:bg-orange-50 rounded-lg transition-colors"
+                                            title="Edit toppings / options"
+                                            aria-label="Edit toppings"
+                                        >
+                                            <Pencil size={16} />
+                                        </button>
+                                    )}
+                                    <button type="button" onClick={() => removeItem(item.uniqueId)} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors rounded-lg">
+                                        <X size={16} />
+                                    </button>
+                                </div>
                             </div>
                             <div className="flex justify-between items-center text-[#D95D1E] font-bold text-sm">
                                 <span>{formatCurrency(item.price)}</span>
                                 <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-1 border border-gray-100">
-                                    <button onClick={() => updateQuantity(item.uniqueId, -1)} className="w-6 h-6 flex items-center justify-center bg-white rounded-md shadow-sm text-gray-700 hover:text-[#D95D1E]"><Minus size={14} /></button>
+                                    <button type="button" onClick={() => updateQuantity(item.uniqueId, -1)} className="w-6 h-6 flex items-center justify-center bg-white rounded-md shadow-sm text-gray-700 hover:text-[#D95D1E]"><Minus size={14} /></button>
                                     <span className="text-gray-900 font-semibold w-4 text-center">{item.quantity}</span>
-                                    <button onClick={() => updateQuantity(item.uniqueId, 1)} className="w-6 h-6 flex items-center justify-center bg-white rounded-md shadow-sm text-gray-700 hover:text-[#D95D1E]"><Plus size={14} /></button>
+                                    <button type="button" onClick={() => updateQuantity(item.uniqueId, 1)} className="w-6 h-6 flex items-center justify-center bg-white rounded-md shadow-sm text-gray-700 hover:text-[#D95D1E]"><Plus size={14} /></button>
                                 </div>
                             </div>
                         </div>
@@ -393,7 +648,7 @@ export function POSClient({ categories, branchId }: { categories: Category[], br
                             </div>
                             {discountAmount > 0 && (
                                 <div className="flex justify-between text-sm text-green-600 font-medium">
-                                    <span>Discount ({discountName})</span>
+                                    <span>Discount ({discountNameDisplay})</span>
                                     <span>-{formatCurrency(discountAmount)}</span>
                                 </div>
                             )}
@@ -416,8 +671,8 @@ export function POSClient({ categories, branchId }: { categories: Category[], br
 
             {/* Ad-Hoc Modal */}
             {showAdHocModal && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+                    <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-sm max-h-[90vh] sm:max-h-none overflow-hidden animate-in fade-in zoom-in-95 duration-200 safe-area-pb">
                         <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
                             <h3 className="font-bold text-gray-900 flex items-center gap-2">
                                 <HelpCircle size={18} className="text-[#D95D1E]" />
@@ -464,8 +719,8 @@ export function POSClient({ categories, branchId }: { categories: Category[], br
 
             {/* Incoming Orders Modal */}
             {showIncomingModal && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+                    <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 safe-area-pb">
                         <div className="p-4 border-b border-gray-100 bg-gray-50 shrink-0">
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="font-bold text-gray-900 flex items-center gap-2 text-lg">
@@ -604,11 +859,18 @@ export function POSClient({ categories, branchId }: { categories: Category[], br
                                             {incomingTab === 'PENDING' && (
                                                 <button 
                                                     onClick={() => updateOrderStatus(order.id, 'PREPARING')}
-                                                    className="w-full py-3 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-xl mt-auto transition-colors shadow-sm flex items-center justify-center gap-2"
+                                                    className="w-full py-3 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2"
                                                 >
                                                     Approve to Kitchen
                                                 </button>
                                             )}
+
+                                            <button 
+                                                onClick={() => setCancelOrderModal({ id: order.id, orderNumber: order.orderNumber, table: order.table })}
+                                                className="w-full py-2 text-red-600 hover:bg-red-50 font-bold rounded-xl transition-colors border border-red-200 text-sm"
+                                            >
+                                                Cancel Order
+                                            </button>
                                         </div>
                                     </div>
                                 ))
@@ -616,6 +878,60 @@ export function POSClient({ categories, branchId }: { categories: Category[], br
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Cancel order confirmation */}
+            {cancelOrderModal && (
+                <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 animate-in fade-in zoom-in-95 duration-200">
+                        <h3 className="font-bold text-gray-900 text-lg mb-2">Cancel order?</h3>
+                        <p className="text-gray-600 text-sm mb-6">
+                            Order #{cancelOrderModal.orderNumber} (Table {cancelOrderModal.table}) will be cancelled. The customer will see the order as cancelled. This cannot be undone.
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setCancelOrderModal(null)}
+                                className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors"
+                            >
+                                Back
+                            </button>
+                            <button
+                                onClick={() => {
+                                    updateOrderStatus(cancelOrderModal.id, 'CANCELLED');
+                                    if (editingOrderId === cancelOrderModal.id) {
+                                        setEditingOrderId(null);
+                                        setCart([]);
+                                        setCartDrawerOpen(false);
+                                    }
+                                    setCancelOrderModal(null);
+                                    setShowIncomingModal(false);
+                                    toast.success('Order cancelled');
+                                }}
+                                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors"
+                            >
+                                Cancel Order
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Product Add Modal (modifiers/toppings) */}
+            {productModalProduct && (
+                <ProductAddModal
+                    product={productModalProduct}
+                    categoryName={filteredCategories.find(c => c.products.some(p => p.id === productModalProduct.id))?.name}
+                    onAdd={handleProductModalAdd}
+                    onClose={() => {
+                        setProductModalProduct(null);
+                        setEditingCartItemUniqueId(null);
+                    }}
+                    resolveImageUrl={resolveImageUrl}
+                    formatCurrency={formatCurrency}
+                    initialOptionsFromCart={editingCartItemUniqueId ? cart.find(i => i.uniqueId === editingCartItemUniqueId)?.options : undefined}
+                    initialQuantity={editingCartItemUniqueId ? cart.find(i => i.uniqueId === editingCartItemUniqueId)?.quantity : undefined}
+                    editMode={!!editingCartItemUniqueId}
+                />
             )}
         </div>
     );

@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { orders as ordersSchema, tables as tablesSchema, orderItems as orderItemsSchema } from '@/db/schema';
+import { orders as ordersSchema, tables as tablesSchema, orderItems as orderItemsSchema, products as productsSchema } from '@/db/schema';
 import { eq, inArray, desc, and, gte, lte, or, sql, ilike } from 'drizzle-orm';
 export interface OrderData {
     id: string;
@@ -48,6 +48,16 @@ export async function createOrderAction(data: {
     note?: string;
 }) {
     try {
+        if (!data.branchId || !data.tableId) {
+            return { success: false, error: 'Missing table or branch. Please scan the table QR code again.' };
+        }
+        if (!data.items?.length) {
+            return { success: false, error: 'Order must have at least one item.' };
+        }
+        const totalAmount = Number(data.totalAmount);
+        if (isNaN(totalAmount) || totalAmount < 0) {
+            return { success: false, error: 'Invalid order total.' };
+        }
         const startOfOperationalDay = getStartOfOperationalDay();
 
         // Calculate the next order number for this branch for today
@@ -64,37 +74,58 @@ export async function createOrderAction(data: {
             
         const nextOrderNumber = latestOrder && latestOrder.orderNumber ? latestOrder.orderNumber + 1 : 1;
 
-        const [insertedOrder] = await db.insert(ordersSchema).values({
-            branchId: data.branchId,
-            tableId: data.tableId,
-            orderNumber: nextOrderNumber,
-            status: 'PENDING',
-            totalAmount: data.totalAmount.toString(),
-            paymentMethod: data.paymentMethod,
-            note: data.note,
-        }).returning();
+        const validItems = data.items.filter(
+            (item): item is { productId: string; quantity: number; priceAtTime: number; customizations?: any } =>
+                Boolean(item?.productId && typeof item.quantity === 'number' && typeof item.priceAtTime === 'number')
+        );
+        if (validItems.length !== data.items.length) {
+            return { success: false, error: 'Some items are invalid. Please refresh and try again.' };
+        }
 
-        if (data.items.length > 0) {
-            await db.insert(orderItemsSchema).values(
-                data.items.map(item => ({
-                    orderId: insertedOrder.id,
+        const productIds = [...new Set(validItems.map((i) => i.productId))];
+        const existingProducts = await db.select({ id: productsSchema.id }).from(productsSchema).where(inArray(productsSchema.id, productIds));
+        const existingIds = new Set(existingProducts.map((p) => p.id));
+        const missingIds = productIds.filter((id) => !existingIds.has(id));
+        console.log('missingIds', missingIds);
+        console.log('existingIds', existingIds);
+        console.log('productIds', productIds);
+        console.log('validItems', validItems);
+        if (missingIds.length > 0) {
+            return { success: false, error: 'One or more items are no longer available. Please update your cart and try again.' };
+        }
+
+        const insertedOrder = await db.transaction(async (tx) => {
+            const [order] = await tx.insert(ordersSchema).values({
+                branchId: data.branchId,
+                tableId: data.tableId,
+                orderNumber: nextOrderNumber,
+                status: 'PENDING',
+                totalAmount: String(totalAmount),
+                paymentMethod: data.paymentMethod,
+                note: data.note ?? null,
+            }).returning();
+            if (!order) throw new Error('Failed to create order');
+            await tx.insert(orderItemsSchema).values(
+                validItems.map(item => ({
+                    orderId: order.id,
                     productId: item.productId,
                     quantity: item.quantity,
-                    priceAtTime: item.priceAtTime.toString(),
-                    customizations: item.customizations ? JSON.stringify(item.customizations) : null,
+                    priceAtTime: String(Number(item.priceAtTime)),
+                    customizations: item.customizations && typeof item.customizations === 'object' ? JSON.stringify(item.customizations) : (typeof item.customizations === 'string' ? item.customizations : null),
                 }))
             );
-        }
+            return order;
+        });
 
         return { success: true, order: insertedOrder };
     } catch (error: any) {
-        console.error('createOrderAction error details:', {
-            message: error.message,
-            stack: error.stack,
-            detail: error.detail,
-            hint: error.hint
-        });
-        return { success: false, error: 'Failed to create order' };
+        const pgCode = error?.cause?.code ?? error?.code;
+        const message = error?.message || 'Failed to create order';
+        const userMessage = pgCode === '23503'
+            ? 'One or more items are no longer available or the table is invalid. Please update your cart or scan the table QR code again.'
+            : 'Unable to create order. Please try again.';
+        console.error('createOrderAction error:', { message, code: pgCode, detail: error?.cause?.detail ?? error?.detail });
+        return { success: false, error: userMessage };
     }
 }
 
@@ -412,7 +443,7 @@ export async function createPOSOrderAction(data: {
         return { success: true, order: insertedOrder };
     } catch (error: any) {
         console.error('createPOSOrderAction error:', error);
-        return { success: false, error: 'Failed to create POS order' };
+        return { success: false, error: 'Unable to save order. Please try again.' };
     }
 }
 
@@ -486,6 +517,6 @@ export async function updatePOSOrderAction(data: {
         return { success: true };
     } catch (error: any) {
         console.error('updatePOSOrderAction error:', error);
-        return { success: false, error: 'Failed to update POS order' };
+        return { success: false, error: 'Unable to update order. Please try again.' };
     }
 }

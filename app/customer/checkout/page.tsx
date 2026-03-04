@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useCart } from "@/context/CartContext";
 import { useOrder } from "@/context/OrderContext";
@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import OrderConfirmation from "@/components/customer/OrderConfirmation";
 import { useTable } from "@/context/TableContext";
 import FloatingOrderTabs from "@/components/customer/FloatingOrderTabs";
+import { toast } from "sonner";
 
 export default function CheckoutPage() {
   const { items, cartTotal, clearCart } = useCart();
@@ -37,16 +38,25 @@ export default function CheckoutPage() {
 
   const handlePlaceOrder = async () => {
     if (isSubmitting) return;
+    if (!tableId || !branchId) {
+      toast.error("Missing table. Please scan the table QR code first.");
+      return;
+    }
     setIsSubmitting(true);
     try {
       const result = await createOrder(items, cartTotal, paymentMethod, note);
-      console.log(result);
 
-      if (result) {
+      if (result && 'orderNumber' in result) {
         setLastOrderNumber(result.orderNumber);
         clearCart();
         setShowConfirmation(true);
+      } else if (result && 'success' in result && result.success === false) {
+        toast.error(result.error || "Could not place order. Please try again.");
+      } else {
+        toast.error("Could not place order. Please try again or scan the table QR code.");
       }
+    } catch (e) {
+      toast.error("Something went wrong. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
