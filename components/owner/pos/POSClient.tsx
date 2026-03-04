@@ -3,11 +3,13 @@
 import { useState, useMemo } from 'react';
 import Image from 'next/image';
 import { toast } from 'sonner';
-import { ShoppingCart, Plus, Minus, X, CreditCard, Banknote, HelpCircle, UtensilsCrossed, Tag, Package, Search, Bell, CheckCircle, Pencil } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, X, CreditCard, Banknote, HelpCircle, UtensilsCrossed, Tag, Package, Search, Bell, CheckCircle, Pencil, Printer } from 'lucide-react';
 import { createPOSOrderAction } from '@/app/actions/orders';
 import { useOrder } from '@/context/OrderContext';
 import type { CartItem as OrderCartItem } from '@/context/CartContext';
 import { ProductAddModal } from './ProductAddModal';
+import { buildReceiptEscPosFromOrder } from '@/lib/receipt-thermal';
+import { connectAndPrint, isBluetoothSupported } from '@/lib/bluetooth-thermal-print';
 
 export type Product = {
     id: string;
@@ -357,6 +359,40 @@ export function POSClient({
         setPaymentMethod('CASH');
         setEditingOrderId(null);
     };
+
+    const storeName = typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_RECEIPT_STORE_NAME
+        ? process.env.NEXT_PUBLIC_RECEIPT_STORE_NAME
+        : 'BrewFlow';
+
+    async function printReceipt(order: { orderNumber: number; items: { name: string; price: number; quantity: number; options?: Record<string, unknown>; extras?: { name: string; price: number; quantity?: number }[] }[]; total: number; table: string; paymentMethod: string; timestamp: Date }) {
+        const receiptOrder = {
+            orderNumber: order.orderNumber,
+            items: order.items.map((item: any) => ({
+                name: item.name ?? 'Unknown',
+                price: typeof item.price === 'number' ? item.price : Number(item.price) || 0,
+                quantity: item.quantity ?? 1,
+                options: item.options,
+                extras: item.extras?.map((ex: any) => ({ name: ex.name, price: ex.price, quantity: ex.quantity ?? 1 })),
+            })),
+            total: order.total,
+            table: order.table,
+            paymentMethod: order.paymentMethod,
+            timestamp: order.timestamp instanceof Date ? order.timestamp : new Date(order.timestamp),
+        };
+        const bytes = buildReceiptEscPosFromOrder(receiptOrder, { storeName });
+        const result = await connectAndPrint(bytes);
+        if (result.ok) {
+            toast.success('Receipt sent to printer');
+        } else {
+            if (result.reason === 'unsupported') {
+                toast.info('Receipt printing requires Chrome or Edge. Payment confirmed.');
+            } else if (result.reason === 'cancelled') {
+                toast.info('Printer not selected. Payment confirmed.');
+            } else {
+                toast.warning('Payment confirmed. Could not print receipt.');
+            }
+        }
+    }
 
     const formatCurrency = (val: number) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(val);
 
@@ -836,11 +872,12 @@ export function POSClient({
                                                     </button>
                                                     <div className="w-px bg-gray-200"></div>
                                                     <button 
-                                                        onClick={() => {
+                                                        onClick={async () => {
                                                             updateOrderPaymentStatus(order.id, 'PAID');
                                                             if (incomingTab === 'UNPAID' && order.status === 'READY') {
-                                                                updateOrderStatus(order.id, 'COMPLETED'); // Auto complete if paid and ready
+                                                                updateOrderStatus(order.id, 'COMPLETED');
                                                             }
+                                                            printReceipt(order).catch(() => {});
                                                         }}
                                                         className={`flex-1 py-1.5 text-xs font-bold transition-colors ${order.paymentStatus === 'PAID' ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
                                                     >
@@ -854,6 +891,20 @@ export function POSClient({
                                                 className="w-full py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold rounded-xl transition-colors border border-gray-200 text-sm"
                                             >
                                                 Edit / Add Items
+                                            </button>
+
+                                            <button 
+                                                onClick={() => {
+                                                    if (!isBluetoothSupported()) {
+                                                        toast.info('Receipt printing requires Chrome or Edge.');
+                                                        return;
+                                                    }
+                                                    printReceipt(order).catch(() => toast.error('Could not print receipt.'));
+                                                }}
+                                                className="w-full py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold rounded-xl transition-colors border border-gray-200 text-sm flex items-center justify-center gap-2"
+                                            >
+                                                <Printer size={16} />
+                                                Print receipt
                                             </button>
 
                                             {incomingTab === 'PENDING' && (
