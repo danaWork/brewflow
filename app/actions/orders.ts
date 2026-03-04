@@ -12,6 +12,7 @@ export interface OrderData {
     tableNumber: string;
     createdAt: Date;
     paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA' | null;
+    paymentStatus: 'UNPAID' | 'PAID';
 }
 
 function getStartOfOperationalDay(): Date {
@@ -150,10 +151,11 @@ export async function getActiveOrdersAction(branchId: string) {
                 tableNumber: o.table?.tableNumber || 'Unknown Table',
                 createdAt: o.createdAt,
                 paymentMethod: o.paymentMethod,
+                paymentStatus: o.paymentStatus as 'UNPAID' | 'PAID',
                 note: o.note,
                 items: o.items.map((item: any) => ({
                     productId: item.productId,
-                    name: item.product?.name || 'Unknown Product',
+                    name: item.customName || item.product?.name || 'Unknown Product',
                     quantity: item.quantity,
                     price: parseFloat(item.priceAtTime as string),
                     options: item.customizations ? JSON.parse(item.customizations) : undefined
@@ -263,10 +265,11 @@ export async function getPastOrdersAction(
                 createdAt: o.createdAt,
                 completedAt: o.completedAt,
                 paymentMethod: o.paymentMethod,
+                paymentStatus: o.paymentStatus as 'UNPAID' | 'PAID',
                 note: o.note,
                 items: o.items.map((item: any) => ({
                     productId: item.productId,
-                    name: item.product?.name || 'Unknown Product',
+                    name: item.customName || item.product?.name || 'Unknown Product',
                     quantity: item.quantity,
                     price: parseFloat(item.priceAtTime as string),
                     options: item.customizations ? JSON.parse(item.customizations) : undefined
@@ -328,5 +331,161 @@ export async function getOrdersStatusAction(orderIds: string[]) {
     } catch (error) {
         console.error('getOrdersStatusAction error:', error);
         return { success: false, error: 'Failed to fetch order statuses' };
+    }
+}
+
+async function getOrCreatePOSTable(branchId: string) {
+    const existing = await db.query.tables.findFirst({
+        where: and(
+            eq(tablesSchema.branchId, branchId),
+            eq(tablesSchema.tableNumber, 'Walk-In (POS)')
+        )
+    });
+    if (existing) return existing.id;
+    
+    const [newTable] = await db.insert(tablesSchema).values({
+        branchId,
+        tableNumber: 'Walk-In (POS)',
+        qrIdentifier: `pos-walkin-${branchId.substring(0, 8)}`,
+    }).returning();
+    
+    return newTable.id;
+}
+
+export async function createPOSOrderAction(data: {
+    branchId: string;
+    items: { productId: string | null; customName: string | null; quantity: number; priceAtTime: number; customizations?: any }[];
+    subtotalAmount: number;
+    discountAmount: number;
+    discountName: string | null;
+    totalAmount: number;
+    paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA';
+    note?: string;
+}) {
+    try {
+        const startOfOperationalDay = getStartOfOperationalDay();
+        const tableId = await getOrCreatePOSTable(data.branchId);
+
+        const [latestOrder] = await db.select({ orderNumber: ordersSchema.orderNumber })
+            .from(ordersSchema)
+            .where(
+                and(
+                    eq(ordersSchema.branchId, data.branchId),
+                    gte(ordersSchema.createdAt, startOfOperationalDay)
+                )
+            )
+            .orderBy(desc(ordersSchema.orderNumber))
+            .limit(1);
+
+        const nextOrderNumber = latestOrder && latestOrder.orderNumber ? latestOrder.orderNumber + 1 : 1;
+
+        const [insertedOrder] = await db.insert(ordersSchema).values({
+            branchId: data.branchId,
+            tableId: tableId,
+            orderNumber: nextOrderNumber,
+            status: 'COMPLETED', // POS orders are usually considered completed immediately
+            subtotalAmount: data.subtotalAmount.toString(),
+            discountAmount: data.discountAmount.toString(),
+            discountName: data.discountName,
+            totalAmount: data.totalAmount.toString(),
+            paymentMethod: data.paymentMethod,
+            paymentStatus: 'PAID', // Automatically marked as PAID
+            note: data.note,
+            acceptedAt: new Date(),
+            readyAt: new Date(),
+            completedAt: new Date(),
+        }).returning();
+
+        if (data.items.length > 0) {
+            await db.insert(orderItemsSchema).values(
+                data.items.map(item => ({
+                    orderId: insertedOrder.id,
+                    productId: item.productId,
+                    customName: item.customName,
+                    quantity: item.quantity,
+                    priceAtTime: item.priceAtTime.toString(),
+                    customizations: item.customizations ? JSON.stringify(item.customizations) : null,
+                }))
+            );
+        }
+
+        return { success: true, order: insertedOrder };
+    } catch (error: any) {
+        console.error('createPOSOrderAction error:', error);
+        return { success: false, error: 'Failed to create POS order' };
+    }
+}
+
+export async function updateOrderPaymentMethodAction(orderId: string, paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA') {
+    try {
+        await db.update(ordersSchema)
+            .set({ paymentMethod })
+            .where(eq(ordersSchema.id, orderId));
+        return { success: true };
+    } catch (error) {
+        console.error('updateOrderPaymentMethodAction error:', error);
+        return { success: false, error: 'Failed to update payment method' };
+    }
+}
+
+export async function updateOrderPaymentStatusAction(orderId: string, paymentStatus: 'UNPAID' | 'PAID') {
+    try {
+        await db.update(ordersSchema)
+            .set({ paymentStatus })
+            .where(eq(ordersSchema.id, orderId));
+        return { success: true };
+    } catch (error) {
+        console.error('updateOrderPaymentStatusAction error:', error);
+        return { success: false, error: 'Failed to update payment status' };
+    }
+}
+
+export async function updatePOSOrderAction(data: {
+    orderId: string;
+    items: { productId: string | null; customName: string | null; quantity: number; priceAtTime: number; customizations?: any }[];
+    subtotalAmount: number;
+    discountAmount: number;
+    discountName: string | null;
+    totalAmount: number;
+    paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA';
+    paymentStatus: 'UNPAID' | 'PAID';
+    status: 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
+    note?: string;
+}) {
+    try {
+        // Delete existing items for the order
+        await db.delete(orderItemsSchema).where(eq(orderItemsSchema.orderId, data.orderId));
+
+        // Update the order totals and status
+        await db.update(ordersSchema).set({
+            subtotalAmount: data.subtotalAmount.toString(),
+            discountAmount: data.discountAmount.toString(),
+            discountName: data.discountName,
+            totalAmount: data.totalAmount.toString(),
+            paymentMethod: data.paymentMethod,
+            paymentStatus: data.paymentStatus,
+            status: data.status,
+            note: data.note,
+            acceptedAt: data.status === 'PREPARING' || data.status === 'COMPLETED' ? new Date() : undefined
+        }).where(eq(ordersSchema.id, data.orderId));
+
+        // Insert new items
+        if (data.items.length > 0) {
+            await db.insert(orderItemsSchema).values(
+                data.items.map(item => ({
+                    orderId: data.orderId,
+                    productId: item.productId,
+                    customName: item.customName,
+                    quantity: item.quantity,
+                    priceAtTime: item.priceAtTime.toString(),
+                    customizations: item.customizations ? JSON.stringify(item.customizations) : null,
+                }))
+            );
+        }
+
+        return { success: true };
+    } catch (error: any) {
+        console.error('updatePOSOrderAction error:', error);
+        return { success: false, error: 'Failed to update POS order' };
     }
 }

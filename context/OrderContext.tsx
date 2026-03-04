@@ -8,6 +8,8 @@ import {
   getActiveOrdersAction,
   updateOrderStatusAction,
   getOrdersStatusAction,
+  updateOrderPaymentStatusAction,
+  updatePOSOrderAction,
 } from '@/app/actions/orders';
 import { getSessionAction } from '@/app/actions/auth';
 
@@ -23,6 +25,7 @@ export interface Order {
   tableId?: string;
   timestamp: Date;
   paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA';
+  paymentStatus: 'UNPAID' | 'PAID';
   note?: string;
 }
 
@@ -30,7 +33,9 @@ interface OrderContextType {
   userOrders: Order[];
   activeOrders: Order[];
   createOrder: (items: CartItem[], total: number, paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA', note?: string) => Promise<{ id: string; orderNumber: number } | null>;
+  updateOrder: (orderId: string, items: CartItem[], total: number, paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA', paymentStatus: 'UNPAID' | 'PAID', status: OrderStatus, note?: string) => Promise<{ success: boolean }>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
+  updateOrderPaymentStatus: (orderId: string, status: 'UNPAID' | 'PAID') => Promise<void>;
   dismissOrder: (orderId: string) => void;
   refreshActiveOrders: () => Promise<void>;
   isLoading: boolean;
@@ -123,6 +128,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         tableId: o.tableId || undefined,
         timestamp: o.createdAt ? new Date(o.createdAt) : new Date(),
         paymentMethod: (o.paymentMethod as any) || 'CASH',
+        paymentStatus: o.paymentStatus || 'UNPAID',
         note: o.note
       }));
 
@@ -259,6 +265,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         tableId: currentTableId,
         timestamp: new Date(),
         paymentMethod,
+        paymentStatus: 'UNPAID',
         note: note
       };
 
@@ -269,6 +276,61 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.error('Failed to create order:', e);
       return null;
+    }
+  };
+
+  const updateOrder = async (orderId: string, items: CartItem[], total: number, paymentMethod: 'CASH' | 'GCASH' | 'PAYMAYA', paymentStatus: 'UNPAID' | 'PAID', status: OrderStatus, note?: string) => {
+    try {
+      const itemsToPrepare: any[] = [];
+      items.forEach(item => {
+        itemsToPrepare.push({
+          productId: item.productId,
+          customName: item.customName,
+          quantity: item.quantity,
+          priceAtTime: item.price,
+          customizations: {
+             ...item.options,
+             bundleLabel: item.bundleLabel,
+             tag: item.tag
+          }
+        });
+        if (item.extras && item.extras.length > 0) {
+          item.extras.forEach(extra => {
+            const extraQty = extra.quantity || 1;
+            itemsToPrepare.push({
+              productId: extra.productId,
+              customName: null,
+              quantity: extraQty,
+              priceAtTime: extra.price,
+              customizations: {
+                ...extra.options,
+                tag: extra.tag || 'EXTRA'
+              }
+            });
+          });
+        }
+      });
+
+      const result = await updatePOSOrderAction({
+        orderId,
+        items: itemsToPrepare,
+        subtotalAmount: total, // Passing total mapped for now as discount functionality handles logic via POS component
+        discountAmount: 0,
+        discountName: null,
+        totalAmount: total,
+        paymentMethod,
+        paymentStatus,
+        status,
+        note,
+      });
+
+      if (result.success) {
+        refreshActiveOrders();
+      }
+      return result;
+    } catch (e) {
+      console.error('Failed to update order:', e);
+      return { success: false };
     }
   };
 
@@ -286,6 +348,20 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateOrderPaymentStatus = async (orderId: string, paymentStatus: 'UNPAID' | 'PAID') => {
+    setActiveOrders(prev => prev.map(o =>
+      o.id === orderId ? { ...o, paymentStatus } : o
+    ));
+    setUserOrders(prev => prev.map(o =>
+      o.id === orderId ? { ...o, paymentStatus } : o
+    ));
+
+    const result = await updateOrderPaymentStatusAction(orderId, paymentStatus);
+    if (!result.success) {
+      console.error('Error updating payment status:', result.error);
+    }
+  };
+
   const dismissOrder = (orderId: string) => {
     setUserOrders(prev => prev.filter(o => o.id !== orderId));
   };
@@ -295,7 +371,9 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       userOrders,
       activeOrders,
       createOrder,
+      updateOrder,
       updateOrderStatus,
+      updateOrderPaymentStatus,
       dismissOrder,
       refreshActiveOrders,
       isLoading

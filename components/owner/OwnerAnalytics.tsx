@@ -1,6 +1,6 @@
 'use client';
 
-import { Package, ShoppingCart, Sparkles, DollarSign, ShoppingBag, TrendingUp, Info } from 'lucide-react';
+import { Package, ShoppingCart, Sparkles, DollarSign, ShoppingBag, TrendingUp, Info, Banknote, CreditCard } from 'lucide-react';
 import type { OwnerAnalytics } from '@/app/actions/owner';
 import { RevenueChart } from './RevenueChart';
 import { useMemo, useState, useRef, useEffect } from 'react';
@@ -52,7 +52,7 @@ export function OwnerAnalytics({ analytics }: OwnerAnalyticsProps) {
                 </div>
 
                 {/* Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
                     {/* Total Revenue */}
                     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm relative overflow-hidden">
                         <div className="flex items-center gap-2 mb-4">
@@ -72,8 +72,32 @@ export function OwnerAnalytics({ analytics }: OwnerAnalyticsProps) {
                         <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-green-50 rounded-full opacity-50" />
                     </div>
 
-                    {/* Total Orders */}
+                    {/* Total Cash Revenue */}
                     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                        <div className="flex items-center gap-2 mb-4 text-gray-500">
+                            <Banknote size={20} className="text-emerald-500" />
+                            <span className="text-sm font-medium">Cash Sales</span>
+                        </div>
+                        <h3 className="text-2xl font-bold text-gray-900 mb-1">
+                            {formatCurrency(analytics.totalCashRevenue)}
+                        </h3>
+                        <p className="text-xs text-gray-400">Total Cash (Last 30 Days)</p>
+                    </div>
+
+                    {/* Total Digital Revenue */}
+                    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                        <div className="flex items-center gap-2 mb-4 text-gray-500">
+                            <CreditCard size={20} className="text-blue-500" />
+                            <span className="text-sm font-medium">Digital Sales</span>
+                        </div>
+                        <h3 className="text-2xl font-bold text-gray-900 mb-1">
+                            {formatCurrency(analytics.totalDigitalRevenue)}
+                        </h3>
+                        <p className="text-xs text-gray-400">Maya / GCash (Last 30 Days)</p>
+                    </div>
+
+                    {/* Total Orders */}
+                    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm xl:col-span-1">
                         <div className="flex items-center gap-2 mb-4 text-gray-500">
                             <ShoppingBag size={20} />
                             <span className="text-sm font-medium">Total Orders</span>
@@ -85,7 +109,7 @@ export function OwnerAnalytics({ analytics }: OwnerAnalyticsProps) {
                     </div>
 
                     {/* Average Order Value */}
-                    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm xl:col-span-1">
                         <div className="flex items-center gap-2 mb-4 text-gray-500">
                             <TrendingUp size={20} />
                             <span className="text-sm font-medium">Avg Order Value</span>

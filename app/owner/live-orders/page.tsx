@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Clock, ChefHat, CheckCircle, X, CreditCard, Banknote, Smartphone, ClipboardList, Bell, History, ChevronDown, ChevronUp, RefreshCw, Search } from 'lucide-react';
 import { useOrderNotifications } from '@/hooks/useOrderNotifications';
 import LiveOrdersTabsMobile from './LiveOrdersTabsMobile';
-import { getPastOrdersAction } from '@/app/actions/orders';
+import { getPastOrdersAction, updateOrderPaymentMethodAction } from '@/app/actions/orders';
 import { getSessionAction } from '@/app/actions/auth';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -397,16 +397,15 @@ function ActivityLogSection() {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function LiveOrdersPage() {
-  const { activeOrders, updateOrderStatus, isLoading } = useOrder();
+  const { activeOrders, updateOrderStatus, isLoading, refreshActiveOrders } = useOrder();
   const [cancelModalOrder, setCancelModalOrder] = useState<Order | null>(null);
 
   const visibleOrders = activeOrders.filter(o => o.status !== 'CANCELLED' && o.status !== 'COMPLETED');
 
   const { newOrderNotification, dismissNotification } = useOrderNotifications(activeOrders, isLoading);
 
-  // Only PENDING, PREPARING, READY in the live kanban
+  // Only PREPARING and READY in the kitchen kanban
   const columns: { id: OrderStatus, title: string, bgColor: string, borderColor: string, icon: any }[] = [
-    { id: 'PENDING', title: 'Pending', bgColor: 'bg-[#FFF9E6]', borderColor: 'border-[#E6C84A]', icon: Clock },
     { id: 'PREPARING', title: 'Preparing', bgColor: 'bg-[#FFF5EB]', borderColor: 'border-[#E6894A]', icon: ChefHat },
     { id: 'READY', title: 'Ready', bgColor: 'bg-[#E8F5E9]', borderColor: 'border-[#4CAF50]', icon: CheckCircle },
   ];
@@ -421,6 +420,16 @@ export default function LiveOrdersPage() {
     if (cancelModalOrder) {
       updateOrderStatus(cancelModalOrder.id, 'CANCELLED');
       setCancelModalOrder(null);
+    }
+  };
+
+  const handlePaymentMethodChange = async (orderId: string, newMethod: 'CASH' | 'GCASH' | 'PAYMAYA') => {
+    const res = await updateOrderPaymentMethodAction(orderId, newMethod);
+    if (res.success) {
+      alert('Payment method updated');
+      refreshActiveOrders();
+    } else {
+      alert('Failed to update payment method');
     }
   };
 
@@ -452,15 +461,15 @@ export default function LiveOrdersPage() {
 
       <div className="bg-white px-4 py-4 md:px-6 md:py-4 border-b border-gray-200 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <ClipboardList size={20} className="text-gray-600" />
-          <h1 className="text-xl font-bold text-gray-900">Orders</h1>
+          <ChefHat size={20} className="text-[#D95D1E]" />
+          <h1 className="text-xl font-bold text-gray-900">Kitchen Display</h1>
         </div>
       </div>
 
       {/* ── Live Orders heading ── */}
       <div className="px-4 md:px-6 pt-5 md:pt-6 pb-4 md:pb-2">
-        <h2 className="text-lg font-bold text-gray-900">Live Orders</h2>
-        <p className="text-sm text-gray-500 mt-1">{visibleOrders.length} active order{visibleOrders.length !== 1 ? 's' : ''}</p>
+        <h2 className="text-lg font-bold text-gray-900">Active preparation</h2>
+        <p className="text-sm text-gray-500 mt-1">{visibleOrders.filter(o => o.status === 'PREPARING' || o.status === 'READY').length} order{visibleOrders.filter(o => o.status === 'PREPARING' || o.status === 'READY').length !== 1 ? 's' : ''} in queue</p>
       </div>
 
       {/* Mobile: tabbed view */}
@@ -470,6 +479,7 @@ export default function LiveOrdersPage() {
           getOrdersByStatus={getOrdersByStatus}
           updateOrderStatus={updateOrderStatus}
           onCancelClick={handleCancelClick}
+          onPaymentMethodChange={handlePaymentMethodChange}
         />
       </div>
 
@@ -507,9 +517,22 @@ export default function LiveOrdersPage() {
                         <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-full">
                           {order.table}
                         </span>
-                        <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-xs font-bold px-2.5 py-1 rounded-full uppercase">
-                          <PaymentIcon method={order.paymentMethod} />
-                          {order.paymentMethod}
+                        <div className="relative group/payment">
+                          <select
+                            value={order.paymentMethod || 'CASH'}
+                            onChange={(e) => handlePaymentMethodChange(order.id, e.target.value as any)}
+                            className="appearance-none inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-xs font-bold pl-2.5 py-1 pr-6 rounded-full uppercase cursor-pointer hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-[#D95D1E]"
+                          >
+                            <option value="CASH">CASH</option>
+                            <option value="GCASH">GCASH</option>
+                            <option value="PAYMAYA">PAYMAYA</option>
+                          </select>
+                          <ChevronDown size={10} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                        </div>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            order.paymentStatus === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'
+                        }`}>
+                            {order.paymentStatus}
                         </span>
                       </div>
 
@@ -573,14 +596,7 @@ export default function LiveOrdersPage() {
                         </div>
                       </div>
 
-                      {col.id === 'PENDING' && (
-                        <button
-                          onClick={() => updateOrderStatus(order.id, 'PREPARING')}
-                          className="w-full py-2 bg-blue-50 text-blue-600 font-bold text-sm rounded-lg hover:bg-blue-100 transition"
-                        >
-                          Start Preparing →
-                        </button>
-                      )}
+                      {/* Removed PENDING to PREPARING button as this is handled in POS now */}
                       {col.id === 'PREPARING' && (
                         <button
                           onClick={() => updateOrderStatus(order.id, 'READY')}

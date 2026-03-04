@@ -12,6 +12,7 @@ import {
   Coffee,
   LogOut,
   X,
+  Calculator
 } from 'lucide-react';
 import Drawer from '@/components/ui/Drawer';
 import { useState, useEffect } from 'react';
@@ -30,6 +31,12 @@ type NavGroup = {
 };
 
 const navGroups: NavGroup[] = [
+  {
+    title: 'Point of Sale',
+    items: [
+      { label: 'POS Terminal', href: '/owner/pos', icon: Calculator },
+    ],
+  },
   {
     title: 'Business / Operations',
     items: [

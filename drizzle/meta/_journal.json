@@ -57,6 +57,13 @@
       "when": 1772162856877,
       "tag": "0007_thick_miracleman",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1772614440518,
+      "tag": "0008_rainy_korvac",
+      "breakpoints": true
     }
   ]
 }

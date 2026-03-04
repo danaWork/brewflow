@@ -12,9 +12,11 @@ export type OwnerAnalytics = {
     crossSellItemsSold: number;
     customizedOrdersCount: number;
     totalRevenue: number;
+    totalCashRevenue: number;
+    totalDigitalRevenue: number;
     totalOrders: number;
     averageOrderValue: number;
-    revenueOverTime: Array<{ date: string; revenue: number; orders: number }>;
+    revenueOverTime: Array<{ date: string; revenue: number; cashRevenue: number; digitalRevenue: number; orders: number }>;
 };
 
 export async function getOwnerAnalytics(branchId: string, days: number = 30): Promise<OwnerAnalytics> {
@@ -26,6 +28,7 @@ export async function getOwnerAnalytics(branchId: string, days: number = 30): Pr
         const branchOrders = await db.select({
             orderId: orders.id,
             totalAmount: orders.totalAmount,
+            paymentMethod: orders.paymentMethod,
             createdAt: orders.createdAt,
             items: sql<any>`json_agg(json_build_object(
                 'productId', ${orderItems.productId},
@@ -45,11 +48,13 @@ export async function getOwnerAnalytics(branchId: string, days: number = 30): Pr
                     inArray(orders.status, ['PREPARING', 'READY', 'COMPLETED'])
                 )
             )
-            .groupBy(orders.id, orders.totalAmount, orders.createdAt);
+            .groupBy(orders.id, orders.totalAmount, orders.paymentMethod, orders.createdAt);
 
         // Calculate metrics
         let totalOrders = 0;
         let totalRevenue = 0;
+        let totalCashRevenue = 0;
+        let totalDigitalRevenue = 0;
         let bundleOrders = 0;
         let crossSellOrders = 0;
         let customizedOrders = 0;
@@ -57,18 +62,32 @@ export async function getOwnerAnalytics(branchId: string, days: number = 30): Pr
         let crossSellItems = 0;
         let customizedItems = 0;
 
-        const revenueByDate = new Map<string, { revenue: number; orders: number }>();
+        const revenueByDate = new Map<string, { revenue: number; cashRevenue: number; digitalRevenue: number; orders: number }>();
 
         branchOrders.forEach(order => {
             totalOrders++;
             const revenue = parseFloat(order.totalAmount.toString());
             totalRevenue += revenue;
 
+            if (order.paymentMethod === 'CASH') {
+                totalCashRevenue += revenue;
+            } else if (order.paymentMethod === 'GCASH' || order.paymentMethod === 'PAYMAYA') {
+                totalDigitalRevenue += revenue;
+            }
+
             // Group by date
             const dateKey = order.createdAt.toISOString().split('T')[0];
-            const existing = revenueByDate.get(dateKey) || { revenue: 0, orders: 0 };
+            const existing = revenueByDate.get(dateKey) || { revenue: 0, cashRevenue: 0, digitalRevenue: 0, orders: 0 };
+            
+            let cashToAdd = 0;
+            let digitalToAdd = 0;
+            if (order.paymentMethod === 'CASH') cashToAdd = revenue;
+            else if (order.paymentMethod === 'GCASH' || order.paymentMethod === 'PAYMAYA') digitalToAdd = revenue;
+
             revenueByDate.set(dateKey, {
                 revenue: existing.revenue + revenue,
+                cashRevenue: existing.cashRevenue + cashToAdd,
+                digitalRevenue: existing.digitalRevenue + digitalToAdd,
                 orders: existing.orders + 1
             });
 
@@ -115,18 +134,20 @@ export async function getOwnerAnalytics(branchId: string, days: number = 30): Pr
             .map(([date, data]) => ({
                 date,
                 revenue: parseFloat(data.revenue.toFixed(2)),
+                cashRevenue: parseFloat(data.cashRevenue.toFixed(2)),
+                digitalRevenue: parseFloat(data.digitalRevenue.toFixed(2)),
                 orders: data.orders
             }))
             .sort((a, b) => a.date.localeCompare(b.date));
 
         // Fill in missing dates with zero values
-        const filledRevenueOverTime: Array<{ date: string; revenue: number; orders: number }> = [];
+        const filledRevenueOverTime: Array<{ date: string; revenue: number; cashRevenue: number; digitalRevenue: number; orders: number }> = [];
         for (let i = 0; i < days; i++) {
             const date = new Date();
             date.setDate(date.getDate() - (days - 1 - i));
             const dateKey = date.toISOString().split('T')[0];
             const existing = revenueOverTime.find(r => r.date === dateKey);
-            filledRevenueOverTime.push(existing || { date: dateKey, revenue: 0, orders: 0 });
+            filledRevenueOverTime.push(existing || { date: dateKey, revenue: 0, cashRevenue: 0, digitalRevenue: 0, orders: 0 });
         }
 
         const safeDiv = (n: number, d: number) => d === 0 ? 0 : (n / d) * 100;
@@ -139,6 +160,8 @@ export async function getOwnerAnalytics(branchId: string, days: number = 30): Pr
             crossSellItemsSold: crossSellOrders,
             customizedOrdersCount: customizedOrders,
             totalRevenue: parseFloat(totalRevenue.toFixed(2)),
+            totalCashRevenue: parseFloat(totalCashRevenue.toFixed(2)),
+            totalDigitalRevenue: parseFloat(totalDigitalRevenue.toFixed(2)),
             totalOrders,
             averageOrderValue: totalOrders > 0 ? parseFloat((totalRevenue / totalOrders).toFixed(2)) : 0,
             revenueOverTime: filledRevenueOverTime
@@ -154,6 +177,8 @@ export async function getOwnerAnalytics(branchId: string, days: number = 30): Pr
             crossSellItemsSold: 0,
             customizedOrdersCount: 0,
             totalRevenue: 0,
+            totalCashRevenue: 0,
+            totalDigitalRevenue: 0,
             totalOrders: 0,
             averageOrderValue: 0,
             revenueOverTime: []

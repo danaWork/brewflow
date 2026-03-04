@@ -4,7 +4,7 @@ import { TrendingUp } from 'lucide-react';
 import { useMemo, useState, useRef, useEffect } from 'react';
 
 interface RevenueChartProps {
-    data: Array<{ date: string; revenue: number; orders: number }>;
+    data: Array<{ date: string; revenue: number; cashRevenue: number; digitalRevenue: number; orders: number }>;
 }
 
 const MOBILE_BREAKPOINT = 768;
@@ -15,6 +15,8 @@ export function RevenueChart({ data }: RevenueChartProps) {
         y: number;
         date: string;
         revenue: number;
+        cashRevenue: number;
+        digitalRevenue: number;
         orders: number;
     } | null>(null);
     const [isMobile, setIsMobile] = useState(false);
@@ -151,6 +153,8 @@ export function RevenueChart({ data }: RevenueChartProps) {
                 y: point.y,
                 date: point.date,
                 revenue: point.revenue,
+                cashRevenue: point.cashRevenue,
+                digitalRevenue: point.digitalRevenue,
                 orders: point.orders
             });
         }
@@ -239,7 +243,7 @@ export function RevenueChart({ data }: RevenueChartProps) {
                                 className="cursor-pointer touch-none"
                                 onMouseEnter={(e) => handlePointMouseEnter(point, e)}
                                 onMouseLeave={handlePointMouseLeave}
-                                onClick={() => isMobile && setTooltip(tooltip?.date === point.date ? null : { x: point.x, y: point.y, date: point.date, revenue: point.revenue, orders: point.orders })}
+                                onClick={() => isMobile && setTooltip(tooltip?.date === point.date ? null : { x: point.x, y: point.y, date: point.date, revenue: point.revenue, cashRevenue: point.cashRevenue, digitalRevenue: point.digitalRevenue, orders: point.orders })}
                             />
                             <circle
                                 cx={point.x}
@@ -295,8 +299,16 @@ export function RevenueChart({ data }: RevenueChartProps) {
                                 {formatCurrency(tooltip.revenue)}
                             </span>
                         </div>
-                        <div className="text-xs text-gray-500 font-medium mt-0.5">
+                        <div className="text-xs text-gray-500 font-medium mt-0.5 border-b border-gray-100 pb-1">
                             {tooltip.orders} {tooltip.orders === 1 ? 'order' : 'orders'}
+                        </div>
+                        <div className="flex justify-between items-center text-xs mt-1">
+                            <span className="text-gray-500">Cash:</span>
+                            <span className="font-semibold text-gray-700">{formatCurrency(tooltip.cashRevenue)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs">
+                            <span className="text-gray-500">Digital:</span>
+                            <span className="font-semibold text-gray-700">{formatCurrency(tooltip.digitalRevenue)}</span>
                         </div>
                     </div>
                     <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-[-1px]">

@@ -5,6 +5,7 @@ import { relations } from 'drizzle-orm';
 export const roleEnum = pgEnum('role', ['SUPERADMIN', 'BRANCH_MANAGER', 'KITCHEN_STAFF']);
 export const orderStatusEnum = pgEnum('order_status', ['PENDING', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED']);
 export const paymentMethodEnum = pgEnum('payment_method', ['CASH', 'GCASH', 'PAYMAYA']);
+export const paymentStatusEnum = pgEnum('payment_status', ['UNPAID', 'PAID']);
 export const promotionTypeEnum = pgEnum('promotion_type', ['PERFECT_PAIR', 'CROSS_SELL']);
 export const discountTypeEnum = pgEnum('discount_type', ['PERCENTAGE', 'FIXED']);
 
@@ -111,7 +112,11 @@ export const orders = pgTable('orders', {
   orderNumber: integer('order_number').notNull(), // Manually computed per shop instead of global identity
   status: orderStatusEnum('status').default('PENDING').notNull(),
   paymentMethod: paymentMethodEnum('payment_method'),
+  paymentStatus: paymentStatusEnum('payment_status').default('UNPAID').notNull(),
   note: text('note'),
+  subtotalAmount: decimal('subtotal_amount', { precision: 10, scale: 2 }), // Before discounts
+  discountAmount: decimal('discount_amount', { precision: 10, scale: 2 }), // Applied discount value
+  discountName: text('discount_name'), // e.g. "PWD", "Senior Citizen", "House 10%"
   totalAmount: decimal('total_amount', { precision: 10, scale: 2 }).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   acceptedAt: timestamp('accepted_at'),
@@ -122,7 +127,8 @@ export const orders = pgTable('orders', {
 export const orderItems = pgTable('order_items', {
   id: uuid('id').defaultRandom().primaryKey(),
   orderId: uuid('order_id').references(() => orders.id).notNull(),
-  productId: uuid('product_id').references(() => products.id).notNull(),
+  productId: uuid('product_id').references(() => products.id), // Nullable for ad-hoc items
+  customName: text('custom_name'), // Name for ad-hoc items if productId is null
   quantity: integer('quantity').notNull(),
   priceAtTime: decimal('price_at_time', { precision: 10, scale: 2 }).notNull(),
   customizations: text('customizations'), // Store as JSON string for ad-hoc options

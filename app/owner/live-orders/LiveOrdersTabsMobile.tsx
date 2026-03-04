@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Clock, ChefHat, CheckCircle, CreditCard, Banknote, Smartphone, X } from 'lucide-react';
+import { Clock, ChefHat, CheckCircle, CreditCard, Banknote, Smartphone, X, ChevronDown } from 'lucide-react';
 import type { Order, OrderStatus } from '@/context/OrderContext';
 
 function PaymentIcon({ method }: { method: string }) {
@@ -24,6 +24,7 @@ interface LiveOrdersTabsMobileProps {
   getOrdersByStatus: (status: OrderStatus) => Order[];
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   onCancelClick: (order: Order) => void;
+  onPaymentMethodChange: (orderId: string, newMethod: 'CASH' | 'GCASH' | 'PAYMAYA') => Promise<void>;
 }
 
 export default function LiveOrdersTabsMobile({
@@ -31,6 +32,7 @@ export default function LiveOrdersTabsMobile({
   getOrdersByStatus,
   updateOrderStatus,
   onCancelClick,
+  onPaymentMethodChange,
 }: LiveOrdersTabsMobileProps) {
   const [activeTab, setActiveTab] = useState<OrderStatus>(columns[0]?.id ?? 'PENDING');
   const activeCol = columns.find((c) => c.id === activeTab) ?? columns[0];
@@ -105,9 +107,22 @@ export default function LiveOrdersTabsMobile({
                 <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-full">
                   {order.table}
                 </span>
-                <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-xs font-bold px-2.5 py-1 rounded-full uppercase">
-                  <PaymentIcon method={order.paymentMethod} />
-                  {order.paymentMethod}
+                <div className="relative group/payment">
+                  <select
+                    value={order.paymentMethod || 'CASH'}
+                    onChange={(e) => onPaymentMethodChange(order.id, e.target.value as any)}
+                    className="appearance-none inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-xs font-bold pl-2.5 py-1 pr-6 rounded-full uppercase cursor-pointer hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-[#D95D1E]"
+                  >
+                    <option value="CASH">CASH</option>
+                    <option value="GCASH">GCASH</option>
+                    <option value="PAYMAYA">PAYMAYA</option>
+                  </select>
+                  <ChevronDown size={10} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                    order.paymentStatus === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'
+                }`}>
+                    {order.paymentStatus}
                 </span>
               </div>
 
@@ -174,15 +189,7 @@ export default function LiveOrdersTabsMobile({
                 <div className="text-lg font-bold text-[#D95D1E]">₱{order.total.toFixed(2)}</div>
               </div>
 
-              {activeCol.id === 'PENDING' && (
-                <button
-                  type="button"
-                  onClick={() => updateOrderStatus(order.id, 'PREPARING')}
-                  className="w-full py-2 bg-blue-50 text-blue-600 font-bold text-sm rounded-lg hover:bg-blue-100 transition"
-                >
-                  Start Preparing →
-                </button>
-              )}
+              {/* Removed PENDING to PREPARING button as this is handled in POS now */}
               {activeCol.id === 'PREPARING' && (
                 <button
                   type="button"
