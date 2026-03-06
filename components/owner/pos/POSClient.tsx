@@ -93,6 +93,16 @@ export function POSClient({
     const [productModalProduct, setProductModalProduct] = useState<Product | null>(null);
     const [editingCartItemUniqueId, setEditingCartItemUniqueId] = useState<string | null>(null);
     const [cancelOrderModal, setCancelOrderModal] = useState<{ id: string; orderNumber: number; table: string } | null>(null);
+    const [receiptModal, setReceiptModal] = useState<{
+        orderNumber: number;
+        table: string;
+        paymentMethod: string;
+        timestamp: Date;
+        total: number;
+        items: { name: string; price: number; quantity: number; options?: Record<string, unknown>; extras?: { name: string; price: number; quantity?: number }[] }[];
+        discountName?: string | null;
+        discountAmount?: number;
+    } | null>(null);
 
     const pendingOrders = activeOrders.filter(o => o.status === 'PENDING');
     const unpaidOrders = activeOrders.filter(o => o.paymentStatus === 'UNPAID' && o.status !== 'PENDING' && o.status !== 'COMPLETED' && o.status !== 'CANCELLED');
@@ -315,8 +325,25 @@ export function POSClient({
                     paymentMethod,
                 });
 
-                if (res.success) {
-                    toast.success('Order completed successfully');
+                if (res.success && res.order) {
+                    toast.success('Order placed successfully (Sent to Kitchen)');
+                    // Set receipt modal with current order details before clearing state
+                    setReceiptModal({
+                        orderNumber: res.order.orderNumber,
+                        table: res.order.tableId, // POS table ID or walk-in designator
+                        paymentMethod,
+                        timestamp: new Date(),
+                        total,
+                        items: cart.map(item => ({
+                            name: item.name,
+                            price: item.price,
+                            quantity: item.quantity,
+                            options: item.options,
+                            extras: item.extras?.map(ex => ({ name: ex.name, price: ex.price, quantity: ex.quantity }))
+                        })),
+                        discountName: appliedPromotion ? appliedPromotion.name : (discountName === 'None' ? null : discountName),
+                        discountAmount: discountAmount
+                    });
                     setCart([]);
                     setDiscountName('None');
                     setPaymentMethod('CASH');
@@ -708,7 +735,7 @@ export function POSClient({
             {/* Ad-Hoc Modal */}
             {showAdHocModal && (
                 <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
-                    <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-sm max-h-[90vh] sm:max-h-none overflow-hidden animate-in fade-in zoom-in-95 duration-200 safe-area-pb">
+                    <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-sm max-h-[85vh] sm:max-h-none overflow-hidden animate-in fade-in zoom-in-95 duration-200 safe-area-pb">
                         <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
                             <h3 className="font-bold text-gray-900 flex items-center gap-2">
                                 <HelpCircle size={18} className="text-[#D95D1E]" />
@@ -756,7 +783,7 @@ export function POSClient({
             {/* Incoming Orders Modal */}
             {showIncomingModal && (
                 <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
-                    <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 safe-area-pb">
+                    <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] sm:max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 safe-area-pb">
                         <div className="p-4 border-b border-gray-100 bg-gray-50 shrink-0">
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="font-bold text-gray-900 flex items-center gap-2 text-lg">
@@ -926,6 +953,104 @@ export function POSClient({
                                     </div>
                                 ))
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Receipt Modal */}
+            {receiptModal && (
+                <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+                        {/* Receipt Header */}
+                        <div className="bg-gray-50 border-b border-gray-100 p-6 text-center">
+                            <h3 className="text-xl font-black text-gray-900 mb-1">{storeName}</h3>
+                            <p className="text-sm text-gray-500 font-medium tracking-wide">RECEIPT / POINT OF SALE</p>
+                        </div>
+                        
+                        {/* Receipt Body */}
+                        <div className="p-6 bg-white space-y-5 flex-1 overflow-y-auto max-h-[50vh] custom-scrollbar">
+                            <div className="flex justify-between items-center text-sm font-semibold text-gray-700 pb-4 border-b border-dashed border-gray-200">
+                                <span>Order #{receiptModal.orderNumber}</span>
+                                <span>{receiptModal.timestamp.toLocaleDateString()} {receiptModal.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                            </div>
+                            
+                            <div className="space-y-3">
+                                {receiptModal.items.map((item, idx) => (
+                                    <div key={idx} className="text-sm">
+                                        <div className="flex justify-between items-start font-medium text-gray-900">
+                                            <span className="flex-1 pr-2">{item.quantity} x {item.name}</span>
+                                            <span>{formatCurrency(item.price * item.quantity)}</span>
+                                        </div>
+                                        {/* Modifiers / Options */}
+                                        {item.options && Object.keys(item.options).length > 0 && (
+                                            <div className="pl-4 mt-1 text-xs text-gray-500 space-y-0.5">
+                                                {Object.entries(item.options).map(([key, val]) => {
+                                                     if (key === 'tag' || key === 'bundleLabel') return null;
+                                                     return <div key={key}>- {key}: {String(val)}</div>;
+                                                })}
+                                                {item.options.tag ? <div>- Tag: {String(item.options.tag)}</div> : null}
+                                                {item.options.bundleLabel ? <div>- Bundle: {String(item.options.bundleLabel)}</div> : null}
+                                            </div>
+                                        )}
+                                        {/* Extras */}
+                                        {item.extras && item.extras.length > 0 && (
+                                            <div className="pl-4 mt-1 text-xs text-gray-500 space-y-0.5">
+                                                {item.extras.map((ex, i) => (
+                                                    <div key={i} className="flex justify-between">
+                                                        <span>+ {ex.quantity && ex.quantity > 1 ? `${ex.quantity} x ` : ''}{ex.name}</span>
+                                                        <span>{formatCurrency(ex.price * (ex.quantity || 1))}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                            
+                            <div className="pt-4 border-t border-dashed border-gray-200 space-y-1.5">
+                                {receiptModal.discountAmount ? (
+                                    <>
+                                        <div className="flex justify-between text-sm text-gray-600 font-medium">
+                                            <span>Subtotal</span>
+                                            <span>{formatCurrency(receiptModal.total + receiptModal.discountAmount)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm text-green-600 font-medium">
+                                            <span>Discount ({receiptModal.discountName || 'Manual'})</span>
+                                            <span>-{formatCurrency(receiptModal.discountAmount)}</span>
+                                        </div>
+                                    </>
+                                ) : null}
+                                <div className="flex justify-between items-center text-lg font-black text-gray-900 pt-2">
+                                    <span>Total</span>
+                                    <span>{formatCurrency(receiptModal.total)}</span>
+                                </div>
+                                <div className="flex justify-between text-xs font-semibold text-gray-500 uppercase tracking-widest pt-2">
+                                    <span>Payment</span>
+                                    <span>{receiptModal.paymentMethod}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Receipt Actions */}
+                        <div className="p-4 bg-gray-50 border-t border-gray-100 flex gap-3">
+                            <button
+                                onClick={() => setReceiptModal(null)}
+                                className="flex-1 py-3 px-4 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-colors"
+                            >
+                                Done
+                            </button>
+                            <button
+                                onClick={() => {
+                                    printReceipt(receiptModal);
+                                    // Normally you'd want the user to explicitly dismiss it, so we don't nullify the modal here.
+                                    // If you want it to auto-close after print, add: setReceiptModal(null);
+                                }}
+                                className="flex-1 py-3 px-4 bg-[#D95D1E] hover:bg-[#c25016] text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm"
+                            >
+                                <Printer size={18} />
+                                Print
+                            </button>
                         </div>
                     </div>
                 </div>

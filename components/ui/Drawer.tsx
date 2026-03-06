@@ -47,7 +47,7 @@ export default function Drawer({
       <div 
         className={`
           relative w-full max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden 
-          flex flex-col max-h-[90vh]
+          flex flex-col max-h-[85vh] sm:max-h-[90vh]
           transition-transform duration-300 ease-out transform
           ${isOpen ? 'translate-y-0 sm:scale-100' : 'translate-y-full sm:scale-95'}
         `}
