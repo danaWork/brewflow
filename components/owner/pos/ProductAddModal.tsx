@@ -188,7 +188,7 @@ export function ProductAddModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-lg max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden flex-1 sm:flex-initial">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] sm:max-h-[90vh] flex flex-col overflow-hidden flex-1 sm:flex-initial">
         <div className="p-4 border-b border-gray-100 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             {canGoBack && (

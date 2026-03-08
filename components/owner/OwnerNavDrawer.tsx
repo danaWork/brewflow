@@ -35,6 +35,7 @@ const navGroups: NavGroup[] = [
     title: 'Point of Sale',
     items: [
       { label: 'POS Terminal', href: '/owner/pos', icon: Calculator },
+      { label: 'Receipts', href: '/owner/pos/receipts', icon: ClipboardList },
     ],
   },
   {
