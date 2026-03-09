@@ -223,6 +223,18 @@ export default function ReceiptsClient({ branchId }: { branchId: string }) {
                             </div>
                             
                             <div className="pt-4 border-t border-dashed border-gray-200 space-y-1.5">
+                                {receiptModal.discountAmount ? (
+                                    <>
+                                        <div className="flex justify-between text-sm text-gray-600 font-medium">
+                                            <span>Subtotal</span>
+                                            <span>{formatCurrency(receiptModal.total + receiptModal.discountAmount)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm text-green-600 font-medium">
+                                            <span>Discount ({receiptModal.discountName || 'Manual'})</span>
+                                            <span>-{formatCurrency(receiptModal.discountAmount)}</span>
+                                        </div>
+                                    </>
+                                ) : null}
                                 {receiptModal.note ? (
                                     <div className="pb-3 border-b border-dashed border-gray-200 mb-3 text-xs text-gray-600">
                                         <strong>Note:</strong> {receiptModal.note}

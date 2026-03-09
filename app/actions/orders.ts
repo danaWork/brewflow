@@ -240,6 +240,8 @@ export async function getActiveOrdersAction(branchId: string) {
         createdAt: o.createdAt,
         paymentMethod: o.paymentMethod,
         paymentStatus: o.paymentStatus as "UNPAID" | "PAID",
+        discountAmount: o.discountAmount ? parseFloat(o.discountAmount as string) : 0,
+        discountName: o.discountName,
         note: o.note,
         items: o.items.map((item: any) => ({
           productId: item.productId,
@@ -364,6 +366,8 @@ export async function getPastOrdersAction(
         completedAt: o.completedAt,
         paymentMethod: o.paymentMethod,
         paymentStatus: o.paymentStatus as "UNPAID" | "PAID",
+        discountAmount: o.discountAmount ? parseFloat(o.discountAmount as string) : 0,
+        discountName: o.discountName,
         note: o.note,
         items: o.items.map((item: any) => ({
           productId: item.productId,

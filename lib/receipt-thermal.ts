@@ -21,6 +21,9 @@ export interface ReceiptOrder {
   table: string;
   paymentMethod: string;
   timestamp: Date;
+  discountAmount?: number;
+  discountName?: string | null;
+  note?: string;
 }
 
 export interface BuildReceiptOptions {
@@ -80,9 +83,22 @@ export function buildReceiptText(
   }
 
   lines.push(SEP);
+  if (order.discountAmount && order.discountAmount > 0) {
+    const subtotalLine = `Subtotal PHP ${(order.total + order.discountAmount).toFixed(2)}`;
+    lines.push(padRight(subtotalLine, WIDTH));
+    const discountName = order.discountName || 'Discount';
+    const discountLine = `${discountName} -PHP ${order.discountAmount.toFixed(2)}`;
+    lines.push(padRight(discountLine, WIDTH));
+    lines.push(SEP);
+  }
+
   const totalLine = `TOTAL    PHP ${order.total.toFixed(2)}`;
   lines.push(padRight(totalLine, WIDTH));
   lines.push(`Payment: ${order.paymentMethod}`);
+  if (order.note) {
+    lines.push(SEP);
+    lines.push(`Note: ${order.note}`);
+  }
   lines.push(SEP);
   lines.push(padCenter('Thank you!', WIDTH));
   lines.push(SEP);
@@ -183,6 +199,9 @@ export interface PosOrderForReceipt {
   table: string;
   paymentMethod: string;
   timestamp: Date;
+  discountAmount?: number;
+  discountName?: string | null;
+  note?: string;
 }
 
 /**
@@ -198,6 +217,9 @@ export function buildReceiptEscPosFromOrder(
     table: order.table,
     paymentMethod: order.paymentMethod,
     timestamp: order.timestamp instanceof Date ? order.timestamp : new Date(order.timestamp),
+    discountAmount: order.discountAmount,
+    discountName: order.discountName,
+    note: order.note,
     items: order.items.map((item) => ({
       name: item.name,
       price: item.price,
