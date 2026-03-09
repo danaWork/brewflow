@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Image from 'next/image';
 import { toast } from 'sonner';
 import { ShoppingCart, Plus, Minus, X, CreditCard, Banknote, HelpCircle, UtensilsCrossed, Tag, Package, Search, Bell, CheckCircle, Pencil, Printer } from 'lucide-react';
@@ -80,6 +80,7 @@ export function POSClient({
     const [searchQuery, setSearchQuery] = useState('');
     const [discountName, setDiscountName] = useState<string>('None');
     const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'GCASH' | 'PAYMAYA'>('CASH');
+    const [cashReceived, setCashReceived] = useState<string>('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Ad-Hoc Modal State
@@ -103,6 +104,38 @@ export function POSClient({
         discountName?: string | null;
         discountAmount?: number;
     } | null>(null);
+
+    const [isInitialized, setIsInitialized] = useState(false);
+
+    useEffect(() => {
+        try {
+            const savedCart = localStorage.getItem('pos_cart');
+            const savedDiscount = localStorage.getItem('pos_discount');
+            const savedPayment = localStorage.getItem('pos_payment');
+            const savedCash = localStorage.getItem('pos_cash');
+
+            if (savedCart) setCart(JSON.parse(savedCart));
+            if (savedDiscount) setDiscountName(savedDiscount);
+            if (savedPayment) setPaymentMethod(savedPayment as 'CASH' | 'GCASH' | 'PAYMAYA');
+            if (savedCash) setCashReceived(savedCash);
+        } catch (e) {
+            console.error('Failed to load POS state from local storage', e);
+        } finally {
+            setIsInitialized(true);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!isInitialized) return;
+        try {
+            localStorage.setItem('pos_cart', JSON.stringify(cart));
+            localStorage.setItem('pos_discount', discountName);
+            localStorage.setItem('pos_payment', paymentMethod);
+            localStorage.setItem('pos_cash', cashReceived);
+        } catch (e) {
+            console.error('Failed to save POS state to local storage', e);
+        }
+    }, [cart, discountName, paymentMethod, cashReceived, isInitialized]);
 
     const pendingOrders = activeOrders.filter(o => o.status === 'PENDING');
     const unpaidOrders = activeOrders.filter(o => o.paymentStatus === 'UNPAID' && o.status !== 'PENDING' && o.status !== 'COMPLETED' && o.status !== 'CANCELLED');
@@ -255,9 +288,13 @@ export function POSClient({
         return subtotal * (discount.value / 100);
     }, [subtotal, discountName]);
 
-    const discountAmount = appliedPromotion ? promotionDiscountAmount : manualDiscountAmount;
-    const discountNameDisplay = appliedPromotion ? appliedPromotion.name : discountName;
-    const total = subtotal - discountAmount;
+    const isManualDiscountApplied = discountName !== 'None';
+    const discountAmount = (appliedPromotion ? promotionDiscountAmount : 0) + (isManualDiscountApplied ? manualDiscountAmount : 0);
+    let discountNameDisplay = 'None';
+    if (appliedPromotion && isManualDiscountApplied) discountNameDisplay = `${appliedPromotion.name} & ${discountName}`;
+    else if (appliedPromotion) discountNameDisplay = appliedPromotion.name;
+    else if (isManualDiscountApplied) discountNameDisplay = discountName;
+    const total = Math.max(0, subtotal - discountAmount);
 
     const handleCheckout = async () => {
         if (cart.length === 0) {
@@ -283,13 +320,15 @@ export function POSClient({
                     bundleLabel: item.bundleLabel,
                     tag: item.tag,
                 })) as OrderCartItem[];
-                const res = await updateOrder(editingOrderId, cartForUpdate, total, paymentMethod, currentPaymentStatus, currentStatus, undefined);
+                const discountToSend = discountNameDisplay === 'None' ? null : discountNameDisplay;
+                const res = await updateOrder(editingOrderId, cartForUpdate, subtotal, discountAmount, discountToSend, total, paymentMethod, currentPaymentStatus, currentStatus, undefined);
 
                 if (res.success) {
                     toast.success('Order updated. Customer will see the changes.');
                     setCart([]);
                     setDiscountName('None');
                     setPaymentMethod('CASH');
+                    setCashReceived('');
                     setEditingOrderId(null);
                     setCartDrawerOpen(false);
                 } else {
@@ -320,7 +359,7 @@ export function POSClient({
                     items: itemsToSend,
                     subtotalAmount: subtotal,
                     discountAmount: discountAmount,
-                    discountName: appliedPromotion ? appliedPromotion.name : (discountName === 'None' ? null : discountName),
+                    discountName: discountNameDisplay === 'None' ? null : discountNameDisplay,
                     totalAmount: total,
                     paymentMethod,
                 });
@@ -341,12 +380,13 @@ export function POSClient({
                             options: item.options,
                             extras: item.extras?.map(ex => ({ name: ex.name, price: ex.price, quantity: ex.quantity }))
                         })),
-                        discountName: appliedPromotion ? appliedPromotion.name : (discountName === 'None' ? null : discountName),
+                        discountName: discountNameDisplay === 'None' ? null : discountNameDisplay,
                         discountAmount: discountAmount
                     });
                     setCart([]);
                     setDiscountName('None');
                     setPaymentMethod('CASH');
+                    setCashReceived('');
                     setEditingOrderId(null);
                     setCartDrawerOpen(false);
                 } else {
@@ -384,6 +424,7 @@ export function POSClient({
     const cancelEdit = () => {
         setCart([]);
         setPaymentMethod('CASH');
+        setCashReceived('');
         setEditingOrderId(null);
     };
 
@@ -391,7 +432,7 @@ export function POSClient({
         ? process.env.NEXT_PUBLIC_RECEIPT_STORE_NAME
         : 'BrewFlow';
 
-    async function printReceipt(order: { orderNumber: number; items: { name: string; price: number; quantity: number; options?: Record<string, unknown>; extras?: { name: string; price: number; quantity?: number }[] }[]; total: number; table: string; paymentMethod: string; timestamp: Date }) {
+    async function printReceipt(order: { orderNumber: number; items: { name: string; price: number; quantity: number; options?: Record<string, unknown>; extras?: { name: string; price: number; quantity?: number }[] }[]; total: number; table: string; paymentMethod: string; timestamp: Date; discountAmount?: number; discountName?: string | null }) {
         const receiptOrder = {
             orderNumber: order.orderNumber,
             items: order.items.map((item: any) => ({
@@ -405,6 +446,8 @@ export function POSClient({
             table: order.table,
             paymentMethod: order.paymentMethod,
             timestamp: order.timestamp instanceof Date ? order.timestamp : new Date(order.timestamp),
+            discountAmount: order.discountAmount,
+            discountName: order.discountName,
         };
         const bytes = buildReceiptEscPosFromOrder(receiptOrder, { storeName });
         const result = await connectAndPrint(bytes);
@@ -709,16 +752,43 @@ export function POSClient({
                                 <span>Subtotal</span>
                                 <span>{formatCurrency(subtotal)}</span>
                             </div>
-                            {discountAmount > 0 && (
+                            {appliedPromotion && promotionDiscountAmount > 0 && (
                                 <div className="flex justify-between text-sm text-green-600 font-medium">
-                                    <span>Discount ({discountNameDisplay})</span>
-                                    <span>-{formatCurrency(discountAmount)}</span>
+                                    <span>Discount ({appliedPromotion.name})</span>
+                                    <span>-{formatCurrency(promotionDiscountAmount)}</span>
+                                </div>
+                            )}
+                            {isManualDiscountApplied && manualDiscountAmount > 0 && (
+                                <div className="flex justify-between text-sm text-green-600 font-medium">
+                                    <span>Discount ({discountName})</span>
+                                    <span>-{formatCurrency(manualDiscountAmount)}</span>
                                 </div>
                             )}
                             <div className="flex justify-between items-center pt-2 border-t border-gray-200 mt-2 pb-2">
                                 <span className="text-lg font-bold text-gray-900">Total</span>
                                 <span className="text-2xl font-black text-[#D95D1E]">{formatCurrency(total)}</span>
                             </div>
+
+                            {paymentMethod === 'CASH' && (
+                                <div className="space-y-2 pt-2 border-t border-gray-200">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">Cash Received</label>
+                                        <input
+                                            type="number"
+                                            placeholder="0.00"
+                                            value={cashReceived}
+                                            onChange={e => setCashReceived(e.target.value)}
+                                            className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#D95D1E]/20 focus:border-[#D95D1E] transition-all"
+                                        />
+                                    </div>
+                                    {parseFloat(cashReceived) > 0 && parseFloat(cashReceived) >= total && (
+                                        <div className="flex justify-between items-center text-sm font-bold text-green-600 bg-green-50 p-2 rounded-lg border border-green-100 mb-2 mt-2">
+                                            <span>Change</span>
+                                            <span>{formatCurrency(parseFloat(cashReceived) - total)}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             <button
                                 onClick={handleCheckout}
@@ -881,10 +951,27 @@ export function POSClient({
                                                 ))}
                                             </div>
                                             
-                                            <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-                                                <span className="text-gray-600 font-medium text-sm">Total</span>
-                                                <span className="font-bold text-[#D95D1E] text-lg">₱{order.total.toFixed(2)}</span>
-                                            </div>
+                                            {order.discountAmount && order.discountAmount > 0 ? (
+                                                <div className="pt-3 border-t border-gray-100 space-y-1.5">
+                                                    <div className="flex justify-between items-center text-sm font-medium text-gray-500">
+                                                        <span>Subtotal</span>
+                                                        <span>₱{(order.total + order.discountAmount).toFixed(2)}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center text-sm font-medium text-green-600">
+                                                        <span>Discount ({order.discountName || 'Manual'})</span>
+                                                        <span>-₱{order.discountAmount.toFixed(2)}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center pt-1.5 overflow-hidden">
+                                                        <span className="text-gray-600 font-medium text-sm">Total</span>
+                                                        <span className="font-bold text-[#D95D1E] text-lg">₱{order.total.toFixed(2)}</span>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex justify-between items-center pt-3 border-t border-gray-100">
+                                                    <span className="text-gray-600 font-medium text-sm">Total</span>
+                                                    <span className="font-bold text-[#D95D1E] text-lg">₱{order.total.toFixed(2)}</span>
+                                                </div>
+                                            )}
                                         </div>
                                         
                                         <div className="w-full md:w-48 flex flex-col gap-3 shrink-0 justify-end border-t md:border-t-0 md:border-l border-gray-100 pt-3 md:pt-0 md:pl-4 mt-3 md:mt-0">
