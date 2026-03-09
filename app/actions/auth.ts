@@ -1,11 +1,13 @@
 'use server';
 
+import { headers } from 'next/headers';
 import { db } from '@/lib/db';
 import { users, companies, branches } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { login, getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
+import { getTenantFromHost } from '@/lib/tenant';
 
 export async function loginAction(formData: FormData) {
     const email = formData.get('email') as string;
@@ -15,26 +17,51 @@ export async function loginAction(formData: FormData) {
         return { error: 'Email and password are required' };
     }
 
-    const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    const host = (await headers()).get('host') ?? '';
+    const tenant = getTenantFromHost(host);
 
-    if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
-        return { error: 'Invalid credentials' };
+    if (tenant.type === 'admin') {
+        const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+        if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
+            return { error: 'Invalid credentials' };
+        }
+        if (user.role !== 'SUPERADMIN') {
+            return { error: 'Use your shop URL to sign in' };
+        }
+        await login({
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            branchId: user.branchId,
+            companyId: user.companyId,
+        });
+        redirect('/admin/dashboard');
     }
 
-    await login({
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        branchId: user.branchId,
-        companyId: user.companyId,
-    });
+    // Shop host: resolve company by subdomain, then user by email + companyId
+    if (tenant.type === 'shop' && tenant.subdomain) {
+        const [company] = await db.select().from(companies).where(eq(companies.subdomain, tenant.subdomain)).limit(1);
+        if (!company) {
+            return { error: 'Invalid credentials' };
+        }
+        const [user] = await db.select().from(users).where(and(eq(users.email, email), eq(users.companyId, company.id))).limit(1);
+        if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
+            return { error: 'Invalid credentials' };
+        }
+        await login({
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            branchId: user.branchId,
+            companyId: user.companyId,
+        });
+        const role = user.role;
+        if (role === 'BRANCH_MANAGER') redirect('/owner/analytics');
+        if (role === 'KITCHEN_STAFF') redirect('/staff/orders');
+        redirect('/');
+    }
 
-    const role = user.role;
-    if (role === 'SUPERADMIN') redirect('/admin/dashboard');
-    if (role === 'BRANCH_MANAGER') redirect('/owner/analytics');
-    if (role === 'KITCHEN_STAFF') redirect('/staff/orders');
-
-    redirect('/');
+    return { error: 'Invalid credentials' };
 }
 
 export async function seedAction() {
@@ -43,6 +70,7 @@ export async function seedAction() {
 
     const [company] = await db.insert(companies).values({
         name: 'BrewFlow HQ',
+        subdomain: 'hq',
         contactEmail: 'hq@brewflow.com',
     }).returning();
 

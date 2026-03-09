@@ -1,12 +1,15 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { updateShop } from '@/app/actions/admin';
+
+const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'brewflow.com';
 
 interface Shop {
     id: string;
     name: string;
+    subdomain?: string;
 }
 
 interface EditShopModalProps {
@@ -17,8 +20,17 @@ interface EditShopModalProps {
 
 export function EditShopModal({ isOpen, onClose, shop }: EditShopModalProps) {
     const [shopName, setShopName] = useState(shop.name);
+    const [subdomain, setSubdomain] = useState(shop.subdomain ?? '');
     const [isPending, startTransition] = useTransition();
     const [error, setError] = useState('');
+
+    useEffect(() => {
+        if (isOpen) {
+            setShopName(shop.name);
+            setSubdomain(shop.subdomain ?? '');
+            setError('');
+        }
+    }, [isOpen, shop.id, shop.name, shop.subdomain]);
 
     if (!isOpen) return null;
 
@@ -30,13 +42,13 @@ export function EditShopModal({ isOpen, onClose, shop }: EditShopModalProps) {
             setError('Shop name is required');
             return;
         }
+        if (!subdomain.trim()) {
+            setError('Subdomain is required');
+            return;
+        }
 
         startTransition(async () => {
-            const formData = new FormData();
-            formData.append('companyId', shop.id);
-            formData.append('newName', shopName);
-
-            const result = await updateShop(shop.id, shopName);
+            const result = await updateShop(shop.id, shopName.trim(), subdomain.trim().toLowerCase());
             if (result.success) {
                 onClose();
             } else {
@@ -73,6 +85,22 @@ export function EditShopModal({ isOpen, onClose, shop }: EditShopModalProps) {
                                 placeholder="Enter shop name"
                                 required
                             />
+                        </div>
+                        <div>
+                            <label htmlFor="subdomain" className="block text-sm font-medium text-gray-700 mb-1">
+                                Subdomain
+                            </label>
+                            <input
+                                id="subdomain"
+                                type="text"
+                                value={subdomain}
+                                onChange={(e) => setSubdomain(e.target.value)}
+                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#D46215] outline-none transition-colors"
+                                placeholder="e.g. no-r-limits"
+                                required
+                            />
+                            <p className="text-xs text-gray-500 mt-1">Shop URL: https://{subdomain || 'subdomain'}.{ROOT_DOMAIN}</p>
+                            <p className="text-xs text-amber-600 mt-1">Changing the subdomain will change the shop URL; update any printed QR codes or links.</p>
                         </div>
 
                         {error && (
