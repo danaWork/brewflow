@@ -1,4 +1,4 @@
-import { pgTable, text, decimal, boolean, timestamp, uuid, pgEnum, integer } from 'drizzle-orm/pg-core';
+import { pgTable, text, decimal, boolean, timestamp, uuid, pgEnum, integer, uniqueIndex } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // Enums based on the ER Diagram
@@ -14,6 +14,7 @@ export const discountTypeEnum = pgEnum('discount_type', ['PERCENTAGE', 'FIXED'])
 export const companies = pgTable('companies', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: text('name').notNull(),
+  subdomain: text('subdomain').notNull().unique(),
   contactEmail: text('contact_email'),
 });
 
@@ -29,12 +30,14 @@ export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
   companyId: uuid('company_id').references(() => companies.id).notNull(),
   branchId: uuid('branch_id').references(() => branches.id), // NULL for SuperAdmin
-  email: text('email').unique().notNull(),
+  email: text('email').notNull(),
   passwordHash: text('password_hash').notNull(),
   role: roleEnum('role').notNull(),
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  companyEmailUnique: uniqueIndex('users_company_email_unique').on(table.companyId, table.email),
+}));
 
 export const passwordResetTokens = pgTable('password_reset_tokens', {
   id: uuid('id').defaultRandom().primaryKey(),

@@ -9,6 +9,7 @@ import { EditShopModal } from '@/components/admin/EditShopModal';
 interface Shop {
     id: string;
     name: string;
+    subdomain?: string;
     totalOrders: number;
     isActive: boolean;
     plan: string;

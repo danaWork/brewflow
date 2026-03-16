@@ -13,6 +13,7 @@ async function seed() {
     // 1. Create Company
     const [company] = await db.insert(schema.companies).values({
       name: 'Brewflow Coffee',
+      subdomain: 'brewflow-coffee',
       contactEmail: 'hello@brewflow.com',
     }).returning();
     console.log('✅ Company created:', company.name);

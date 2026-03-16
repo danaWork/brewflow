@@ -6,6 +6,7 @@ import { count, eq, sql, desc, like, and, gte, lte, inArray } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache';
 import { logActivity } from '@/lib/activity';
 import { getUserSession } from './auth';
+import { isReservedSubdomain, isValidSubdomainFormat } from '@/lib/slug';
 
 export async function getAdminOverviewStats() {
     try {
@@ -43,13 +44,14 @@ export async function getAllShops() {
         const shops = await db.select({
             id: companies.id,
             name: companies.name,
+            subdomain: companies.subdomain,
             totalOrders: count(orders.id),
             isActive: sql`BOOL_OR(${branches.isActive})`,
         })
             .from(companies)
             .leftJoin(branches, eq(companies.id, branches.companyId))
             .leftJoin(orders, eq(branches.id, orders.branchId))
-            .groupBy(companies.id, companies.name);
+            .groupBy(companies.id, companies.name, companies.subdomain);
 
         return shops.map(shop => ({
             ...shop,
@@ -131,15 +133,25 @@ export async function deleteShop(companyId: string) {
     }
 }
 
-export async function updateShop(companyId: string, newName: string) {
+export async function updateShop(companyId: string, newName: string, newSubdomain: string) {
     try {
         const session = await getUserSession();
-        if (!session || !newName.trim()) {
-            return { success: false, error: 'Invalid input or unauthorized' };
+        if (!session) {
+            return { success: false, error: 'Unauthorized' };
+        }
+        const nameTrim = newName.trim();
+        const sub = newSubdomain.trim().toLowerCase();
+        if (!nameTrim) {
+            return { success: false, error: 'Shop name is required' };
+        }
+        if (!isValidSubdomainFormat(sub)) {
+            return { success: false, error: 'Subdomain must be 2–63 characters, lowercase letters, numbers, and hyphens only' };
+        }
+        if (isReservedSubdomain(sub)) {
+            return { success: false, error: 'This subdomain is reserved' };
         }
 
-        // Get old company name for logging
-        const [company] = await db.select({ name: companies.name })
+        const [company] = await db.select({ name: companies.name, subdomain: companies.subdomain })
             .from(companies)
             .where(eq(companies.id, companyId))
             .limit(1);
@@ -148,26 +160,29 @@ export async function updateShop(companyId: string, newName: string) {
             return { success: false, error: 'Shop not found' };
         }
 
-        // Update company name
+        // If subdomain is changing, ensure it's not taken by another company
+        if (sub !== company.subdomain) {
+            const [existing] = await db.select({ id: companies.id }).from(companies).where(eq(companies.subdomain, sub)).limit(1);
+            if (existing) {
+                return { success: false, error: 'This subdomain is already in use' };
+            }
+        }
+
         await db.update(companies)
-            .set({ name: newName.trim() })
+            .set({ name: nameTrim, subdomain: sub })
             .where(eq(companies.id, companyId));
 
-        // Update branch name 
-        // We assume the first branch or main branch should be updated. 
-        // We'll just append " - Main" to match the creation logic
         await db.update(branches)
-            .set({ branchName: `${newName.trim()} - Main` })
+            .set({ branchName: `${nameTrim} - Main` })
             .where(eq(branches.companyId, companyId));
 
-        // Log activity
         await logActivity(
             null,
             session.userId,
             'Shop Updated',
             {
                 oldName: company.name,
-                newName: newName.trim(),
+                newName: nameTrim,
                 companyId,
             }
         );
@@ -240,14 +255,25 @@ export async function createManagerAccount(email: string, passwordPlain: string,
     }
 }
 
-export async function createShop(name: string, managerEmail: string, passwordPlain: string) {
+export async function createShop(name: string, subdomain: string, managerEmail: string, passwordPlain: string) {
     try {
         const session = await getUserSession();
+        const sub = subdomain.trim().toLowerCase();
+        if (!isValidSubdomainFormat(sub)) {
+            return { error: 'Subdomain must be 2–63 characters, lowercase letters, numbers, and hyphens only' };
+        }
+        if (isReservedSubdomain(sub)) {
+            return { error: 'This subdomain is reserved' };
+        }
+        const [existing] = await db.select({ id: companies.id }).from(companies).where(eq(companies.subdomain, sub)).limit(1);
+        if (existing) {
+            return { error: 'This subdomain is already in use' };
+        }
         const passwordHash = bcrypt.hashSync(passwordPlain, 10);
-        const [company] = await db.insert(companies).values({ name }).returning();
+        const [company] = await db.insert(companies).values({ name: name.trim(), subdomain: sub }).returning();
         const [branch] = await db.insert(branches).values({
             companyId: company.id,
-            branchName: `${name} - Main`,
+            branchName: `${name.trim()} - Main`,
         }).returning();
 
         await db.insert(users).values({

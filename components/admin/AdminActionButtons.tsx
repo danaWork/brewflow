@@ -1,28 +1,44 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createShop, createManagerAccount } from '@/app/actions/admin';
+import { slugify } from '@/lib/slug';
 import { Plus, Store, UserPlus, X, Loader2 } from 'lucide-react';
 import { AlertModal } from '@/components/ui/AlertModal';
+
+const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'brewflow.com';
 
 export function AdminActionButtons({ shops }: { shops: any[] }) {
     const [showShopModal, setShowShopModal] = useState(false);
     const [showUserModal, setShowUserModal] = useState(false);
     const [loading, setLoading] = useState(false);
     const [alertConfig, setAlertConfig] = useState<{isOpen: boolean, message: string}>({ isOpen: false, message: '' });
+    const [shopName, setShopName] = useState('');
+    const [subdomain, setSubdomain] = useState('');
+
+    useEffect(() => {
+        if (showShopModal) {
+            setShopName('');
+            setSubdomain('');
+        }
+    }, [showShopModal]);
 
     const handleCreateShop = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setLoading(true);
         const formData = new FormData(e.currentTarget);
-        const name = formData.get('name') as string;
         const email = formData.get('email') as string;
         const passwordLabel = formData.get('password') as string;
 
-        const res = await createShop(name, email, passwordLabel);
+        const res = await createShop(shopName.trim(), subdomain.trim().toLowerCase(), email, passwordLabel);
         setLoading(false);
         if (res.success) setShowShopModal(false);
         else setAlertConfig({ isOpen: true, message: res.error || 'Failed to create shop' });
+    };
+
+    const handleNameChange = (value: string) => {
+        setShopName(value);
+        setSubdomain(slugify(value));
     };
 
     const handleCreateUser = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -72,7 +88,26 @@ export function AdminActionButtons({ shops }: { shops: any[] }) {
                         <form onSubmit={handleCreateShop} className="space-y-4">
                             <div className="space-y-1.5">
                                 <label className="text-sm font-semibold text-gray-700 ml-1">Shop Name</label>
-                                <input name="name" required placeholder="Enter shop name" className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-[#D46215]" />
+                                <input
+                                    name="name"
+                                    required
+                                    placeholder="e.g. No r limits"
+                                    value={shopName}
+                                    onChange={(e) => handleNameChange(e.target.value)}
+                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-[#D46215]"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-sm font-semibold text-gray-700 ml-1">Subdomain</label>
+                                <input
+                                    name="subdomain"
+                                    required
+                                    placeholder="e.g. no-r-limits"
+                                    value={subdomain}
+                                    onChange={(e) => setSubdomain(e.target.value)}
+                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-[#D46215]"
+                                />
+                                <p className="text-xs text-gray-500 ml-1">Shop URL: https://{subdomain || 'subdomain'}.{ROOT_DOMAIN}</p>
                             </div>
                             <div className="bg-gray-50 p-4 rounded-2xl space-y-4">
                                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Initial Manager Account</p>

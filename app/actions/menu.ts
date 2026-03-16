@@ -1,5 +1,6 @@
 'use server';
 
+import { headers } from 'next/headers';
 import { db } from '@/lib/db';
 import {
     categories as categoriesSchema,
@@ -10,7 +11,8 @@ import {
     promotionItems as promotionItemsSchema
 } from '@/db/schema';
 import { eq, asc, desc, and, or, isNull } from 'drizzle-orm';
-import { branchProductAvailability } from '@/db/schema';
+import { branchProductAvailability, companies as companiesSchema } from '@/db/schema';
+import { getTenantFromHost } from '@/lib/tenant';
 
 export async function getMenuData(branchId: string, qrIdentifier: string) {
     if (process.env.DATABASE_URL?.includes('placeholder') || !process.env.DATABASE_URL) {
@@ -40,7 +42,6 @@ export async function getMenuData(branchId: string, qrIdentifier: string) {
             return { success: false, error: "Table not found" };
         }
 
-        const tableName = tableData.tableNumber;
         // Fetch Branch to get Company ID
         const [branchData] = await db
             .select({ companyId: branchesSchema.companyId })
@@ -51,6 +52,22 @@ export async function getMenuData(branchId: string, qrIdentifier: string) {
         if (!branchData) {
             return { success: false, error: "Branch not found" };
         }
+
+        // When on a shop subdomain, ensure this branch belongs to the current shop
+        const host = (await headers()).get('host') ?? '';
+        const tenant = getTenantFromHost(host);
+        if (tenant.type === 'shop' && tenant.subdomain) {
+            const [tenantCompany] = await db
+                .select({ id: companiesSchema.id })
+                .from(companiesSchema)
+                .where(eq(companiesSchema.subdomain, tenant.subdomain))
+                .limit(1);
+            if (!tenantCompany || tenantCompany.id !== branchData.companyId) {
+                return { success: false, error: "Branch not found" };
+            }
+        }
+
+        const tableName = tableData.tableNumber;
 
         // Fetch categories with products and modifiers using relational queries
         const categoriesData = await db.query.categories.findMany({
