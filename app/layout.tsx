@@ -9,8 +9,16 @@ const BASE_URL =
   process.env.NEXT_PUBLIC_APP_URL ??
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
 
+function normalizeAbsoluteUrl(url: string): string {
+  // `new URL("example.com")` throws; metadataBase must be absolute with scheme.
+  if (/^https?:\/\//i.test(url)) return url;
+  return `https://${url}`;
+}
+
+const SITE_URL = normalizeAbsoluteUrl(BASE_URL);
+
 export const metadata: Metadata = {
-  metadataBase: new URL(BASE_URL),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "BrewFlow — Coffee Shop Ordering, Simplified",
     template: "%s | BrewFlow",
@@ -38,7 +46,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: "website",
-    url: BASE_URL,
+    url: SITE_URL,
     siteName: "BrewFlow",
     title: "BrewFlow — Coffee Shop Ordering, Simplified",
     description:
