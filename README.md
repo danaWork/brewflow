@@ -1,6 +1,6 @@
 # BrewFlow - Multi-App Restaurant System
 
-A modern food-ordering/QR-based restaurant system built with **Next.js 16**, **Drizzle ORM**, and **Neon DB**, optimized for deployment on **Cloudflare Pages**.
+A modern food-ordering/QR-based restaurant system built with **Next.js 16**, **Drizzle ORM**, and **Neon DB**, optimized for deployment on **Vercel**.
 
 ## 🏗️ Architecture
 
@@ -28,7 +28,7 @@ brewflow/
 ├── lib/                     # Core utilities and DB client
 ├── public/                  # Static assets
 ├── types/                   # TypeScript definitions
-└── wrangler.toml            # Cloudflare Pages configuration
+└── vercel.json              # Vercel configuration
 ```
 
 ## 🚀 Getting Started
@@ -72,7 +72,7 @@ npm run dev
 - **ORM**: Drizzle ORM
 - **Runtime**: Node.js / Edge Compatible
 - **Styling**: Tailwind CSS
-- **Deployment**: Cloudflare Pages
+- **Deployment**: Vercel
 
 ## 📄 License
 
