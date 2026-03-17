@@ -37,8 +37,6 @@ yarn-error.log*
 # vercel
 .vercel
 
-# cloudflare
-.wrangler
 /dist
 
 # drizzle / neon

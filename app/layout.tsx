@@ -5,7 +5,9 @@ import { Providers } from "./providers";
 
 const montserrat = Montserrat({ subsets: ["latin"] });
 
-const BASE_URL = "https://brewflowdemo.netlify.app";
+const BASE_URL =
+  process.env.NEXT_PUBLIC_APP_URL ??
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
@@ -22,7 +24,7 @@ export const metadata: Metadata = {
     "real-time orders",
     "brew flow",
     "café POS",
-    "table ordering system",``
+    "table ordering system",
   ],
   authors: [{ name: "BrewFlow" }],
   creator: "BrewFlow",
