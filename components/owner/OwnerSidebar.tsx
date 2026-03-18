@@ -15,7 +15,8 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertCircle,
-  Calculator
+  Calculator,
+  Settings
 } from 'lucide-react';
 import { getPromotionsStockStatusAction } from '@/app/actions/promotions';
 import { getInventoryStockStatusAction } from '@/app/actions/inventory';
@@ -58,6 +59,12 @@ const navGroups: NavGroup[] = [
     items: [
       { label: 'Menu & Categories', href: '/owner/menu-categories', icon: UtensilsCrossed },
       { label: 'Inventory', href: '/owner/inventory', icon: Package },
+    ],
+  },
+  {
+    title: 'Settings',
+    items: [
+      { label: 'Shop Settings', href: '/owner/settings', icon: Settings },
     ],
   },
 ];

@@ -221,3 +221,55 @@ export async function updateDashboardPassword(currentPass: string, newPass: stri
         return { success: false, error: 'Internal server error' };
     }
 }
+
+export async function updateDashboardEmail(newEmail: string, currentPass: string) {
+    try {
+        const session = await getUserSession();
+        if (!session) {
+            return { success: false, error: 'Unauthorized' };
+        }
+
+        const [user] = await db.select({ passwordHash: users.passwordHash, companyId: users.companyId })
+            .from(users)
+            .where(eq(users.id, session.userId))
+            .limit(1);
+
+        if (!user) {
+            return { success: false, error: 'User not found' };
+        }
+
+        const isValid = bcrypt.compareSync(currentPass, user.passwordHash);
+        if (!isValid) {
+            return { success: false, error: 'Current password is incorrect' };
+        }
+
+        // Check format
+        if (!newEmail.includes('@') || newEmail.length < 5) {
+            return { success: false, error: 'Invalid email format' };
+        }
+
+        // Check if email already exists in the same company
+        const [existing] = await db.select({ id: users.id })
+            .from(users)
+            .where(
+                and(
+                    eq(users.companyId, user.companyId),
+                    eq(users.email, newEmail)
+                )
+            )
+            .limit(1);
+
+        if (existing && existing.id !== session.userId) {
+            return { success: false, error: 'Email is already in use' };
+        }
+
+        await db.update(users)
+            .set({ email: newEmail })
+            .where(eq(users.id, session.userId));
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error updating dashboard email:', error);
+        return { success: false, error: 'Internal server error' };
+    }
+}

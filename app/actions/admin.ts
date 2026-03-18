@@ -325,6 +325,45 @@ export async function deleteUser(userId: string) {
     }
 }
 
+export async function adminUpdateUserEmail(userId: string, newEmail: string) {
+    try {
+        const session = await getUserSession();
+        if (!session || session.role !== 'SUPERADMIN') {
+            return { success: false, error: 'Unauthorized' };
+        }
+
+        const [user] = await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, userId)).limit(1);
+        if (!user) {
+            return { success: false, error: 'User not found' };
+        }
+
+        if (!newEmail.includes('@') || newEmail.length < 5) {
+            return { success: false, error: 'Invalid email format' };
+        }
+
+        const [existing] = await db.select({ id: users.id })
+            .from(users)
+            .where(
+                and(
+                    eq(users.companyId, user.companyId),
+                    eq(users.email, newEmail)
+                )
+            )
+            .limit(1);
+
+        if (existing && existing.id !== userId) {
+            return { success: false, error: 'Email is already in use by another user in this company' };
+        }
+
+        await db.update(users).set({ email: newEmail }).where(eq(users.id, userId));
+        revalidatePath('/admin/dashboard');
+        return { success: true };
+    } catch (error) {
+        console.error('Error updating user email:', error);
+        return { success: false, error: 'Internal server error' };
+    }
+}
+
 
 export type UpsellStats = {
     platformAcceptanceRate: number;
