@@ -1,14 +1,15 @@
 'use client';
 
-import { UserCircle, Trash2, Key, ChevronDown, Search, ArrowUpDown } from 'lucide-react';
+import { UserCircle, Trash2, Key, ChevronDown, Search, ArrowUpDown, Mail } from 'lucide-react';
 import { useTransition, useState, useMemo } from 'react';
-import { deleteUser, updateUserNotes, adminInitiateShopPasswordReset } from '@/app/actions/admin';
+import { deleteUser, updateUserNotes, adminInitiateShopPasswordReset, adminUpdateUserEmail } from '@/app/actions/admin';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { toast } from 'sonner';
 
 interface AdminUser {
     id: string;
     username: string;
+    email: string;
     shopName: string | null;
     notes: string | null;
     created: string;
@@ -181,6 +182,8 @@ export function UsersTab({ users }: { users: AdminUser[] }) {
 
 function UserCard({ user, onDelete, onResetPassword }: { user: AdminUser; onDelete: () => void; onResetPassword: () => void }) {
     const [notes, setNotes] = useState(user.notes || '');
+    const [email, setEmail] = useState(user.email || '');
+    const [isEditingEmail, setIsEditingEmail] = useState(false);
 
     const handleNotesBlur = async () => {
         if (notes !== user.notes) {
@@ -188,13 +191,47 @@ function UserCard({ user, onDelete, onResetPassword }: { user: AdminUser; onDele
         }
     };
 
+    const handleEmailBlur = async () => {
+        setIsEditingEmail(false);
+        if (email !== user.email && email.includes('@')) {
+            const promise = adminUpdateUserEmail(user.id, email);
+            toast.promise(promise, {
+                loading: 'Updating email...',
+                success: (data) => data.success ? 'Email updated successfully' : 'Failed to update email',
+                error: 'Failed to update email',
+            });
+        } else if (!email.includes('@')) {
+            setEmail(user.email); // Revert on invalid
+        }
+    };
+
     return (
         <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100">
-            <div className="flex justify-between items-start gap-2 mb-2">
+            <div className="flex justify-between items-start gap-2 mb-1">
                 <span className="font-semibold text-gray-700 text-sm">{user.username}</span>
                 <span className="text-xs text-gray-400 shrink-0">{user.created}</span>
             </div>
-            <div className="text-xs text-gray-500 mb-2">{user.shopName || 'N/A'}</div>
+            
+            {isEditingEmail ? (
+                <input
+                    type="email"
+                    autoFocus
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    onBlur={handleEmailBlur}
+                    onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                    className="w-full bg-white border border-[#D46215] rounded-lg px-2 py-1 text-xs text-gray-900 outline-none mb-2"
+                />
+            ) : (
+                <div className="flex items-center gap-2 group/email mb-2">
+                    <span className="text-xs text-gray-500">{user.email}</span>
+                    <button onClick={() => setIsEditingEmail(true)} className="opacity-0 group-hover/email:opacity-100 text-gray-400 hover:text-[#D46215] transition-opacity">
+                        <Mail size={12} />
+                    </button>
+                </div>
+            )}
+
+            <div className="text-xs text-gray-500 mb-2 truncate" title={user.shopName || 'N/A'}>{user.shopName || 'N/A'}</div>
             <input
                 type="text"
                 value={notes}
@@ -217,6 +254,8 @@ function UserCard({ user, onDelete, onResetPassword }: { user: AdminUser; onDele
 
 function UserRow({ user, onDelete, onResetPassword }: { user: AdminUser; onDelete: () => void; onResetPassword: () => void }) {
     const [notes, setNotes] = useState(user.notes || '');
+    const [email, setEmail] = useState(user.email || '');
+    const [isEditingEmail, setIsEditingEmail] = useState(false);
 
     const handleNotesBlur = async () => {
         if (notes !== user.notes) {
@@ -224,10 +263,44 @@ function UserRow({ user, onDelete, onResetPassword }: { user: AdminUser; onDelet
         }
     };
 
+    const handleEmailBlur = async () => {
+        setIsEditingEmail(false);
+        if (email !== user.email && email.includes('@')) {
+            const promise = adminUpdateUserEmail(user.id, email);
+            toast.promise(promise, {
+                loading: 'Updating email...',
+                success: (data) => data.success ? 'Email updated successfully' : 'Failed to update email',
+                error: 'Failed to update email',
+            });
+        } else if (!email.includes('@')) {
+            setEmail(user.email); // Revert on invalid
+        }
+    };
+
     return (
         <tr className="hover:bg-gray-50/50 transition-colors group">
             <td className="px-6 py-4">
-                <span className="font-semibold text-gray-700">{user.username}</span>
+                <div className="flex flex-col">
+                    <span className="font-semibold text-gray-700">{user.username}</span>
+                    {isEditingEmail ? (
+                        <input
+                            type="email"
+                            autoFocus
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            onBlur={handleEmailBlur}
+                            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                            className="bg-white border border-[#D46215] rounded-lg px-2 py-0.5 text-xs text-gray-900 outline-none mt-1 w-full max-w-[200px]"
+                        />
+                    ) : (
+                        <div className="flex items-center gap-2 group/email mt-0.5">
+                            <span className="text-xs text-gray-500">{user.email}</span>
+                            <button onClick={() => setIsEditingEmail(true)} className="opacity-0 group-hover/email:opacity-100 text-gray-400 hover:text-[#D46215] transition-opacity">
+                                <Mail size={12} />
+                            </button>
+                        </div>
+                    )}
+                </div>
             </td>
             <td className="px-6 py-4">
                 <span className="text-gray-500">{user.shopName || 'N/A'}</span>
