@@ -6,6 +6,14 @@
 const THERMAL_SERVICE_UUID = '0000ff00-0000-1000-8000-00805f9b34fb';
 const THERMAL_CHAR_UUID = '0000ff02-0000-1000-8000-00805f9b34fb';
 
+const GENERIC_PRINTER_SERVICES = [
+  THERMAL_SERVICE_UUID,
+  '000018f0-0000-1000-8000-00805f9b34fb',
+  'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+  '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+  '0000fee7-0000-1000-8000-00805f9b34fb'
+];
+
 const STORAGE_KEY = 'brewflow-bluetooth-printer-id';
 
 // Minimal Web Bluetooth shapes to avoid pulling in full typings
@@ -73,7 +81,7 @@ export async function connectAndPrint(receiptBytes: Uint8Array): Promise<PrintRe
   try {
     const raw = await (navigator as NavigatorBluetooth).bluetooth!.requestDevice({
       acceptAllDevices: true,
-      optionalServices: [THERMAL_SERVICE_UUID],
+      optionalServices: GENERIC_PRINTER_SERVICES,
     });
     const device = raw as BluetoothDeviceLike;
 
@@ -88,7 +96,16 @@ export async function connectAndPrint(receiptBytes: Uint8Array): Promise<PrintRe
       return { ok: false, reason: 'connect_failed' };
     }
 
-    const service = await server.getPrimaryService(THERMAL_SERVICE_UUID).catch(() => null);
+    let service: BluetoothService | null = null;
+    for (const uuid of GENERIC_PRINTER_SERVICES) {
+      try {
+        service = await server.getPrimaryService(uuid);
+        if (service) break;
+      } catch (err) {
+        // Try the next one
+      }
+    }
+
     if (!service) {
       server.disconnect();
       return { ok: false, reason: 'service_not_found' };
