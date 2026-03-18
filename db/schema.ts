@@ -41,7 +41,7 @@ export const users = pgTable('users', {
 
 export const passwordResetTokens = pgTable('password_reset_tokens', {
   id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').references(() => users.id).notNull(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   token: text('token').notNull(),
   expiresAt: timestamp('expires_at').notNull(),
 });

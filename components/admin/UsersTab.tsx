@@ -2,8 +2,9 @@
 
 import { UserCircle, Trash2, Key, ChevronDown, Search, ArrowUpDown } from 'lucide-react';
 import { useTransition, useState, useMemo } from 'react';
-import { deleteUser, updateUserNotes } from '@/app/actions/admin';
+import { deleteUser, updateUserNotes, adminInitiateShopPasswordReset } from '@/app/actions/admin';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { toast } from 'sonner';
 
 interface AdminUser {
     id: string;
@@ -106,7 +107,19 @@ export function UsersTab({ users }: { users: AdminUser[] }) {
             {/* Mobile: card list */}
             <div className="md:hidden space-y-3">
                 {filteredAndSortedUsers.map((user) => (
-                    <UserCard key={user.id} user={user} onDelete={() => handleDeleteClick(user.id)} />
+                    <UserCard 
+                        key={user.id} 
+                        user={user} 
+                        onDelete={() => handleDeleteClick(user.id)} 
+                        onResetPassword={async () => {
+                            const promise = adminInitiateShopPasswordReset(user.id);
+                            toast.promise(promise, {
+                                loading: 'Sending password reset email...',
+                                success: (data) => data.success ? 'Password reset email sent to user' : 'Failed to send email',
+                                error: 'Failed to initiate reset',
+                            });
+                        }}
+                    />
                 ))}
                 {filteredAndSortedUsers.length === 0 && (
                     <div className="py-10 text-center text-gray-400 italic text-sm">
@@ -129,7 +142,19 @@ export function UsersTab({ users }: { users: AdminUser[] }) {
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                         {filteredAndSortedUsers.map((user) => (
-                            <UserRow key={user.id} user={user} onDelete={() => handleDeleteClick(user.id)} />
+                            <UserRow 
+                                key={user.id} 
+                                user={user} 
+                                onDelete={() => handleDeleteClick(user.id)} 
+                                onResetPassword={async () => {
+                                    const promise = adminInitiateShopPasswordReset(user.id);
+                                    toast.promise(promise, {
+                                        loading: 'Sending password reset email...',
+                                        success: (data) => data.success ? 'Password reset email sent to user' : 'Failed to send email',
+                                        error: 'Failed to initiate reset',
+                                    });
+                                }}
+                            />
                         ))}
                         {filteredAndSortedUsers.length === 0 && (
                             <tr>
@@ -154,7 +179,7 @@ export function UsersTab({ users }: { users: AdminUser[] }) {
     );
 }
 
-function UserCard({ user, onDelete }: { user: AdminUser; onDelete: () => void }) {
+function UserCard({ user, onDelete, onResetPassword }: { user: AdminUser; onDelete: () => void; onResetPassword: () => void }) {
     const [notes, setNotes] = useState(user.notes || '');
 
     const handleNotesBlur = async () => {
@@ -179,7 +204,7 @@ function UserCard({ user, onDelete }: { user: AdminUser; onDelete: () => void })
                 className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 text-xs text-gray-600 outline-none focus:border-[#D46215] transition-all mb-3"
             />
             <div className="flex justify-end gap-1">
-                <button type="button" className="p-2 text-gray-400 hover:text-gray-600 rounded-lg" aria-label="Key">
+                <button type="button" onClick={onResetPassword} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg" aria-label="Key">
                     <Key size={16} />
                 </button>
                 <button type="button" onClick={onDelete} className="p-2 text-gray-400 hover:text-red-500 rounded-lg" aria-label="Delete">
@@ -190,7 +215,7 @@ function UserCard({ user, onDelete }: { user: AdminUser; onDelete: () => void })
     );
 }
 
-function UserRow({ user, onDelete }: { user: AdminUser; onDelete: () => void }) {
+function UserRow({ user, onDelete, onResetPassword }: { user: AdminUser; onDelete: () => void; onResetPassword: () => void }) {
     const [notes, setNotes] = useState(user.notes || '');
 
     const handleNotesBlur = async () => {
@@ -222,7 +247,7 @@ function UserRow({ user, onDelete }: { user: AdminUser; onDelete: () => void }) 
             </td>
             <td className="px-6 py-4 text-right">
                 <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+                    <button onClick={onResetPassword} className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
                         <Key size={18} />
                     </button>
                     <button

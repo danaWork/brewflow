@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { companies, branches, orders, users, orderItems, orderItemModifiers, categories, products, activityLogs } from '@/db/schema';
+import { companies, branches, orders, users, orderItems, orderItemModifiers, categories, products, activityLogs, passwordResetTokens } from '@/db/schema';
 import { count, eq, sql, desc, like, and, gte, lte, inArray } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { logActivity } from '@/lib/activity';
@@ -606,4 +606,44 @@ function getRelativeTime(date: Date) {
     if (Math.abs(diffInSeconds) < 3600) return rtf.format(Math.round(diffInSeconds / 60), 'minute');
     if (Math.abs(diffInSeconds) < 86400) return rtf.format(Math.round(diffInSeconds / 3600), 'hour');
     return rtf.format(Math.round(diffInSeconds / 86400), 'day');
+}
+
+import { sendPasswordResetEmail } from '@/lib/email';
+import crypto from 'crypto';
+
+export async function adminInitiateShopPasswordReset(shopUserId: string) {
+    try {
+        const session = await getUserSession();
+        if (!session || session.role !== 'SUPERADMIN') {
+            return { success: false, error: 'Unauthorized' };
+        }
+
+        const [user] = await db.select({ email: users.email }).from(users).where(eq(users.id, shopUserId)).limit(1);
+        if (!user) {
+            return { success: false, error: 'User not found' };
+        }
+
+        const token = crypto.randomUUID();
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+        await db.insert(passwordResetTokens).values({
+            userId: shopUserId,
+            token,
+            expiresAt,
+        });
+
+        const domain = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        const resetLink = `${domain}/reset-password?token=${token}`;
+        
+        const emailResult = await sendPasswordResetEmail(user.email, resetLink);
+
+        if (!emailResult.success) {
+            return { success: false, error: 'Failed to send email' };
+        }
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error initiating password reset:', error);
+        return { success: false, error: 'Internal server error' };
+    }
 }

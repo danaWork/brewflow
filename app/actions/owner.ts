@@ -1,8 +1,10 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { orders, orderItems, orderItemModifiers, categories, products } from '@/db/schema';
+import { users, orders, orderItems, orderItemModifiers, categories, products } from '@/db/schema';
 import { eq, sql, and, gte, inArray } from 'drizzle-orm';
+import bcrypt from 'bcryptjs';
+import { getUserSession } from './auth';
 
 export type OwnerAnalytics = {
     bundleAcceptanceRate: number;
@@ -183,5 +185,39 @@ export async function getOwnerAnalytics(branchId: string, days: number = 30): Pr
             averageOrderValue: 0,
             revenueOverTime: []
         };
+    }
+}
+
+export async function updateDashboardPassword(currentPass: string, newPass: string) {
+    try {
+        const session = await getUserSession();
+        if (!session) {
+            return { success: false, error: 'Unauthorized' };
+        }
+
+        const [user] = await db.select({ passwordHash: users.passwordHash })
+            .from(users)
+            .where(eq(users.id, session.userId))
+            .limit(1);
+
+        if (!user) {
+            return { success: false, error: 'User not found' };
+        }
+
+        const isValid = bcrypt.compareSync(currentPass, user.passwordHash);
+        if (!isValid) {
+            return { success: false, error: 'Current password is incorrect' };
+        }
+
+        const newPasswordHash = bcrypt.hashSync(newPass, 10);
+
+        await db.update(users)
+            .set({ passwordHash: newPasswordHash })
+            .where(eq(users.id, session.userId));
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error updating dashboard password:', error);
+        return { success: false, error: 'Internal server error' };
     }
 }
