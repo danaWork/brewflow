@@ -2,7 +2,7 @@
 
 import { headers } from 'next/headers';
 import { db } from '@/lib/db';
-import { users, companies, branches } from '@/db/schema';
+import { users, companies, branches, passwordResetTokens } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { login, getSession } from '@/lib/auth';
@@ -135,4 +135,36 @@ export async function getUserSession() {
         branchId: session.user.branchId,
         companyId: session.user.companyId,
     };
+}
+
+export async function resetPasswordWithToken(token: string, newPasswordPlain: string) {
+    try {
+        const [resetToken] = await db.select()
+            .from(passwordResetTokens)
+            .where(eq(passwordResetTokens.token, token))
+            .limit(1);
+
+        if (!resetToken) {
+            return { success: false, error: 'Invalid or expired token' };
+        }
+
+        if (new Date() > resetToken.expiresAt) {
+            await db.delete(passwordResetTokens).where(eq(passwordResetTokens.id, resetToken.id));
+            return { success: false, error: 'Token has expired' };
+        }
+
+        const passwordHash = bcrypt.hashSync(newPasswordPlain, 10);
+
+        await db.update(users)
+            .set({ passwordHash })
+            .where(eq(users.id, resetToken.userId));
+
+        // Delete the used token
+        await db.delete(passwordResetTokens).where(eq(passwordResetTokens.id, resetToken.id));
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error resetting password:', error);
+        return { success: false, error: 'Internal server error' };
+    }
 }
