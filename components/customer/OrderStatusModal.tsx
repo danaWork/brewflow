@@ -15,6 +15,7 @@ interface OrderStatusModalProps {
 export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: OrderStatusModalProps) {
     const [render, setRender] = useState(false);
     const [receiptDataUrl, setReceiptDataUrl] = useState<string | null>(null);
+    const receiptRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -329,7 +330,7 @@ export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: 
                                             </>
                                         )}
                                     </a>
-                                    {receiptDataUrl && typeof navigator !== 'undefined' && navigator.canShare && (
+                                    {receiptDataUrl && typeof navigator !== 'undefined' && typeof navigator.canShare === 'function' && (
                                         <button
                                             onClick={handleShare}
                                             className="px-4 flex items-center justify-center bg-[#D95D1E] text-white font-bold rounded-xl hover:bg-[#c25016] transition-colors active:scale-95"
