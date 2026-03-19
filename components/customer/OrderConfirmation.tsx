@@ -107,7 +107,7 @@ export default function OrderConfirmation({ isOpen, onClose, orderNumber, paymen
                     </>
                   )}
                </a>
-               {receiptDataUrl && typeof navigator !== 'undefined' && navigator.canShare && (
+               {receiptDataUrl && typeof navigator !== 'undefined' && typeof navigator.canShare === 'function' && (
                    <button
                        onClick={handleShare}
                        className="px-6 flex items-center justify-center bg-[#D95D1E] text-white font-bold rounded-xl hover:bg-[#c25016] transition-colors active:scale-95 border-2 border-[#D95D1E]"
