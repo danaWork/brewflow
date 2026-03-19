@@ -24,6 +24,8 @@ export default function CheckoutPage() {
   const [isPaymentDropdownOpen, setIsPaymentDropdownOpen] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [lastOrderNumber, setLastOrderNumber] = useState<number>(0);
+  const [lastOrderItems, setLastOrderItems] = useState<typeof items>([]);
+  const [lastOrderTotal, setLastOrderTotal] = useState<number>(0);
 
   const paymentMethods: {
     label: string;
@@ -48,6 +50,8 @@ export default function CheckoutPage() {
 
       if (result && 'orderNumber' in result) {
         setLastOrderNumber(result.orderNumber);
+        setLastOrderItems([...items]);
+        setLastOrderTotal(cartTotal);
         clearCart();
         setShowConfirmation(true);
       } else if (result && 'success' in result && result.success === false) {
@@ -341,6 +345,8 @@ export default function CheckoutPage() {
         onClose={handleCloseConfirmation}
         orderNumber={lastOrderNumber}
         paymentMethod={paymentMethod}
+        items={lastOrderItems}
+        total={lastOrderTotal}
       />
     </div>
   );
