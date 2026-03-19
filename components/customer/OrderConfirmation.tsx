@@ -33,9 +33,28 @@ export default function OrderConfirmation({ isOpen, onClose, orderNumber, paymen
         backgroundColor: '#ffffff',
       });
       const image = canvas.toDataURL('image/png');
+      const filename = `receipt-${formattedOrderNumber.replace('#', '')}.png`;
+
+      // Native share for mobile
+      try {
+        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+        if (blob) {
+            const file = new File([blob], filename, { type: 'image/png' });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: 'BrewFlow Receipt',
+                });
+                return; // Share succeeded, bypass standard download
+            }
+        }
+      } catch (e) {
+        console.log('Share API failed or rejected, falling back to download', e);
+      }
+
       const link = document.createElement('a');
       link.href = image;
-      link.download = `receipt-${formattedOrderNumber.replace('#', '')}.png`;
+      link.download = filename;
       link.click();
     } catch (error) {
       console.error('Failed to download receipt:', error);

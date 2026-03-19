@@ -1,8 +1,9 @@
 'use client';
 
 import { Order, OrderStatus } from '@/context/OrderContext';
-import { Wallet, ChefHat, Bell, CheckCircle2, X, XCircle } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Wallet, ChefHat, Bell, CheckCircle2, X, XCircle, Download } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import html2canvas from 'html2canvas';
 
 interface OrderStatusModalProps {
     isOpen: boolean;
@@ -13,6 +14,47 @@ interface OrderStatusModalProps {
 
 export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: OrderStatusModalProps) {
     const [render, setRender] = useState(false);
+    const [isDownloading, setIsDownloading] = useState(false);
+    const receiptRef = useRef<HTMLDivElement>(null);
+
+    const handleDownloadReceipt = async () => {
+        if (!receiptRef.current || !order) return;
+        try {
+            setIsDownloading(true);
+            const canvas = await html2canvas(receiptRef.current, {
+                scale: 2,
+                backgroundColor: '#ffffff',
+            });
+            const image = canvas.toDataURL('image/png');
+            const filename = `receipt-${order.orderNumber}.png`;
+
+            // Native share for mobile
+            try {
+                const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+                if (blob) {
+                    const file = new File([blob], filename, { type: 'image/png' });
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        await navigator.share({
+                            files: [file],
+                            title: 'BrewFlow Receipt',
+                        });
+                        return; // Share succeeded
+                    }
+                }
+            } catch (e) {
+                console.log('Share API failed or rejected, falling back to download', e);
+            }
+
+            const link = document.createElement('a');
+            link.href = image;
+            link.download = filename;
+            link.click();
+        } catch (error) {
+            console.error('Failed to download receipt:', error);
+        } finally {
+            setIsDownloading(false);
+        }
+    };
 
     useEffect(() => {
         if (isOpen) setRender(true);
@@ -116,7 +158,7 @@ export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: 
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className={`bg-gray-50 w-full max-w-md rounded-[2rem] overflow-hidden shadow-2xl relative max-h-[90vh] flex flex-col ${animationClass}`}>
+            <div ref={receiptRef} className={`bg-gray-50 w-full max-w-md rounded-[2rem] overflow-hidden shadow-2xl relative max-h-[90vh] flex flex-col ${animationClass}`}>
 
                 <button
                     onClick={onClose}
@@ -216,7 +258,7 @@ export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: 
                                                     </div>
                                                     {item.options?.toppings && item.options.toppings.length > 0 && (
                                                         <div className="text-[10px] text-green-600 font-bold uppercase tracking-wider">
-                                                            + {item.options.toppings.map((t: any) => t.name).join(', ')}
+                                                            + {item.options.toppings.map((t: { name: string }) => t.name).join(', ')}
                                                         </div>
                                                     )}
                                                 </div>
@@ -265,9 +307,31 @@ export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: 
                             Dismiss Order
                         </button>
                     ) : (
-                        <div className="flex justify-between items-center">
-                            <span className="text-gray-500 font-medium text-lg">Total Amount</span>
-                            <span className="text-[#D95D1E] font-bold text-2xl">₱{order.total.toFixed(2)}</span>
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                                <span className="text-gray-500 font-medium text-lg">Total Amount</span>
+                                <span className="text-[#D95D1E] font-bold text-2xl">₱{order.total.toFixed(2)}</span>
+                            </div>
+                            
+                            {['PREPARING', 'READY', 'COMPLETED'].includes(order.status) && (
+                                <button
+                                    onClick={handleDownloadReceipt}
+                                    disabled={isDownloading}
+                                    className="w-full flex items-center justify-center gap-2 bg-gray-50 text-gray-900 font-bold py-3 text-md rounded-xl border-2 border-gray-200 hover:border-gray-900 hover:bg-gray-100 transition-colors active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isDownloading ? (
+                                        <>
+                                            <span className="w-5 h-5 border-2 border-gray-400/30 border-t-gray-900 rounded-full animate-spin" />
+                                            Generating...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Download size={18} />
+                                            Download Receipt
+                                        </>
+                                    )}
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>
