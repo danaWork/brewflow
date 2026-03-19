@@ -2,8 +2,8 @@
 
 import { Order, OrderStatus } from '@/context/OrderContext';
 import { Wallet, ChefHat, Bell, CheckCircle2, X, XCircle, Download } from 'lucide-react';
-import { useEffect, useState, useRef } from 'react';
-import html2canvas from 'html2canvas';
+import { useEffect, useState } from 'react';
+import { generateReceiptDataUrl } from '@/lib/generate-receipt-image';
 
 interface OrderStatusModalProps {
     isOpen: boolean;
@@ -15,36 +15,38 @@ interface OrderStatusModalProps {
 export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: OrderStatusModalProps) {
     const [render, setRender] = useState(false);
     const [receiptDataUrl, setReceiptDataUrl] = useState<string | null>(null);
-    const receiptRef = useRef<HTMLDivElement>(null);
 
-    // Step 1: show the modal DOM when isOpen becomes true; reset when it closes
     useEffect(() => {
         if (isOpen) {
             setRender(true);
-            setReceiptDataUrl(null);
         }
     }, [isOpen]);
 
-    // Step 2: once the modal is rendered in the DOM, generate the receipt image
+    // Generate receipt from order data — no DOM capture, no race conditions
     useEffect(() => {
-        if (!render || !order) return;
-        const generateReceipt = async () => {
-            // Small delay to ensure the DOM has fully painted before html2canvas runs
-            await new Promise(res => setTimeout(res, 300));
-            if (!receiptRef.current) return;
-            try {
-                const canvas = await html2canvas(receiptRef.current, {
-                    scale: 2,
-                    backgroundColor: '#ffffff',
-                    logging: false,
-                });
-                setReceiptDataUrl(canvas.toDataURL('image/png'));
-            } catch (e) {
-                console.error('Failed to pre-generate receipt', e);
-            }
-        };
-        generateReceipt();
-    }, [render, order]);
+        if (!order || !['PREPARING', 'READY', 'COMPLETED'].includes(order.status)) return;
+        setReceiptDataUrl(null);
+        try {
+            const dataUrl = generateReceiptDataUrl({
+                orderNumber: order.orderNumber,
+                table: order.table,
+                paymentMethod: order.paymentMethod,
+                timestamp: order.timestamp instanceof Date ? order.timestamp : new Date(order.timestamp),
+                items: order.items.map(item => ({
+                    name: item.name,
+                    price: item.price,
+                    quantity: item.quantity,
+                    options: item.options as Record<string, unknown> | undefined,
+                })),
+                discountAmount: order.discountAmount,
+                discountName: order.discountName,
+                total: order.total,
+            });
+            setReceiptDataUrl(dataUrl);
+        } catch (e) {
+            console.error('Failed to generate receipt', e);
+        }
+    }, [order]);
 
     const handleShare = async () => {
          if (!receiptDataUrl || !order) return;
@@ -52,11 +54,8 @@ export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: 
              const res = await fetch(receiptDataUrl);
              const blob = await res.blob();
              const file = new File([blob], `receipt-${order.orderNumber}.png`, { type: 'image/png' });
-             if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                 await navigator.share({
-                     files: [file],
-                     title: 'BrewFlow Receipt',
-                 });
+             if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+                 await navigator.share({ files: [file], title: 'BrewFlow Receipt' });
              }
          } catch (e) {
              console.log('Share API failed', e);
@@ -163,7 +162,7 @@ export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: 
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div ref={receiptRef} className={`bg-gray-50 w-full max-w-md rounded-[2rem] overflow-hidden shadow-2xl relative max-h-[90vh] flex flex-col ${animationClass}`}>
+            <div className={`bg-gray-50 w-full max-w-md rounded-[2rem] overflow-hidden shadow-2xl relative max-h-[90vh] flex flex-col ${animationClass}`}>
 
                 <button
                     onClick={onClose}
