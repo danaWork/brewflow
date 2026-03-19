@@ -3,7 +3,7 @@
 import { Check, Download } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTable } from '@/context/TableContext';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 
 interface OrderConfirmationProps {
@@ -16,52 +16,51 @@ interface OrderConfirmationProps {
 export default function OrderConfirmation({ isOpen, onClose, orderNumber, paymentMethod }: OrderConfirmationProps) {
   const router = useRouter();
   const { tableId , tableName } = useTable();
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [receiptDataUrl, setReceiptDataUrl] = useState<string | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
-
-  if (!isOpen) return null;
 
   // Format order number with leading zeros (e.g., #0001)
   const formattedOrderNumber = `#${String(orderNumber).padStart(4, '0')}`;
 
-  const handleDownloadReceipt = async () => {
-    if (!receiptRef.current) return;
-    try {
-      setIsDownloading(true);
-      const canvas = await html2canvas(receiptRef.current, {
-        scale: 2, // Higher resolution
-        backgroundColor: '#ffffff',
-      });
-      const image = canvas.toDataURL('image/png');
-      const filename = `receipt-${formattedOrderNumber.replace('#', '')}.png`;
+  useEffect(() => {
+     if (!isOpen) return;
+     const generateReceipt = async () => {
+         if (!receiptRef.current) return;
+         try {
+             // adding a small delay to ensure DOM is fully rendered
+             await new Promise(res => setTimeout(res, 500));
+             const canvas = await html2canvas(receiptRef.current, {
+                 scale: 2, // Higher resolution
+                 backgroundColor: '#ffffff',
+                 logging: false,
+             });
+             setReceiptDataUrl(canvas.toDataURL('image/png'));
+         } catch (e) {
+             console.error('Failed to pre-generate receipt', e);
+         }
+     };
+     generateReceipt();
+  }, [isOpen]);
 
-      // Native share for mobile
-      try {
-        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
-        if (blob) {
-            const file = new File([blob], filename, { type: 'image/png' });
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({
-                    files: [file],
-                    title: 'BrewFlow Receipt',
-                });
-                return; // Share succeeded, bypass standard download
-            }
-        }
-      } catch (e) {
-        console.log('Share API failed or rejected, falling back to download', e);
-      }
-
-      const link = document.createElement('a');
-      link.href = image;
-      link.download = filename;
-      link.click();
-    } catch (error) {
-      console.error('Failed to download receipt:', error);
-    } finally {
-      setIsDownloading(false);
-    }
+  const handleShare = async () => {
+       if (!receiptDataUrl) return;
+       try {
+           const res = await fetch(receiptDataUrl);
+           const blob = await res.blob();
+           const filename = `receipt-${formattedOrderNumber.replace('#', '')}.png`;
+           const file = new File([blob], filename, { type: 'image/png' });
+           if (navigator.canShare && navigator.canShare({ files: [file] })) {
+               await navigator.share({
+                   files: [file],
+                   title: 'BrewFlow Receipt',
+               });
+           }
+       } catch (e) {
+           console.log('Share API failed', e);
+       }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
@@ -90,23 +89,34 @@ export default function OrderConfirmation({ isOpen, onClose, orderNumber, paymen
          </div>
 
          <div className="space-y-3">
-           <button
-              onClick={handleDownloadReceipt}
-              disabled={isDownloading}
-              className="w-full flex items-center justify-center gap-2 bg-white text-gray-900 font-bold py-4 rounded-xl text-lg border-2 border-gray-200 hover:border-gray-900 hover:bg-gray-50 transition-colors active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-           >
-              {isDownloading ? (
-                <>
-                  <span className="w-5 h-5 border-2 border-gray-400/30 border-t-gray-900 rounded-full animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Download size={20} />
-                  Download Receipt
-                </>
-              )}
-           </button>
+           <div className="flex gap-2 w-full">
+               <a
+                  href={receiptDataUrl || '#'}
+                  download={`receipt-${formattedOrderNumber.replace('#', '')}.png`}
+                  className={`flex-1 flex items-center justify-center gap-2 bg-white text-gray-900 font-bold py-4 rounded-xl text-lg border-2 border-gray-200 hover:border-gray-900 hover:bg-gray-50 transition-colors active:scale-95 ${!receiptDataUrl ? 'opacity-50 cursor-wait pointer-events-none' : ''}`}
+               >
+                  {!receiptDataUrl ? (
+                    <>
+                      <span className="w-5 h-5 border-2 border-gray-400/30 border-t-gray-900 rounded-full animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Download size={20} />
+                      Download Save
+                    </>
+                  )}
+               </a>
+               {receiptDataUrl && typeof navigator !== 'undefined' && navigator.canShare && (
+                   <button
+                       onClick={handleShare}
+                       className="px-6 flex items-center justify-center bg-[#D95D1E] text-white font-bold rounded-xl hover:bg-[#c25016] transition-colors active:scale-95 border-2 border-[#D95D1E]"
+                       title="Share Receipt"
+                   >
+                       Share
+                   </button>
+               )}
+           </div>
 
            <button
               onClick={() => {

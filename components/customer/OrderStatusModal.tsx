@@ -14,51 +14,48 @@ interface OrderStatusModalProps {
 
 export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: OrderStatusModalProps) {
     const [render, setRender] = useState(false);
-    const [isDownloading, setIsDownloading] = useState(false);
-    const receiptRef = useRef<HTMLDivElement>(null);
-
-    const handleDownloadReceipt = async () => {
-        if (!receiptRef.current || !order) return;
-        try {
-            setIsDownloading(true);
-            const canvas = await html2canvas(receiptRef.current, {
-                scale: 2,
-                backgroundColor: '#ffffff',
-            });
-            const image = canvas.toDataURL('image/png');
-            const filename = `receipt-${order.orderNumber}.png`;
-
-            // Native share for mobile
-            try {
-                const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
-                if (blob) {
-                    const file = new File([blob], filename, { type: 'image/png' });
-                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                        await navigator.share({
-                            files: [file],
-                            title: 'BrewFlow Receipt',
-                        });
-                        return; // Share succeeded
-                    }
-                }
-            } catch (e) {
-                console.log('Share API failed or rejected, falling back to download', e);
-            }
-
-            const link = document.createElement('a');
-            link.href = image;
-            link.download = filename;
-            link.click();
-        } catch (error) {
-            console.error('Failed to download receipt:', error);
-        } finally {
-            setIsDownloading(false);
-        }
-    };
+    const [receiptDataUrl, setReceiptDataUrl] = useState<string | null>(null);
 
     useEffect(() => {
-        if (isOpen) setRender(true);
-    }, [isOpen]);
+        if (!isOpen) return;
+        setRender(true);
+        // Pre-generate receipt for native download support
+        const generateReceipt = async () => {
+             if (!receiptRef.current || !order) return;
+             try {
+                // adding a small delay to ensure DOM is fully rendered
+                await new Promise(res => setTimeout(res, 500));
+                const canvas = await html2canvas(receiptRef.current, {
+                    scale: 2,
+                    backgroundColor: '#ffffff',
+                    logging: false,
+                });
+                setReceiptDataUrl(canvas.toDataURL('image/png'));
+             } catch (e) {
+                 console.error('Failed to pre-generate receipt', e);
+             }
+        };
+        generateReceipt();
+    }, [isOpen, order]);
+
+    const handleShare = async () => {
+         if (!receiptDataUrl || !order) return;
+         try {
+             const res = await fetch(receiptDataUrl);
+             const blob = await res.blob();
+             const file = new File([blob], `receipt-${order.orderNumber}.png`, { type: 'image/png' });
+             if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                 await navigator.share({
+                     files: [file],
+                     title: 'BrewFlow Receipt',
+                 });
+             }
+         } catch (e) {
+             console.log('Share API failed', e);
+         }
+    };
+
+
 
     if (!order || !render) return null;
 
@@ -101,7 +98,7 @@ export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: 
         return 'bg-gray-200';
     };
 
-    const Banner = () => {
+    const renderBanner = () => {
         switch (order.status) {
             case 'PENDING':
                 return (
@@ -172,7 +169,7 @@ export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: 
                 </div>
 
                 <div className="shrink-0">
-                    <Banner />
+                    {renderBanner()}
                 </div>
 
                 <div className="flex-1 p-6 space-y-6 overflow-y-auto">
@@ -314,23 +311,34 @@ export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: 
                             </div>
                             
                             {['PREPARING', 'READY', 'COMPLETED'].includes(order.status) && (
-                                <button
-                                    onClick={handleDownloadReceipt}
-                                    disabled={isDownloading}
-                                    className="w-full flex items-center justify-center gap-2 bg-gray-50 text-gray-900 font-bold py-3 text-md rounded-xl border-2 border-gray-200 hover:border-gray-900 hover:bg-gray-100 transition-colors active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {isDownloading ? (
-                                        <>
-                                            <span className="w-5 h-5 border-2 border-gray-400/30 border-t-gray-900 rounded-full animate-spin" />
-                                            Generating...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Download size={18} />
-                                            Download Receipt
-                                        </>
+                                <div className="flex gap-2">
+                                    <a
+                                        href={receiptDataUrl || '#'}
+                                        download={`receipt-${order.orderNumber}.png`}
+                                        className={`flex-1 flex items-center justify-center gap-2 bg-gray-50 text-gray-900 font-bold py-3 text-md rounded-xl border-2 border-gray-200 hover:border-gray-900 hover:bg-gray-100 transition-colors active:scale-95 ${!receiptDataUrl ? 'opacity-50 cursor-wait pointer-events-none' : ''}`}
+                                    >
+                                        {!receiptDataUrl ? (
+                                            <>
+                                                <span className="w-5 h-5 border-2 border-gray-400/30 border-t-gray-900 rounded-full animate-spin" />
+                                                Generating...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Download size={18} />
+                                                Download Save
+                                            </>
+                                        )}
+                                    </a>
+                                    {receiptDataUrl && typeof navigator !== 'undefined' && navigator.canShare && (
+                                        <button
+                                            onClick={handleShare}
+                                            className="px-4 flex items-center justify-center bg-[#D95D1E] text-white font-bold rounded-xl hover:bg-[#c25016] transition-colors active:scale-95"
+                                            title="Share Receipt"
+                                        >
+                                            Share
+                                        </button>
                                     )}
-                                </button>
+                                </div>
                             )}
                         </div>
                     )}
