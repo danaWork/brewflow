@@ -17,27 +17,34 @@ export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: 
     const [receiptDataUrl, setReceiptDataUrl] = useState<string | null>(null);
     const receiptRef = useRef<HTMLDivElement>(null);
 
+    // Step 1: show the modal DOM when isOpen becomes true; reset when it closes
     useEffect(() => {
-        if (!isOpen) return;
-        setRender(true);
-        // Pre-generate receipt for native download support
+        if (isOpen) {
+            setRender(true);
+            setReceiptDataUrl(null);
+        }
+    }, [isOpen]);
+
+    // Step 2: once the modal is rendered in the DOM, generate the receipt image
+    useEffect(() => {
+        if (!render || !order) return;
         const generateReceipt = async () => {
-             if (!receiptRef.current || !order) return;
-             try {
-                // adding a small delay to ensure DOM is fully rendered
-                await new Promise(res => setTimeout(res, 500));
+            // Small delay to ensure the DOM has fully painted before html2canvas runs
+            await new Promise(res => setTimeout(res, 300));
+            if (!receiptRef.current) return;
+            try {
                 const canvas = await html2canvas(receiptRef.current, {
                     scale: 2,
                     backgroundColor: '#ffffff',
                     logging: false,
                 });
                 setReceiptDataUrl(canvas.toDataURL('image/png'));
-             } catch (e) {
-                 console.error('Failed to pre-generate receipt', e);
-             }
+            } catch (e) {
+                console.error('Failed to pre-generate receipt', e);
+            }
         };
         generateReceipt();
-    }, [isOpen, order]);
+    }, [render, order]);
 
     const handleShare = async () => {
          if (!receiptDataUrl || !order) return;

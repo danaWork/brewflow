@@ -24,13 +24,14 @@ export default function OrderConfirmation({ isOpen, onClose, orderNumber, paymen
 
   useEffect(() => {
      if (!isOpen) return;
+     setReceiptDataUrl(null);
      const generateReceipt = async () => {
+         // Delay must come FIRST so the DOM has time to paint before we try to capture it
+         await new Promise(res => setTimeout(res, 300));
          if (!receiptRef.current) return;
          try {
-             // adding a small delay to ensure DOM is fully rendered
-             await new Promise(res => setTimeout(res, 500));
              const canvas = await html2canvas(receiptRef.current, {
-                 scale: 2, // Higher resolution
+                 scale: 2,
                  backgroundColor: '#ffffff',
                  logging: false,
              });
