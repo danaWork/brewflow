@@ -5,15 +5,29 @@ import { useRouter } from 'next/navigation';
 import { useTable } from '@/context/TableContext';
 import { useState, useEffect } from 'react';
 import { generateReceiptDataUrl } from '@/lib/generate-receipt-image';
+import { CartItem } from '@/context/CartContext';
 
 interface OrderConfirmationProps {
   isOpen: boolean;
   onClose: () => void;
   orderNumber: number;
   paymentMethod: string;
+  items?: CartItem[];
+  total?: number;
+  discountAmount?: number;
+  discountName?: string | null;
 }
 
-export default function OrderConfirmation({ isOpen, onClose, orderNumber, paymentMethod }: OrderConfirmationProps) {
+export default function OrderConfirmation({
+  isOpen,
+  onClose,
+  orderNumber,
+  paymentMethod,
+  items = [],
+  total = 0,
+  discountAmount,
+  discountName,
+}: OrderConfirmationProps) {
   const router = useRouter();
   const { tableId, tableName } = useTable();
   const [receiptDataUrl, setReceiptDataUrl] = useState<string | null>(null);
@@ -26,19 +40,33 @@ export default function OrderConfirmation({ isOpen, onClose, orderNumber, paymen
       return;
     }
     try {
+      const receiptItems = items.map(item => ({
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        options: item.options as Record<string, unknown> | undefined,
+        extras: item.extras?.map(ex => ({
+          name: ex.name,
+          price: ex.price,
+          quantity: ex.quantity,
+        })),
+      }));
+
       const dataUrl = generateReceiptDataUrl({
         orderNumber,
         table: tableName || 'Table 1',
         paymentMethod,
         timestamp: new Date(),
-        items: [], // OrderConfirmation doesn't have item details; shows a summary receipt
-        total: 0,  // total not passed into this component
+        items: receiptItems,
+        discountAmount: discountAmount ?? undefined,
+        discountName: discountName ?? undefined,
+        total,
       });
       setReceiptDataUrl(dataUrl);
     } catch (e) {
       console.error('Failed to generate receipt', e);
     }
-  }, [isOpen, orderNumber, paymentMethod, tableName]);
+  }, [isOpen, orderNumber, paymentMethod, tableName, items, total, discountAmount, discountName]);
 
   const handleShare = async () => {
     if (!receiptDataUrl) return;
@@ -76,6 +104,9 @@ export default function OrderConfirmation({ isOpen, onClose, orderNumber, paymen
           <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">ORDER NUMBER</p>
           <p className="text-4xl font-bold text-[#D95D1E] mb-2">{formattedOrderNumber}</p>
           <p className="text-sm text-gray-400">Payment: {paymentMethod}</p>
+          {total > 0 && (
+            <p className="text-lg font-bold text-gray-700 mt-1">₱{total.toFixed(2)}</p>
+          )}
           <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-center gap-2 text-gray-500 text-sm">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
             You ordered from {tableName?.toLowerCase() || 'table 1'}
