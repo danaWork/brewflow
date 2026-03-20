@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { categories, products, modifierGroups, modifierOptions, productModifierLinks } from '@/db/schema';
+import { categories, products, modifierGroups, modifierOptions, productModifierLinks, productIngredients, branchProductAvailability, promotionItems, notifications } from '@/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import { getUserSession } from './auth';
 import { revalidatePath } from 'next/cache';
@@ -215,8 +215,18 @@ export async function deleteProduct(id: string) {
     const session = await getUserSession();
     if (!session?.companyId) throw new Error('Unauthorized');
 
-    await db.delete(productModifierLinks).where(eq(productModifierLinks.productId, id));
-    await db.delete(products).where(eq(products.id, id));
+    try {
+        // Delete all FK-constrained child rows before removing the product
+        await db.delete(productModifierLinks).where(eq(productModifierLinks.productId, id));
+        await db.delete(productIngredients).where(eq(productIngredients.productId, id));
+        await db.delete(branchProductAvailability).where(eq(branchProductAvailability.productId, id));
+        await db.delete(promotionItems).where(eq(promotionItems.productId, id));
+        await db.delete(notifications).where(eq(notifications.productId, id));
+        await db.delete(products).where(eq(products.id, id));
+    } catch (error) {
+        console.error('Error deleting product:', error);
+        throw new Error('Failed to delete product. It may be referenced by existing orders.');
+    }
 
     revalidatePath('/owner/menu-categories');
 }
