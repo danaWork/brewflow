@@ -211,9 +211,9 @@ export async function updateProduct(id: string, data: {
 }
 
 export async function deleteProduct(id: string) {
-    if (!id) throw new Error('Product ID is required');
+    if (!id) return { success: false, error: 'Product ID is required' };
     const session = await getUserSession();
-    if (!session?.companyId) throw new Error('Unauthorized');
+    if (!session?.companyId) return { success: false, error: 'Unauthorized' };
 
     try {
         // Delete all FK-constrained child rows before removing the product
@@ -223,12 +223,13 @@ export async function deleteProduct(id: string) {
         await db.delete(promotionItems).where(eq(promotionItems.productId, id));
         await db.delete(notifications).where(eq(notifications.productId, id));
         await db.delete(products).where(eq(products.id, id));
+
+        revalidatePath('/owner/menu-categories');
+        return { success: true };
     } catch (error) {
         console.error('Error deleting product:', error);
-        throw new Error('Failed to delete product. It may be referenced by existing orders.');
+        return { success: false, error: 'Failed to delete product. It may be referenced by existing orders.' };
     }
-
-    revalidatePath('/owner/menu-categories');
 }
 
 export async function getModifierGroups() {
