@@ -397,7 +397,8 @@ export default function MenuManagementClient({
     setConfirmConfig({
       isOpen: true,
       title: "Delete Product",
-      message: "Are you sure you want to delete this product?",
+      message:
+        "Are you sure you want to permanently delete this product? It will be removed from the menu, all modifier links, promotions, and stock settings. Historical orders that included this item will be preserved but the product link will be cleared.",
       action: async () => {
         const result = await deleteProduct(id);
         if (result.success) {
