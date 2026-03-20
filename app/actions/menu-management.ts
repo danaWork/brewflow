@@ -1,8 +1,8 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { categories, products, modifierGroups, modifierOptions, productModifierLinks, productIngredients, branchProductAvailability, promotionItems, notifications } from '@/db/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { categories, products, modifierGroups, modifierOptions, productModifierLinks, productIngredients, branchProductAvailability, promotionItems, notifications, orderItems } from '@/db/schema';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 import { getUserSession } from './auth';
 import { revalidatePath } from 'next/cache';
 
@@ -216,19 +216,26 @@ export async function deleteProduct(id: string) {
     if (!session?.companyId) return { success: false, error: 'Unauthorized' };
 
     try {
-        // Delete all FK-constrained child rows before removing the product
+        // 1. Unlink from historical order items (SET NULL to preserve order history)
+        await db.update(orderItems)
+            .set({ productId: null })
+            .where(eq(orderItems.productId, id));
+
+        // 2. Delete all other FK-constrained child rows
         await db.delete(productModifierLinks).where(eq(productModifierLinks.productId, id));
         await db.delete(productIngredients).where(eq(productIngredients.productId, id));
         await db.delete(branchProductAvailability).where(eq(branchProductAvailability.productId, id));
         await db.delete(promotionItems).where(eq(promotionItems.productId, id));
         await db.delete(notifications).where(eq(notifications.productId, id));
+
+        // 3. Finally delete the product
         await db.delete(products).where(eq(products.id, id));
 
         revalidatePath('/owner/menu-categories');
         return { success: true };
     } catch (error) {
         console.error('Error deleting product:', error);
-        return { success: false, error: 'Failed to delete product. It may be referenced by existing orders.' };
+        return { success: false, error: 'Failed to delete product.' };
     }
 }
 
