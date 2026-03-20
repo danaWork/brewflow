@@ -399,8 +399,13 @@ export default function MenuManagementClient({
       title: "Delete Product",
       message: "Are you sure you want to delete this product?",
       action: async () => {
-        await deleteProduct(id);
-        window.location.reload();
+        const result = await deleteProduct(id);
+        if (result.success) {
+          toast.success("Product deleted successfully");
+          window.location.reload();
+        } else {
+          toast.error(result.error || "Failed to delete product");
+        }
       },
     });
   };
