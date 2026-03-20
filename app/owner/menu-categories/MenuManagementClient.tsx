@@ -17,6 +17,7 @@ import {
   MoreVertical,
   HelpCircle,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   createCategory,
   updateCategory,
@@ -326,8 +327,13 @@ export default function MenuManagementClient({
       message:
         "Are you sure you want to delete this category? All products in it will be affected.",
       action: async () => {
-        await deleteCategory(id);
-        window.location.reload();
+        const result = await deleteCategory(id);
+        if (result.success) {
+          toast.success("Category deleted successfully");
+          window.location.reload();
+        } else {
+          toast.error(result.error || "Failed to delete category");
+        }
       },
     });
   };

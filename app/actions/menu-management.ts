@@ -78,14 +78,33 @@ export async function updateCategory(id: string, name: string, type: string, con
 }
 
 export async function deleteCategory(id: string) {
-    if (!id) throw new Error('Category ID is required');
-    const session = await getUserSession();
-    if (!session?.companyId) throw new Error('Unauthorized');
+    if (!id) return { success: false, error: 'Category ID is required' };
+    try {
+        const session = await getUserSession();
+        if (!session?.companyId) return { success: false, error: 'Unauthorized' };
 
-    await db.delete(categories)
-        .where(and(eq(categories.id, id), eq(categories.companyId, session.companyId)));
+        // Check if there are products in this category
+        const [existingProduct] = await db.select({ id: products.id })
+            .from(products)
+            .where(eq(products.categoryId, id))
+            .limit(1);
 
-    revalidatePath('/owner/menu-categories');
+        if (existingProduct) {
+            return { 
+                success: false, 
+                error: 'Cannot delete category because it contains products. Please delete or move the products first.' 
+            };
+        }
+
+        await db.delete(categories)
+            .where(and(eq(categories.id, id), eq(categories.companyId, session.companyId)));
+
+        revalidatePath('/owner/menu-categories');
+        return { success: true };
+    } catch (error) {
+        console.error('Error deleting category:', error);
+        return { success: false, error: 'Failed to delete category' };
+    }
 }
 
 export async function createProduct(data: {
