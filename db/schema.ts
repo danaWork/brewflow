@@ -52,6 +52,7 @@ export const categories = pgTable('categories', {
   name: text('name').notNull(),
   type: text('type').default('drink').notNull(), // 'drink' or 'snack'
   config: text('config'), // JSON string for UI configuration/steps
+  sortOrder: integer('sort_order').notNull().default(0),
 });
 
 export const products = pgTable('products', {
@@ -63,6 +64,7 @@ export const products = pgTable('products', {
   isHidden: boolean('is_hidden').default(false).notNull(),
   isFeatured: boolean('is_featured').default(false).notNull(),
   isQuickCartItem: boolean('is_quick_cart_item').default(false).notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
 });
 
 // Circular ref with modifierOptions; TypeScript cannot infer type. See modifierOptions below.

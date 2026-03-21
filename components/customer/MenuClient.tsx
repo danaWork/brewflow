@@ -71,12 +71,8 @@ export default function MenuClient({ tableId, tableName, branchId, categories, p
       finalProducts = productsInType.filter((p) => p.categoryId === activeCategory);
     }
 
-    // Sort so featured products (isSignature true) appear at the top
-    let sortedProducts = finalProducts.sort((a, b) => {
-      if (a.isSignature && !b.isSignature) return -1;
-      if (!a.isSignature && b.isSignature) return 1;
-      return 0; // maintain original relative order otherwise
-    });
+    // Order comes from server (owner-defined sort_order)
+    let sortedProducts = finalProducts;
 
     if (searchQuery.trim() !== '') {
       const query = searchQuery.toLowerCase();
