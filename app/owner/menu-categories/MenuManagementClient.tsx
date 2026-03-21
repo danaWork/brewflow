@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, type Dispatch, type SetStateAction } from "react";
 import React from "react";
 import Image from "next/image";
 import {
@@ -16,6 +16,7 @@ import {
   Droplet,
   MoreVertical,
   HelpCircle,
+  GripVertical,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -28,6 +29,8 @@ import {
   createModifierGroup,
   updateModifierGroup,
   deleteModifierGroup,
+  updateCategoryOrder,
+  updateProductOrder,
 } from "@/app/actions/menu-management";
 import {
   InventoryItem,
@@ -35,6 +38,23 @@ import {
 } from "@/app/actions/inventory";
 import { AlertModal } from "@/components/ui/AlertModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 type Product = {
   id: string;
@@ -78,6 +98,362 @@ interface Props {
   modifierGroups: ModifierGroup[];
   inventoryItems: InventoryItem[];
   branchId: string;
+}
+
+type SortableProductRowProps = {
+  product: Product;
+  category: Category;
+  mobileActionsProductId: string | null;
+  setMobileActionsProductId: Dispatch<SetStateAction<string | null>>;
+  mobileActionsRowRef: React.RefObject<HTMLDivElement | null>;
+  openProductModal: (product: Product | null, categoryId: string | null) => void;
+  handleDeleteProduct: (id: string) => void;
+};
+
+function SortableProductRow({
+  product,
+  category,
+  mobileActionsProductId,
+  setMobileActionsProductId,
+  mobileActionsRowRef,
+  openProductModal,
+  handleDeleteProduct,
+}: SortableProductRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: product.id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : undefined,
+  };
+  return (
+    <div
+      ref={(node) => {
+        setNodeRef(node);
+        if (mobileActionsProductId === product.id) {
+          mobileActionsRowRef.current = node;
+        } else if (mobileActionsRowRef.current === node) {
+          mobileActionsRowRef.current = null;
+        }
+      }}
+      style={style}
+      className="product-row p-4 pl-2 md:pl-6 flex items-center justify-between gap-3 hover:bg-white transition-colors group"
+    >
+      <button
+        type="button"
+        className="touch-none p-2 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing shrink-0 rounded-lg hover:bg-gray-100"
+        aria-label="Reorder product"
+        {...listeners}
+        {...attributes}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <GripVertical size={18} />
+      </button>
+      <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
+        <div className="relative w-12 h-12 md:w-14 md:h-14 shrink-0 bg-white rounded-xl flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm transition-transform group-hover:scale-105">
+          {product.imageUrl ? (
+            <Image
+              src={product.imageUrl}
+              alt={product.name}
+              fill
+              className="object-cover"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <ImageIcon size={24} className="text-gray-300" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <h4 className="font-semibold text-gray-900 truncate">{product.name}</h4>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
+            <p className="text-sm text-[#D95D1E] font-bold">
+              ₱{product.basePrice}
+            </p>
+            {product.modifierLinks && product.modifierLinks.length > 0 && (
+              <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md font-bold uppercase tracking-tighter">
+                {product.modifierLinks.length} Modifiers
+              </span>
+            )}
+            {product.isHidden && (
+              <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-md font-bold uppercase tracking-tighter">
+                Hidden
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        <button
+          type="button"
+          aria-label="Product actions"
+          className={`md:hidden p-2.5 text-gray-500 hover:bg-gray-100 rounded-xl transition-colors ${mobileActionsProductId === product.id ? "hidden" : ""}`}
+          onClick={() =>
+            setMobileActionsProductId((prev) =>
+              prev === product.id ? null : product.id,
+            )
+          }
+        >
+          <MoreVertical size={18} />
+        </button>
+        <div
+          className={`flex items-center gap-1 transition-all md:translate-x-2 md:group-hover:translate-x-0 ${
+            mobileActionsProductId === product.id
+              ? "flex"
+              : "hidden"
+          } md:flex opacity-100 md:opacity-0 md:group-hover:opacity-100`}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setMobileActionsProductId(null);
+              openProductModal(product, category.id);
+            }}
+            className="p-2.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+            title="Edit product"
+          >
+            <Edit2 size={18} />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMobileActionsProductId(null);
+              handleDeleteProduct(product.id);
+            }}
+            className="p-2.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+            title="Delete product"
+          >
+            <Trash2 size={18} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type ProductSortableListProps = {
+  category: Category;
+  setCategories: Dispatch<SetStateAction<Category[]>>;
+  mobileActionsProductId: string | null;
+  setMobileActionsProductId: Dispatch<SetStateAction<string | null>>;
+  mobileActionsRowRef: React.RefObject<HTMLDivElement | null>;
+  openProductModal: (product: Product | null, categoryId: string | null) => void;
+  handleDeleteProduct: (id: string) => void;
+};
+
+function ProductSortableList({
+  category,
+  setCategories,
+  mobileActionsProductId,
+  setMobileActionsProductId,
+  mobileActionsRowRef,
+  openProductModal,
+  handleDeleteProduct,
+}: ProductSortableListProps) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setCategories((cats) => {
+      const cat = cats.find((c) => c.id === category.id);
+      if (!cat) return cats;
+      const oldIndex = cat.products.findIndex((p) => p.id === active.id);
+      const newIndex = cat.products.findIndex((p) => p.id === over.id);
+      if (oldIndex < 0 || newIndex < 0) return cats;
+      const nextProducts = arrayMove(cat.products, oldIndex, newIndex);
+      const ids = nextProducts.map((p) => p.id);
+      void updateProductOrder(ids).catch(() =>
+        toast.error("Failed to save order"),
+      );
+      return cats.map((c) =>
+        c.id === category.id ? { ...c, products: nextProducts } : c,
+      );
+    });
+  };
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+      id={`${category.id}-product-sort`}
+    >
+      <SortableContext
+        items={category.products.map((p) => p.id)}
+        strategy={verticalListSortingStrategy}
+      >
+        <div className="divide-y divide-gray-100">
+          {category.products.map((product) => (
+            <SortableProductRow
+              key={product.id}
+              product={product}
+              category={category}
+              mobileActionsProductId={mobileActionsProductId}
+              setMobileActionsProductId={setMobileActionsProductId}
+              mobileActionsRowRef={mobileActionsRowRef}
+              openProductModal={openProductModal}
+              handleDeleteProduct={handleDeleteProduct}
+            />
+          ))}
+        </div>
+      </SortableContext>
+    </DndContext>
+  );
+}
+
+type SortableCategoryCardProps = {
+  category: Category;
+  expanded: boolean;
+  onToggle: () => void;
+  onAddProduct: () => void;
+  onEditCategory: () => void;
+  onDeleteCategory: () => void;
+  setCategories: Dispatch<SetStateAction<Category[]>>;
+  mobileActionsProductId: string | null;
+  setMobileActionsProductId: Dispatch<SetStateAction<string | null>>;
+  mobileActionsRowRef: React.RefObject<HTMLDivElement | null>;
+  openProductModal: (product: Product | null, categoryId: string | null) => void;
+  handleDeleteProduct: (id: string) => void;
+};
+
+function SortableCategoryCard({
+  category,
+  expanded,
+  onToggle,
+  onAddProduct,
+  onEditCategory,
+  onDeleteCategory,
+  setCategories,
+  mobileActionsProductId,
+  setMobileActionsProductId,
+  mobileActionsRowRef,
+  openProductModal,
+  handleDeleteProduct,
+}: SortableCategoryCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: category.id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 20 : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm transition-all hover:shadow-md"
+    >
+      <div
+        className="p-5 flex items-center justify-between hover:bg-gray-50/50 transition-colors cursor-pointer"
+        onClick={onToggle}
+      >
+        <div className="flex items-center gap-2 md:gap-4 min-w-0 flex-1">
+          <button
+            type="button"
+            className="touch-none p-2 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing shrink-0 rounded-lg hover:bg-gray-100"
+            aria-label="Reorder category"
+            {...listeners}
+            {...attributes}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <GripVertical size={20} />
+          </button>
+          <div
+            className={`p-1 rounded-md transition-transform shrink-0 ${expanded ? "rotate-0" : "-rotate-90"}`}
+          >
+            <ChevronDown size={20} className="text-gray-400" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-bold text-gray-900 text-lg truncate">
+              {category.name}
+            </h3>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400 border border-gray-200 px-1.5 rounded">
+                {category.type}
+              </span>
+              <span className="text-xs text-gray-400">•</span>
+              <span className="text-xs text-gray-500 font-medium">
+                {category.products.length} products
+              </span>
+            </div>
+          </div>
+        </div>
+        <div
+          className="flex items-center gap-1 shrink-0"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={onAddProduct}
+            className="p-2.5 text-gray-500 hover:text-[#D95D1E] hover:bg-orange-50 rounded-xl transition-all"
+            title="Add Product"
+          >
+            <Plus size={18} />
+          </button>
+          <button
+            onClick={onEditCategory}
+            className="p-2.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+          >
+            <Edit2 size={18} />
+          </button>
+          <button
+            onClick={onDeleteCategory}
+            className="p-2.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+          >
+            <Trash2 size={18} />
+          </button>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="bg-gray-50/30 border-t border-gray-100">
+          {category.products.length === 0 ? (
+            <div className="p-10 text-center">
+              <p className="text-gray-400 italic text-sm mb-4">
+                No products in this category yet.
+              </p>
+              <button
+                onClick={onAddProduct}
+                className="inline-flex items-center gap-2 text-[#D95D1E] font-medium hover:underline text-sm"
+              >
+                <Plus size={16} />
+                Create your first product
+              </button>
+            </div>
+          ) : (
+            <ProductSortableList
+              category={category}
+              setCategories={setCategories}
+              mobileActionsProductId={mobileActionsProductId}
+              setMobileActionsProductId={setMobileActionsProductId}
+              mobileActionsRowRef={mobileActionsRowRef}
+              openProductModal={openProductModal}
+              handleDeleteProduct={handleDeleteProduct}
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 const GoogleDriveImageGuide = () => {
@@ -172,6 +548,33 @@ export default function MenuManagementClient({
   const [expandedCategories, setExpandedCategories] = useState<string[]>(
     initialCategories.map((c) => c.id),
   );
+
+  useEffect(() => {
+    setCategories(initialCategories);
+  }, [initialCategories]);
+
+  const categorySensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  const handleCategoryDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setCategories((items) => {
+      const oldIndex = items.findIndex((c) => c.id === active.id);
+      const newIndex = items.findIndex((c) => c.id === over.id);
+      if (oldIndex < 0 || newIndex < 0) return items;
+      const next = arrayMove(items, oldIndex, newIndex);
+      const ids = next.map((c) => c.id);
+      void updateCategoryOrder(ids).catch(() =>
+        toast.error("Failed to save order"),
+      );
+      return next;
+    });
+  };
 
   // Find water product on mount
   React.useEffect(() => {
@@ -698,185 +1101,40 @@ export default function MenuManagementClient({
             </button>
           </div>
 
-          <div className="space-y-4">
-            {categories.map((category) => (
-              <div
-                key={category.id}
-                className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm transition-all hover:shadow-md"
-              >
-                <div
-                  className="p-5 flex items-center justify-between hover:bg-gray-50/50 transition-colors cursor-pointer"
-                  onClick={() => toggleCategory(category.id)}
-                >
-                  <div className="flex items-center gap-4">
-                    <div
-                      className={`p-1 rounded-md transition-transform ${expandedCategories.includes(category.id) ? "rotate-0" : "-rotate-90"}`}
-                    >
-                      <ChevronDown size={20} className="text-gray-400" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-gray-900 text-lg">
-                        {category.name}
-                      </h3>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400 border border-gray-200 px-1.5 rounded">
-                          {category.type}
-                        </span>
-                        <span className="text-xs text-gray-400">•</span>
-                        <span className="text-xs text-gray-500 font-medium">
-                          {category.products.length} products
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div
-                    className="flex items-center gap-1"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <button
-                      onClick={() => openProductModal(null, category.id)}
-                      className="p-2.5 text-gray-500 hover:text-[#D95D1E] hover:bg-orange-50 rounded-xl transition-all"
-                      title="Add Product"
-                    >
-                      <Plus size={18} />
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditingCategory(category);
-                        setIsCategoryModalOpen(true);
-                      }}
-                      className="p-2.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                    >
-                      <Edit2 size={18} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteCategory(category.id)}
-                      className="p-2.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </div>
-
-                {expandedCategories.includes(category.id) && (
-                  <div className="bg-gray-50/30 border-t border-gray-100">
-                    {category.products.length === 0 ? (
-                      <div className="p-10 text-center">
-                        <p className="text-gray-400 italic text-sm mb-4">
-                          No products in this category yet.
-                        </p>
-                        <button
-                          onClick={() => openProductModal(null, category.id)}
-                          className="inline-flex items-center gap-2 text-[#D95D1E] font-medium hover:underline text-sm"
-                        >
-                          <Plus size={16} />
-                          Create your first product
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="divide-y divide-gray-100">
-                        {category.products.map((product) => (
-                          <div
-                            key={product.id}
-                            ref={
-                              mobileActionsProductId === product.id
-                                ? mobileActionsRowRef
-                                : undefined
-                            }
-                            className="product-row p-4 pl-4 md:pl-14 flex items-center justify-between gap-3 hover:bg-white transition-colors group"
-                          >
-                            <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
-                              <div className="relative w-12 h-12 md:w-14 md:h-14 shrink-0 bg-white rounded-xl flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm transition-transform group-hover:scale-105">
-                                {product.imageUrl ? (
-                                  <Image
-                                    src={product.imageUrl}
-                                    alt={product.name}
-                                    fill
-                                    className="object-cover"
-                                    referrerPolicy="no-referrer"
-                                  />
-                                ) : (
-                                  <ImageIcon
-                                    size={24}
-                                    className="text-gray-300"
-                                  />
-                                )}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <h4 className="font-semibold text-gray-900 truncate">
-                                  {product.name}
-                                </h4>
-                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
-                                  <p className="text-sm text-[#D95D1E] font-bold">
-                                    ₱{product.basePrice}
-                                  </p>
-                                  {product.modifierLinks &&
-                                    product.modifierLinks.length > 0 && (
-                                      <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md font-bold uppercase tracking-tighter">
-                                        {product.modifierLinks.length} Modifiers
-                                      </span>
-                                    )}
-                                  {product.isHidden && (
-                                    <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-md font-bold uppercase tracking-tighter">
-                                      Hidden
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <button
-                                type="button"
-                                aria-label="Product actions"
-                                className={`md:hidden p-2.5 text-gray-500 hover:bg-gray-100 rounded-xl transition-colors ${mobileActionsProductId === product.id ? "hidden" : ""}`}
-                                onClick={() =>
-                                  setMobileActionsProductId((prev) =>
-                                    prev === product.id ? null : product.id,
-                                  )
-                                }
-                              >
-                                <MoreVertical size={18} />
-                              </button>
-                              <div
-                                className={`flex items-center gap-1 transition-all md:translate-x-2 md:group-hover:translate-x-0 ${
-                                  mobileActionsProductId === product.id
-                                    ? "flex"
-                                    : "hidden"
-                                } md:flex opacity-100 md:opacity-0 md:group-hover:opacity-100`}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setMobileActionsProductId(null);
-                                    openProductModal(product, category.id);
-                                  }}
-                                  className="p-2.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                                  title="Edit product"
-                                >
-                                  <Edit2 size={18} />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setMobileActionsProductId(null);
-                                    handleDeleteProduct(product.id);
-                                  }}
-                                  className="p-2.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                                  title="Delete product"
-                                >
-                                  <Trash2 size={18} />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+          <DndContext
+            id="menu-categories-sort"
+            sensors={categorySensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleCategoryDragEnd}
+          >
+            <SortableContext
+              items={categories.map((c) => c.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-4">
+                {categories.map((category) => (
+                  <SortableCategoryCard
+                    key={category.id}
+                    category={category}
+                    expanded={expandedCategories.includes(category.id)}
+                    onToggle={() => toggleCategory(category.id)}
+                    onAddProduct={() => openProductModal(null, category.id)}
+                    onEditCategory={() => {
+                      setEditingCategory(category);
+                      setIsCategoryModalOpen(true);
+                    }}
+                    onDeleteCategory={() => handleDeleteCategory(category.id)}
+                    setCategories={setCategories}
+                    mobileActionsProductId={mobileActionsProductId}
+                    setMobileActionsProductId={setMobileActionsProductId}
+                    mobileActionsRowRef={mobileActionsRowRef}
+                    openProductModal={openProductModal}
+                    handleDeleteProduct={handleDeleteProduct}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
+            </SortableContext>
+          </DndContext>
         </div>
       ) : (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">

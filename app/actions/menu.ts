@@ -10,7 +10,7 @@ import {
     promotions as promotionsSchema,
     promotionItems as promotionItemsSchema
 } from '@/db/schema';
-import { eq, asc, desc, and, or, isNull } from 'drizzle-orm';
+import { eq, asc, and, or, isNull } from 'drizzle-orm';
 import { branchProductAvailability, companies as companiesSchema } from '@/db/schema';
 import { getTenantFromHost } from '@/lib/tenant';
 
@@ -72,9 +72,11 @@ export async function getMenuData(branchId: string, qrIdentifier: string) {
         // Fetch categories with products and modifiers using relational queries
         const categoriesData = await db.query.categories.findMany({
             where: eq(categoriesSchema.companyId, branchData.companyId),
+            orderBy: [asc(categoriesSchema.sortOrder)],
             with: {
                 products: {
                     where: eq(productsSchema.isHidden, false),
+                    orderBy: [asc(productsSchema.sortOrder)],
                     with: {
                         modifierLinks: {
                             with: {

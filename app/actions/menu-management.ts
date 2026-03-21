@@ -2,7 +2,7 @@
 
 import { db } from '@/lib/db';
 import { categories, products, modifierGroups, modifierOptions, productModifierLinks, productIngredients, branchProductAvailability, promotionItems, notifications, orderItems } from '@/db/schema';
-import { eq, and, inArray, sql } from 'drizzle-orm';
+import { eq, and, inArray, sql, asc, max } from 'drizzle-orm';
 import { getUserSession } from './auth';
 import { revalidatePath } from 'next/cache';
 
@@ -12,8 +12,10 @@ export async function getMenuCategories() {
 
     const result = await db.query.categories.findMany({
         where: eq(categories.companyId, session.companyId),
+        orderBy: [asc(categories.sortOrder)],
         with: {
             products: {
+                orderBy: [asc(products.sortOrder)],
                 with: {
                     modifierLinks: true,
                     productIngredients: true
@@ -32,8 +34,10 @@ export async function getMenuCategoriesForPOS() {
 
     const result = await db.query.categories.findMany({
         where: eq(categories.companyId, session.companyId),
+        orderBy: [asc(categories.sortOrder)],
         with: {
             products: {
+                orderBy: [asc(products.sortOrder)],
                 with: {
                     modifierLinks: {
                         with: {
@@ -55,11 +59,18 @@ export async function createCategory(name: string, type: string = 'drink', confi
     const session = await getUserSession();
     if (!session?.companyId) throw new Error('Unauthorized');
 
+    const [maxRow] = await db
+        .select({ m: max(categories.sortOrder) })
+        .from(categories)
+        .where(eq(categories.companyId, session.companyId));
+    const nextSort = (maxRow?.m ?? -1) + 1;
+
     await db.insert(categories).values({
         companyId: session.companyId,
         name,
         type,
         config,
+        sortOrder: nextSort,
     });
 
     revalidatePath('/owner/menu-categories');
@@ -107,6 +118,68 @@ export async function deleteCategory(id: string) {
     }
 }
 
+export async function updateCategoryOrder(orderedIds: string[]) {
+    const session = await getUserSession();
+    if (!session?.companyId) throw new Error('Unauthorized');
+    if (!orderedIds.length) return;
+
+    await db.transaction(async (tx) => {
+        for (let i = 0; i < orderedIds.length; i++) {
+            await tx
+                .update(categories)
+                .set({ sortOrder: i })
+                .where(
+                    and(
+                        eq(categories.id, orderedIds[i]!),
+                        eq(categories.companyId, session.companyId!),
+                    ),
+                );
+        }
+    });
+
+    revalidatePath('/owner/menu-categories');
+}
+
+export async function updateProductOrder(orderedIds: string[]) {
+    const session = await getUserSession();
+    if (!session?.companyId) throw new Error('Unauthorized');
+    if (!orderedIds.length) return;
+
+    const rows = await db
+        .select({ id: products.id, categoryId: products.categoryId })
+        .from(products)
+        .where(inArray(products.id, orderedIds));
+
+    if (rows.length !== orderedIds.length) {
+        throw new Error('Invalid product list');
+    }
+    const categoryIds = new Set(rows.map((r) => r.categoryId));
+    if (categoryIds.size !== 1) {
+        throw new Error('Products must belong to a single category');
+    }
+    const categoryId = [...categoryIds][0]!;
+
+    const [cat] = await db
+        .select({ id: categories.id })
+        .from(categories)
+        .where(and(eq(categories.id, categoryId), eq(categories.companyId, session.companyId)));
+
+    if (!cat) {
+        throw new Error('Unauthorized');
+    }
+
+    await db.transaction(async (tx) => {
+        for (let i = 0; i < orderedIds.length; i++) {
+            await tx
+                .update(products)
+                .set({ sortOrder: i })
+                .where(and(eq(products.id, orderedIds[i]!), eq(products.categoryId, categoryId)));
+        }
+    });
+
+    revalidatePath('/owner/menu-categories');
+}
+
 export async function createProduct(data: {
     categoryId: string;
     name: string;
@@ -121,6 +194,12 @@ export async function createProduct(data: {
     const session = await getUserSession();
     if (!session?.companyId) throw new Error('Unauthorized');
 
+    const [maxProd] = await db
+        .select({ m: max(products.sortOrder) })
+        .from(products)
+        .where(eq(products.categoryId, data.categoryId));
+    const nextProductSort = (maxProd?.m ?? -1) + 1;
+
     const [product] = await db.insert(products).values({
         categoryId: data.categoryId,
         name: data.name,
@@ -129,6 +208,7 @@ export async function createProduct(data: {
         isHidden: data.isHidden || false,
         isFeatured: data.isFeatured || false,
         isQuickCartItem: data.isQuickCartItem || false,
+        sortOrder: nextProductSort,
     }).returning();
 
     // Support both old format (modifierGroupIds) and new format (modifierGroups with defaults)
