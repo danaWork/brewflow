@@ -149,9 +149,16 @@ function SortableProductRow({
         type="button"
         className="touch-none p-2 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing shrink-0 rounded-lg hover:bg-gray-100"
         aria-label="Reorder product"
-        {...listeners}
         {...attributes}
-        onPointerDown={(e) => e.stopPropagation()}
+        {...listeners}
+        onPointerDown={(e) => {
+          (
+            listeners as {
+              onPointerDown?: (ev: React.PointerEvent<HTMLButtonElement>) => void;
+            }
+          )?.onPointerDown?.(e);
+          e.stopPropagation();
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         <GripVertical size={18} />
@@ -371,9 +378,16 @@ function SortableCategoryCard({
             type="button"
             className="touch-none p-2 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing shrink-0 rounded-lg hover:bg-gray-100"
             aria-label="Reorder category"
-            {...listeners}
             {...attributes}
-            onPointerDown={(e) => e.stopPropagation()}
+            {...listeners}
+            onPointerDown={(e) => {
+              (
+                listeners as {
+                  onPointerDown?: (ev: React.PointerEvent<HTMLButtonElement>) => void;
+                }
+              )?.onPointerDown?.(e);
+              e.stopPropagation();
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             <GripVertical size={20} />
