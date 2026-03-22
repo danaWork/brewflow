@@ -131,6 +131,7 @@ export const orders = pgTable('orders', {
   acceptedAt: timestamp('accepted_at'),
   readyAt: timestamp('ready_at'),
   completedAt: timestamp('completed_at'),
+  cancellationReason: text('cancellation_reason'),
 });
 
 export const orderItems = pgTable('order_items', {
