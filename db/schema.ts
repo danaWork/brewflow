@@ -65,6 +65,10 @@ export const products = pgTable('products', {
   isFeatured: boolean('is_featured').default(false).notNull(),
   isQuickCartItem: boolean('is_quick_cart_item').default(false).notNull(),
   sortOrder: integer('sort_order').notNull().default(0),
+  /** Per-product sale: NULL = no sale */
+  saleDiscountType: discountTypeEnum('sale_discount_type'),
+  saleDiscountValue: decimal('sale_discount_value', { precision: 10, scale: 2 }),
+  saleLabel: text('sale_label'),
 });
 
 // Circular ref with modifierOptions; TypeScript cannot infer type. See modifierOptions below.

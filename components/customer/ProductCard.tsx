@@ -4,6 +4,9 @@ interface Product {
   id: string;
   name: string;
   price: number;
+  /** List price before sale (optional) */
+  compareAtPrice?: number;
+  saleLabel?: string | null;
   image: string | null;
   isSignature: boolean;
   isInStock?: boolean;
@@ -66,7 +69,19 @@ export default function ProductCard({ product, onClick, type = 'drinks' }: Produ
           )}
         </div>
         
-        <p className="text-xl font-bold text-gray-900">{formattedPrice}</p>
+        <div className="flex flex-col gap-1">
+          {product.compareAtPrice != null && product.compareAtPrice > product.price && (
+            <span className="text-sm text-gray-400 line-through">
+              {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(product.compareAtPrice)}
+            </span>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-xl font-bold text-gray-900">{formattedPrice}</p>
+            {product.saleLabel ? (
+              <span className="text-[10px] font-bold bg-orange-100 text-orange-800 px-2 py-0.5 rounded">{product.saleLabel}</span>
+            ) : null}
+          </div>
+        </div>
       </div>
     </div>
   );
