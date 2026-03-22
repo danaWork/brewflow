@@ -4,6 +4,7 @@ import { getMenuCategoriesForPOS } from '@/app/actions/menu-management';
 import { getPromotionsAction } from '@/app/actions/promotions';
 import { getUserSession } from '@/app/actions/auth';
 import { redirect } from 'next/navigation';
+import { resolveProductMenuPrice } from '@/lib/product-sale-price';
 
 export const metadata: Metadata = {
   title: 'POS Terminal',
@@ -12,7 +13,16 @@ export const metadata: Metadata = {
 export const revalidate = 0;
 
 function mapProduct(p: any) {
-  const basePrice = p.basePrice ?? p.base_price;
+  const basePriceRaw = p.basePrice ?? p.base_price;
+  const availability = p.branchAvailability?.[0];
+  const listUnit = parseFloat(
+    String(availability?.branchPriceOverride ?? basePriceRaw),
+  );
+  const resolved = resolveProductMenuPrice(listUnit, {
+    saleDiscountType: p.saleDiscountType ?? p.sale_discount_type,
+    saleDiscountValue: p.saleDiscountValue ?? p.sale_discount_value,
+    saleLabel: p.saleLabel ?? p.sale_label,
+  });
   const modifiers = (p.modifierLinks || []).map((ml: any) => {
     const group = ml.modifierGroup || ml.modifier_group;
     if (!group) return null;
@@ -34,7 +44,10 @@ function mapProduct(p: any) {
     id: p.id,
     categoryId: p.categoryId ?? p.category_id,
     name: p.name,
-    basePrice,
+    /** Effective unit price (after branch override + per-product sale) */
+    basePrice: resolved.price,
+    compareAtPrice: resolved.compareAtPrice,
+    saleLabel: resolved.saleLabel,
     imageUrl: p.imageUrl ?? p.image_url ?? null,
     image: p.imageUrl ?? p.image_url ?? null,
     isHidden: p.isHidden ?? p.is_hidden ?? false,
@@ -49,7 +62,7 @@ export default async function POSPage() {
     redirect('/login');
   }
 
-  const raw = await getMenuCategoriesForPOS();
+  const raw = await getMenuCategoriesForPOS(session.branchId);
   const categories = (Array.isArray(raw) ? raw : []).map((cat: any) => ({
     id: cat.id,
     name: cat.name,

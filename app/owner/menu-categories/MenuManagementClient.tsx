@@ -55,6 +55,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { resolveProductMenuPrice } from "@/lib/product-sale-price";
 
 type Product = {
   id: string;
@@ -65,6 +66,9 @@ type Product = {
   isHidden?: boolean;
   isFeatured?: boolean;
   isQuickCartItem?: boolean;
+  saleDiscountType?: "PERCENTAGE" | "FIXED" | null;
+  saleDiscountValue?: string | null;
+  saleLabel?: string | null;
   modifierLinks?: {
     modifierGroupId: string;
     defaultModifierOptionId?: string | null;
@@ -637,6 +641,13 @@ export default function MenuManagementClient({
   const [waterImageUrl, setWaterImageUrl] = useState("");
   const [waterIsQuickCartItem, setWaterIsQuickCartItem] = useState(true);
 
+  const [saleMode, setSaleMode] = useState<"none" | "PERCENTAGE" | "FIXED">(
+    "none",
+  );
+  const [saleValueInput, setSaleValueInput] = useState("");
+  const [saleLabelInput, setSaleLabelInput] = useState("");
+  const [pricePreviewBase, setPricePreviewBase] = useState("");
+
   const [editingModifierGroup, setEditingModifierGroup] = useState<{
     id?: string;
     name: string;
@@ -720,6 +731,26 @@ export default function MenuManagementClient({
     setIsProductModalOpen(true);
   };
 
+  useEffect(() => {
+    if (!isProductModalOpen) return;
+    if (editingProduct) {
+      const t = editingProduct.saleDiscountType;
+      setSaleMode(t === "PERCENTAGE" || t === "FIXED" ? t : "none");
+      setSaleValueInput(
+        editingProduct.saleDiscountValue != null
+          ? String(editingProduct.saleDiscountValue)
+          : "",
+      );
+      setSaleLabelInput(editingProduct.saleLabel ?? "");
+      setPricePreviewBase(String(editingProduct.basePrice ?? ""));
+    } else {
+      setSaleMode("none");
+      setSaleValueInput("");
+      setSaleLabelInput("");
+      setPricePreviewBase("");
+    }
+  }, [isProductModalOpen, editingProduct]);
+
   const handleSaveCategory = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -768,6 +799,15 @@ export default function MenuManagementClient({
     const isHidden = formData.get("isHidden") === "on";
     const isFeatured = formData.get("isFeatured") === "on";
 
+    const saleDiscountType =
+      saleMode !== "none" && saleValueInput.trim() !== ""
+        ? saleMode
+        : null;
+    const saleDiscountValue =
+      saleDiscountType && saleValueInput.trim() !== ""
+        ? saleValueInput.trim()
+        : null;
+
     // Build modifier groups with default options
     const modifierGroupIds = formData.getAll("modifierGroups") as string[];
     const modifierGroups = modifierGroupIds.map((groupId) => ({
@@ -784,6 +824,9 @@ export default function MenuManagementClient({
       isHidden,
       isFeatured,
       isQuickCartItem: editingProduct?.isQuickCartItem,
+      saleDiscountType,
+      saleDiscountValue,
+      saleLabel: saleLabelInput.trim() || null,
     };
 
     let productId = editingProduct?.id;
@@ -1489,7 +1532,8 @@ export default function MenuManagementClient({
                         name="basePrice"
                         type="number"
                         step="0.01"
-                        defaultValue={editingProduct?.basePrice}
+                        value={pricePreviewBase}
+                        onChange={(e) => setPricePreviewBase(e.target.value)}
                         required
                         className="w-full pl-10 pr-5 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-[#D95D1E] transition-all font-bold"
                         placeholder="0.00"
@@ -1564,6 +1608,102 @@ export default function MenuManagementClient({
                       placeholder="Paste image URL here..."
                     />
                   </div>
+                </div>
+              </div>
+
+              <div className="border-t border-gray-100 pt-6">
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">
+                  Per-product sale (optional)
+                </label>
+                <div className="space-y-3 max-w-xl">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">
+                      Discount type
+                    </label>
+                    <select
+                      value={saleMode}
+                      onChange={(e) =>
+                        setSaleMode(
+                          e.target.value as "none" | "PERCENTAGE" | "FIXED",
+                        )
+                      }
+                      className="w-full px-4 py-3 bg-gray-50 rounded-2xl font-semibold border-none focus:ring-2 focus:ring-[#D95D1E]"
+                    >
+                      <option value="none">No sale</option>
+                      <option value="PERCENTAGE">Percentage off</option>
+                      <option value="FIXED">Fixed amount off (PHP)</option>
+                    </select>
+                  </div>
+                  {saleMode !== "none" && (
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">
+                        {saleMode === "PERCENTAGE"
+                          ? "Percent off"
+                          : "Amount off (PHP)"}
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={saleValueInput}
+                        onChange={(e) => setSaleValueInput(e.target.value)}
+                        className="w-full px-4 py-3 bg-gray-50 rounded-2xl font-bold border-none focus:ring-2 focus:ring-[#D95D1E]"
+                        placeholder={saleMode === "PERCENTAGE" ? "10" : "20.00"}
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">
+                      Sale label (optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={saleLabelInput}
+                      onChange={(e) => setSaleLabelInput(e.target.value)}
+                      className="w-full px-4 py-3 bg-gray-50 rounded-2xl font-medium border-none focus:ring-2 focus:ring-[#D95D1E]"
+                      placeholder='e.g. "Happy Hour"'
+                    />
+                  </div>
+                  {(() => {
+                    const list = parseFloat(pricePreviewBase || "0");
+                    if (Number.isNaN(list)) return null;
+                    const r = resolveProductMenuPrice(list, {
+                      saleDiscountType:
+                        saleMode === "none" || !saleValueInput.trim()
+                          ? null
+                          : saleMode,
+                      saleDiscountValue: saleValueInput,
+                      saleLabel: saleLabelInput,
+                    });
+                    if (
+                      r.compareAtPrice != null &&
+                      r.price < r.compareAtPrice - 0.001
+                    ) {
+                      return (
+                        <p className="text-sm text-gray-600 bg-orange-50/50 rounded-xl px-4 py-3 border border-orange-100">
+                          Customer sees:{" "}
+                          <span className="line-through text-gray-400">
+                            ₱{r.compareAtPrice.toFixed(2)}
+                          </span>{" "}
+                          →{" "}
+                          <span className="font-bold text-[#D95D1E]">
+                            ₱{r.price.toFixed(2)}
+                          </span>
+                          {r.saleLabel ? (
+                            <span className="ml-2 text-[10px] font-bold bg-orange-100 text-orange-800 px-2 py-0.5 rounded">
+                              {r.saleLabel}
+                            </span>
+                          ) : null}
+                        </p>
+                      );
+                    }
+                    return (
+                      <p className="text-xs text-gray-400">
+                        Branch price overrides (if any) apply before this sale on
+                        the live menu and POS.
+                      </p>
+                    );
+                  })()}
                 </div>
               </div>
 

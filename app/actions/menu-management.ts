@@ -2,6 +2,7 @@
 
 import { db } from '@/lib/db';
 import { categories, products, modifierGroups, modifierOptions, productModifierLinks, productIngredients, branchProductAvailability, promotionItems, notifications, orderItems } from '@/db/schema';
+import type { SaleDiscountType } from '@/lib/product-sale-price';
 import { eq, and, inArray, sql, asc, max } from 'drizzle-orm';
 import { getUserSession } from './auth';
 import { revalidatePath } from 'next/cache';
@@ -28,7 +29,7 @@ export async function getMenuCategories() {
 }
 
 /** POS: categories with products including full modifier groups and options for add-item modal */
-export async function getMenuCategoriesForPOS() {
+export async function getMenuCategoriesForPOS(branchId: string) {
     const session = await getUserSession();
     if (!session?.companyId) return [];
 
@@ -39,6 +40,9 @@ export async function getMenuCategoriesForPOS() {
             products: {
                 orderBy: [asc(products.sortOrder)],
                 with: {
+                    branchAvailability: {
+                        where: eq(branchProductAvailability.branchId, branchId),
+                    },
                     modifierLinks: {
                         with: {
                             modifierGroup: {
@@ -190,6 +194,9 @@ export async function createProduct(data: {
     isHidden?: boolean;
     isFeatured?: boolean;
     isQuickCartItem?: boolean;
+    saleDiscountType?: SaleDiscountType | null;
+    saleDiscountValue?: string | null;
+    saleLabel?: string | null;
 }) {
     const session = await getUserSession();
     if (!session?.companyId) throw new Error('Unauthorized');
@@ -200,6 +207,15 @@ export async function createProduct(data: {
         .where(eq(products.categoryId, data.categoryId));
     const nextProductSort = (maxProd?.m ?? -1) + 1;
 
+    const saleType =
+        data.saleDiscountType && data.saleDiscountValue != null && String(data.saleDiscountValue).trim() !== ''
+            ? data.saleDiscountType
+            : null;
+    const saleVal =
+        saleType && data.saleDiscountValue != null && String(data.saleDiscountValue).trim() !== ''
+            ? String(data.saleDiscountValue)
+            : null;
+
     const [product] = await db.insert(products).values({
         categoryId: data.categoryId,
         name: data.name,
@@ -209,6 +225,9 @@ export async function createProduct(data: {
         isFeatured: data.isFeatured || false,
         isQuickCartItem: data.isQuickCartItem || false,
         sortOrder: nextProductSort,
+        saleDiscountType: saleType,
+        saleDiscountValue: saleVal,
+        saleLabel: data.saleLabel?.trim() || null,
     }).returning();
 
     // Support both old format (modifierGroupIds) and new format (modifierGroups with defaults)
@@ -243,10 +262,22 @@ export async function updateProduct(id: string, data: {
     isHidden?: boolean;
     isFeatured?: boolean;
     isQuickCartItem?: boolean;
+    saleDiscountType?: SaleDiscountType | null;
+    saleDiscountValue?: string | null;
+    saleLabel?: string | null;
 }) {
     if (!id) throw new Error('Product ID is required');
     const session = await getUserSession();
     if (!session?.companyId) throw new Error('Unauthorized');
+
+    const saleType =
+        data.saleDiscountType && data.saleDiscountValue != null && String(data.saleDiscountValue).trim() !== ''
+            ? data.saleDiscountType
+            : null;
+    const saleVal =
+        saleType && data.saleDiscountValue != null && String(data.saleDiscountValue).trim() !== ''
+            ? String(data.saleDiscountValue)
+            : null;
 
     await db.update(products)
         .set({
@@ -257,6 +288,9 @@ export async function updateProduct(id: string, data: {
             isHidden: data.isHidden ?? false,
             isFeatured: data.isFeatured ?? false,
             isQuickCartItem: data.isQuickCartItem ?? false,
+            saleDiscountType: saleType,
+            saleDiscountValue: saleVal,
+            saleLabel: data.saleLabel?.trim() || null,
         })
         .where(eq(products.id, id));
 

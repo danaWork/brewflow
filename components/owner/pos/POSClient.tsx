@@ -16,6 +16,9 @@ export type Product = {
     categoryId: string;
     name: string;
     basePrice: string | number;
+    /** List price before per-product sale (optional, for display) */
+    compareAtPrice?: number;
+    saleLabel?: string | null;
     imageUrl: string | null;
     image?: string | null;
     isHidden: boolean;
@@ -587,8 +590,16 @@ export function POSClient({
                                                 )}
                                             </div>
                                             <h3 className="font-semibold text-gray-900 leading-tight line-clamp-2">{product.name}</h3>
-                                            <div className="mt-auto pt-2">
-                                                <span className="text-[#D95D1E] font-bold">{formatCurrency(parseFloat(product.basePrice.toString()))}</span>
+                                            <div className="mt-auto pt-2 flex flex-col gap-0.5">
+                                                {product.compareAtPrice != null && product.compareAtPrice > parseFloat(String(product.basePrice)) && (
+                                                    <span className="text-xs text-gray-400 line-through">{formatCurrency(product.compareAtPrice)}</span>
+                                                )}
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="text-[#D95D1E] font-bold">{formatCurrency(parseFloat(product.basePrice.toString()))}</span>
+                                                    {product.saleLabel ? (
+                                                        <span className="text-[10px] font-bold bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded">{product.saleLabel}</span>
+                                                    ) : null}
+                                                </div>
                                             </div>
                                         </button>
                                     ))}

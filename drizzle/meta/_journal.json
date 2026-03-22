@@ -71,6 +71,13 @@
       "when": 1774119853472,
       "tag": "0009_menu_sort_order",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1774196835725,
+      "tag": "0010_product_sale_discount",
+      "breakpoints": true
     }
   ]
 }

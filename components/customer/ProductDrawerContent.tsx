@@ -394,6 +394,20 @@ export default function ProductDrawerContent({
         <h2 className="text-2xl font-bold text-gray-900 leading-tight">
           {product.name}
         </h2>
+        {product.compareAtPrice != null &&
+          typeof product.price === "number" &&
+          product.compareAtPrice > product.price && (
+            <p className="text-sm text-gray-500 mt-1">
+              <span className="line-through">
+                ₱{Number(product.compareAtPrice).toFixed(2)}
+              </span>
+            </p>
+          )}
+        {product.saleLabel ? (
+          <span className="inline-block mt-1 text-[10px] font-bold bg-orange-100 text-orange-800 px-2 py-0.5 rounded">
+            {product.saleLabel}
+          </span>
+        ) : null}
       </div>
     </div>
   );

@@ -13,6 +13,7 @@ import {
 import { eq, asc, and, or, isNull } from 'drizzle-orm';
 import { branchProductAvailability, companies as companiesSchema } from '@/db/schema';
 import { getTenantFromHost } from '@/lib/tenant';
+import { resolveProductMenuPrice } from '@/lib/product-sale-price';
 
 export async function getMenuData(branchId: string, qrIdentifier: string) {
     if (process.env.DATABASE_URL?.includes('placeholder') || !process.env.DATABASE_URL) {
@@ -139,11 +140,22 @@ export async function getMenuData(branchId: string, qrIdentifier: string) {
                 // Usually this means we still SHOW it but mark it out of stock.
                 
                 // Removed the skip so we can show "Sold Out" in UI.
-                
+
+                const listUnit = parseFloat(
+                    (availability?.branchPriceOverride || p.basePrice).toString(),
+                );
+                const resolved = resolveProductMenuPrice(listUnit, {
+                    saleDiscountType: p.saleDiscountType ?? undefined,
+                    saleDiscountValue: p.saleDiscountValue ?? undefined,
+                    saleLabel: p.saleLabel ?? undefined,
+                });
+
                 transformedProducts.push({
                     id: p.id,
                     name: p.name,
-                    price: parseFloat((availability?.branchPriceOverride || p.basePrice).toString()),
+                    price: resolved.price,
+                    compareAtPrice: resolved.compareAtPrice,
+                    saleLabel: resolved.saleLabel ?? null,
                     image: p.imageUrl,
                     categoryId: p.categoryId,
                     categoryIdReal: c.id, 
