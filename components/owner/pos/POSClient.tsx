@@ -97,6 +97,7 @@ export function POSClient({
     const [productModalProduct, setProductModalProduct] = useState<Product | null>(null);
     const [editingCartItemUniqueId, setEditingCartItemUniqueId] = useState<string | null>(null);
     const [cancelOrderModal, setCancelOrderModal] = useState<{ id: string; orderNumber: number; table: string } | null>(null);
+    const [cancelOrderReason, setCancelOrderReason] = useState('');
     const [receiptModal, setReceiptModal] = useState<{
         orderNumber: number;
         table: string;
@@ -1042,7 +1043,7 @@ export function POSClient({
                                             )}
 
                                             <button 
-                                                onClick={() => setCancelOrderModal({ id: order.id, orderNumber: order.orderNumber, table: order.table })}
+                                                onClick={() => { setCancelOrderReason(''); setCancelOrderModal({ id: order.id, orderNumber: order.orderNumber, table: order.table }); }}
                                                 className="w-full py-2 text-red-600 hover:bg-red-50 font-bold rounded-xl transition-colors border border-red-200 text-sm"
                                             >
                                                 Cancel Order
@@ -1159,9 +1160,16 @@ export function POSClient({
                 <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 animate-in fade-in zoom-in-95 duration-200">
                         <h3 className="font-bold text-gray-900 text-lg mb-2">Cancel order?</h3>
-                        <p className="text-gray-600 text-sm mb-6">
+                        <p className="text-gray-600 text-sm mb-4">
                             Order #{cancelOrderModal.orderNumber} (Table {cancelOrderModal.table}) will be cancelled. The customer will see the order as cancelled. This cannot be undone.
                         </p>
+                        <textarea
+                            value={cancelOrderReason}
+                            onChange={(e) => setCancelOrderReason(e.target.value)}
+                            placeholder="Reason for cancellation (optional)"
+                            rows={3}
+                            className="w-full mb-4 px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-red-200"
+                        />
                         <div className="flex gap-3">
                             <button
                                 onClick={() => setCancelOrderModal(null)}
@@ -1171,7 +1179,7 @@ export function POSClient({
                             </button>
                             <button
                                 onClick={() => {
-                                    updateOrderStatus(cancelOrderModal.id, 'CANCELLED');
+                                    updateOrderStatus(cancelOrderModal.id, 'CANCELLED', cancelOrderReason.trim() || undefined);
                                     if (editingOrderId === cancelOrderModal.id) {
                                         setEditingOrderId(null);
                                         setCart([]);
