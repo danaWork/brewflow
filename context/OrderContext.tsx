@@ -41,6 +41,7 @@ export interface Order {
   discountAmount?: number;
   discountName?: string | null;
   note?: string;
+  cancellationReason?: string | null;
 }
 
 interface OrderContextType {
@@ -68,7 +69,7 @@ interface OrderContextType {
     status: OrderStatus,
     note?: string,
   ) => Promise<{ success: boolean }>;
-  updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
+  updateOrderStatus: (orderId: string, status: OrderStatus, cancellationReason?: string) => Promise<void>;
   updateOrderPaymentStatus: (
     orderId: string,
     status: "UNPAID" | "PAID",
@@ -184,6 +185,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         discountAmount: o.discountAmount,
         discountName: o.discountName,
         note: o.note,
+        cancellationReason: o.cancellationReason ?? null,
       }));
 
       setActiveOrders(orders);
@@ -230,6 +232,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
             discountAmount: serverOrder.discountAmount,
             discountName: serverOrder.discountName,
             note: serverOrder.note,
+            cancellationReason: serverOrder.cancellationReason,
           };
         });
         setUserOrders(updatedUserOrders);
@@ -248,7 +251,11 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
               (so: { id: string; status: string }) => so.id === userOrder.id,
             );
             if (match && match.status !== userOrder.status) {
-              return { ...userOrder, status: match.status as OrderStatus };
+              return {
+                ...userOrder,
+                status: match.status as OrderStatus,
+                cancellationReason: match.cancellationReason ?? userOrder.cancellationReason,
+              };
             }
             return userOrder;
           }),
@@ -452,15 +459,16 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
+  const updateOrderStatus = async (orderId: string, status: OrderStatus, cancellationReason?: string) => {
+    const reasonPatch = status === "CANCELLED" ? { cancellationReason: cancellationReason ?? null } : {};
     setActiveOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status } : o)),
+      prev.map((o) => (o.id === orderId ? { ...o, status, ...reasonPatch } : o)),
     );
     setUserOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status } : o)),
+      prev.map((o) => (o.id === orderId ? { ...o, status, ...reasonPatch } : o)),
     );
 
-    const result = await updateOrderStatusAction(orderId, status);
+    const result = await updateOrderStatusAction(orderId, status, cancellationReason);
     if (!result.success) {
       console.error("Error updating order status:", result.error);
     }

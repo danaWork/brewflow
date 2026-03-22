@@ -1,7 +1,7 @@
 'use client';
 
+import React, { useState, useEffect, useCallback } from 'react';
 import { useOrder, Order, OrderStatus } from '@/context/OrderContext';
-import { useState, useEffect, useCallback } from 'react';
 import { Clock, ChefHat, CheckCircle, X, CreditCard, Banknote, Smartphone, ClipboardList, Bell, History, ChevronDown, ChevronUp, RefreshCw, Search } from 'lucide-react';
 import { useOrderNotifications } from '@/hooks/useOrderNotifications';
 import LiveOrdersTabsMobile from './LiveOrdersTabsMobile';
@@ -46,9 +46,15 @@ function CancelConfirmModal({
 }: {
   isOpen: boolean;
   order: Order | null;
-  onConfirm: () => void;
+  onConfirm: (reason: string) => void;
   onCancel: () => void;
 }) {
+  const [reason, setReason] = React.useState('');
+
+  React.useEffect(() => {
+    if (isOpen) setReason('');
+  }, [isOpen]);
+
   if (!isOpen || !order) return null;
 
   return (
@@ -64,9 +70,17 @@ function CancelConfirmModal({
         <p className="text-gray-600 mb-2">
           Are you sure you want to cancel order <span className="font-bold">#{order.orderNumber}</span>?
         </p>
-        <p className="text-sm text-gray-400 mb-6">
+        <p className="text-sm text-gray-400 mb-4">
           This action cannot be undone.
         </p>
+
+        <textarea
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="Reason for cancellation (optional)"
+          rows={3}
+          className="w-full mb-4 px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-red-200"
+        />
 
         <div className="flex gap-3">
           <button
@@ -76,7 +90,7 @@ function CancelConfirmModal({
             Keep Order
           </button>
           <button
-            onClick={onConfirm}
+            onClick={() => onConfirm(reason.trim())}
             className="flex-1 py-3 px-4 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition"
           >
             Cancel Order
@@ -416,9 +430,9 @@ export default function LiveOrdersPage() {
     setCancelModalOrder(order);
   };
 
-  const handleConfirmCancel = () => {
+  const handleConfirmCancel = (reason: string) => {
     if (cancelModalOrder) {
-      updateOrderStatus(cancelModalOrder.id, 'CANCELLED');
+      updateOrderStatus(cancelModalOrder.id, 'CANCELLED', reason || undefined);
       setCancelModalOrder(null);
     }
   };

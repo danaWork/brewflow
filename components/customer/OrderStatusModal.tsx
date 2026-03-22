@@ -143,7 +143,13 @@ export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: 
                         <div className="relative z-10 text-center">
                             <XCircle className="mx-auto mb-2 w-12 h-12" />
                             <h1 className="text-2xl font-bold mb-1">Order Cancelled</h1>
-                            <p className="opacity-90 text-sm">This order has been cancelled.</p>
+                            {order.cancellationReason ? (
+                                <p className="opacity-90 text-sm">
+                                    Reason: {order.cancellationReason}
+                                </p>
+                            ) : (
+                                <p className="opacity-90 text-sm">This order has been cancelled.</p>
+                            )}
                         </div>
                     </div>
                 );

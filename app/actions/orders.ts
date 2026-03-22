@@ -243,6 +243,7 @@ export async function getActiveOrdersAction(branchId: string) {
         discountAmount: o.discountAmount ? parseFloat(o.discountAmount as string) : 0,
         discountName: o.discountName,
         note: o.note,
+        cancellationReason: o.cancellationReason ?? null,
         items: o.items.map((item: any) => ({
           productId: item.productId,
           name: item.customName || item.product?.name || "Unknown Product",
@@ -391,6 +392,7 @@ import { deductInventoryForOrder } from "./inventory";
 export async function updateOrderStatusAction(
   orderId: string,
   status: "PENDING" | "PREPARING" | "READY" | "COMPLETED" | "CANCELLED",
+  cancellationReason?: string,
 ) {
   try {
     if (status === "PREPARING") {
@@ -414,6 +416,8 @@ export async function updateOrderStatusAction(
         acceptedAt: status === "PREPARING" ? new Date() : undefined,
         readyAt: status === "READY" ? new Date() : undefined,
         completedAt: status === "COMPLETED" ? new Date() : undefined,
+        cancellationReason:
+          status === "CANCELLED" ? (cancellationReason ?? null) : undefined,
       })
       .where(eq(ordersSchema.id, orderId));
     return { success: true };
@@ -431,6 +435,7 @@ export async function getOrdersStatusAction(orderIds: string[]) {
       .select({
         id: ordersSchema.id,
         status: ordersSchema.status,
+        cancellationReason: ordersSchema.cancellationReason,
       })
       .from(ordersSchema)
       .where(inArray(ordersSchema.id, orderIds));
