@@ -20,6 +20,7 @@ type PastOrder = {
   completedAt: Date | null;
   paymentMethod: string | null;
   note: string | null;
+  cancellationReason?: string | null;
   items: {
     productId: string;
     name: string;
@@ -182,6 +183,12 @@ function ActivityLogEntry({ order }: { order: PastOrder }) {
             <div className="bg-yellow-50 text-yellow-800 p-2 rounded-lg text-sm border border-yellow-200">
               <span className="font-bold block text-xs uppercase mb-1">Note:</span>
               {order.note}
+            </div>
+          )}
+          {!isCompleted && order.cancellationReason && (
+            <div className="bg-red-50 text-red-800 p-2 rounded-lg text-sm border border-red-200">
+              <span className="font-bold block text-xs uppercase mb-1">Cancellation Reason:</span>
+              {order.cancellationReason}
             </div>
           )}
           <div className="space-y-1">

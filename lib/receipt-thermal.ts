@@ -24,6 +24,7 @@ export interface ReceiptOrder {
   discountAmount?: number;
   discountName?: string | null;
   note?: string;
+  cancellationReason?: string | null;
 }
 
 export interface BuildReceiptOptions {
@@ -98,6 +99,11 @@ export function buildReceiptText(
   if (order.note) {
     lines.push(SEP);
     lines.push(`Note: ${order.note}`);
+  }
+  if (order.cancellationReason) {
+    lines.push(SEP);
+    lines.push('** ORDER CANCELLED **');
+    lines.push(`Reason: ${order.cancellationReason}`);
   }
   lines.push(SEP);
   lines.push(padCenter('Thank you!', WIDTH));
@@ -202,6 +208,7 @@ export interface PosOrderForReceipt {
   discountAmount?: number;
   discountName?: string | null;
   note?: string;
+  cancellationReason?: string | null;
 }
 
 /**
@@ -220,6 +227,7 @@ export function buildReceiptEscPosFromOrder(
     discountAmount: order.discountAmount,
     discountName: order.discountName,
     note: order.note,
+    cancellationReason: order.cancellationReason,
     items: order.items.map((item) => ({
       name: item.name,
       price: item.price,

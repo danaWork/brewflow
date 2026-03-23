@@ -16,6 +16,7 @@ export interface ReceiptData {
   discountAmount?: number | null;
   discountName?: string | null;
   total: number;
+  cancellationReason?: string | null;
 }
 
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
@@ -46,6 +47,7 @@ export function generateReceiptDataUrl(data: ReceiptData): string {
     discountAmount,
     discountName,
     total,
+    cancellationReason,
   } = data;
 
   const SCALE = 2;
@@ -81,6 +83,7 @@ export function generateReceiptDataUrl(data: ReceiptData): string {
   estimatedH += 16; // divider after items
   if (discountAmount && discountAmount > 0) estimatedH += LINE * 2;
   estimatedH += 40 + 22 + 20 + PAD; // total + payment + footer + bottom padding
+  if (cancellationReason) estimatedH += 14 + LINE * 2; // divider + label + reason
 
   // ── Real canvas ─────────────────────────────────────────────────────────────
   const canvas = document.createElement('canvas');
@@ -220,6 +223,29 @@ export function generateReceiptDataUrl(data: ReceiptData): string {
   ctx.fillStyle = '#6b7280';
   ctx.textAlign = 'left'; ctx.fillText(`Payment: ${paymentMethod}`, PAD, y + 12);
   y += 22;
+
+  // ── Cancellation reason ──────────────────────────────────────────────────────
+  if (cancellationReason) {
+    ctx.strokeStyle = '#fca5a5';
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(PAD, y); ctx.lineTo(W - PAD, y); ctx.stroke();
+    ctx.setLineDash([]);
+    y += 14;
+
+    ctx.font = 'bold 11px system-ui, sans-serif';
+    ctx.fillStyle = '#dc2626';
+    ctx.textAlign = 'left';
+    ctx.fillText('ORDER CANCELLED', PAD, y + 11);
+    y += LINE;
+
+    ctx.font = '12px system-ui, sans-serif';
+    ctx.fillStyle = '#374151';
+    const reasonLines = wrapText(ctx, `Reason: ${cancellationReason}`, W - PAD * 2);
+    for (const line of reasonLines) {
+      ctx.fillText(line, PAD, y + 12);
+      y += LINE;
+    }
+  }
 
   // ── Footer ──────────────────────────────────────────────────────────────────
   ctx.font = '11px system-ui, sans-serif';
