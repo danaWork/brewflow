@@ -370,6 +370,7 @@ export async function getPastOrdersAction(
         discountAmount: o.discountAmount ? parseFloat(o.discountAmount as string) : 0,
         discountName: o.discountName,
         note: o.note,
+        cancellationReason: o.cancellationReason ?? null,
         items: o.items.map((item: any) => ({
           productId: item.productId,
           name: item.customName || item.product?.name || "Unknown Product",

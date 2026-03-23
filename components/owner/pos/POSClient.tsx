@@ -107,6 +107,7 @@ export function POSClient({
         items: { name: string; price: number; quantity: number; options?: Record<string, unknown>; extras?: { name: string; price: number; quantity?: number }[] }[];
         discountName?: string | null;
         discountAmount?: number;
+        cancellationReason?: string | null;
     } | null>(null);
 
     const [isInitialized, setIsInitialized] = useState(false);
@@ -452,6 +453,7 @@ export function POSClient({
             timestamp: order.timestamp instanceof Date ? order.timestamp : new Date(order.timestamp),
             discountAmount: order.discountAmount,
             discountName: order.discountName,
+            cancellationReason: (order as any).cancellationReason,
         };
         const bytes = buildReceiptEscPosFromOrder(receiptOrder, { storeName });
         const result = await connectAndPrint(bytes);
