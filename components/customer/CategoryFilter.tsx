@@ -15,37 +15,39 @@ interface CategoryFilterProps {
 
 export default function CategoryFilter({ categories, activeCategoryId, onSelectCategory, activeType }: CategoryFilterProps) {
   return (
-    <div className="flex overflow-x-auto pb-4 pt-2 gap-3 no-scrollbar px-4 scroll-smooth">
-      <button
-        onClick={() => onSelectCategory('all')}
-        className={`
-          whitespace-nowrap px-4 py-2 rounded-lg text-[13px] font-bold transition-colors
-          ${activeCategoryId === 'all' 
-            ? 'bg-[#F1F5F9] text-gray-900 border border-black' 
-            : 'bg-white text-gray-600'}
-        `}
-      >
-        {activeType === 'drinks'
-          ? 'All Drinks'
-          : activeType === 'snacks'
-            ? 'All Snacks'
-            : 'All Meals'}
-      </button>
-      
-      {categories.map((category) => (
+    <div className="w-full max-w-full overflow-x-auto overscroll-x-contain no-scrollbar">
+      <div className="flex w-max min-w-full pb-4 pt-2 gap-3 px-4 scroll-smooth">
         <button
-          key={category.id}
-          onClick={() => onSelectCategory(category.id)}
+          onClick={() => onSelectCategory('all')}
           className={`
             whitespace-nowrap px-4 py-2 rounded-lg text-[13px] font-bold transition-colors
-            ${activeCategoryId === category.id
-              ? 'bg-[#D95D1E] text-white shadow-md border border-black' 
+            ${activeCategoryId === 'all' 
+              ? 'bg-[#F1F5F9] text-gray-900 border border-black' 
               : 'bg-white text-gray-600'}
           `}
         >
-          {category.name}
+          {activeType === 'drinks'
+            ? 'All Drinks'
+            : activeType === 'snacks'
+              ? 'All Snacks'
+              : 'All Meals'}
         </button>
-      ))}
+        
+        {categories.map((category) => (
+          <button
+            key={category.id}
+            onClick={() => onSelectCategory(category.id)}
+            className={`
+              whitespace-nowrap px-4 py-2 rounded-lg text-[13px] font-bold transition-colors
+              ${activeCategoryId === category.id
+                ? 'bg-[#D95D1E] text-white shadow-md border border-black' 
+                : 'bg-white text-gray-600'}
+            `}
+          >
+            {category.name}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
