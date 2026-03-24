@@ -41,15 +41,29 @@ type CartItem = {
     name: string;
     price: number;
     quantity: number;
+    itemDiscountType?: 'PERCENTAGE' | 'FIXED';
+    itemDiscountValue?: number;
     options?: Record<string, any>;
     extras?: CartItemExtra[];
     bundleLabel?: string;
     tag?: string;
 };
 
+function effectiveItemPrice(item: CartItem): number {
+    const raw = Number(item.itemDiscountValue ?? 0);
+    if (!Number.isFinite(raw) || raw <= 0) return item.price;
+
+    if (item.itemDiscountType === 'PERCENTAGE') {
+        const pct = Math.min(100, raw);
+        return Math.max(0, item.price * (1 - pct / 100));
+    }
+
+    return Math.max(0, item.price - raw);
+}
+
 const DISCOUNTS = [
     { name: 'None', type: 'PERCENT', value: 0 },
-    { name: 'PWD', type: 'PERCENT', value: 20 },
+    { name: 'PWD', type: 'PERCENT', value: 10 },
     { name: 'Senior Citizen', type: 'PERCENT', value: 20 },
     { name: 'House (10%)', type: 'PERCENT', value: 10 },
     { name: 'Employee', type: 'PERCENT', value: 50 },
@@ -96,6 +110,7 @@ export function POSClient({
     const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
     const [productModalProduct, setProductModalProduct] = useState<Product | null>(null);
     const [editingCartItemUniqueId, setEditingCartItemUniqueId] = useState<string | null>(null);
+    const [discountEditorOpenById, setDiscountEditorOpenById] = useState<Record<string, boolean>>({});
     const [cancelOrderModal, setCancelOrderModal] = useState<{ id: string; orderNumber: number; table: string } | null>(null);
     const [cancelOrderReason, setCancelOrderReason] = useState('');
     const [receiptModal, setReceiptModal] = useState<{
@@ -202,6 +217,7 @@ export function POSClient({
         if (!productModalProduct) return;
         if (editingCartItemUniqueId) {
             setCart((prev) => {
+                const editingItem = prev.find((i) => i.uniqueId === editingCartItemUniqueId);
                 const without = prev.filter((i) => i.uniqueId !== editingCartItemUniqueId);
                 return [
                     ...without,
@@ -212,6 +228,8 @@ export function POSClient({
                         name: payload.name,
                         price: payload.price,
                         quantity: payload.quantity,
+                        itemDiscountType: editingItem?.itemDiscountType,
+                        itemDiscountValue: editingItem?.itemDiscountValue,
                         options: payload.options && Object.keys(payload.options).length > 0 ? payload.options : undefined,
                     },
                 ];
@@ -258,9 +276,47 @@ export function POSClient({
 
     const removeItem = (uniqueId: string) => {
         setCart(prev => prev.filter(item => item.uniqueId !== uniqueId));
+        setDiscountEditorOpenById((prev) => {
+            const next = { ...prev };
+            delete next[uniqueId];
+            return next;
+        });
     };
 
-    const subtotal = useMemo(() => cart.reduce((sum, item) => sum + (item.price * item.quantity), 0), [cart]);
+    const toggleDiscountEditor = (uniqueId: string) => {
+        setDiscountEditorOpenById((prev) => ({ ...prev, [uniqueId]: !prev[uniqueId] }));
+    };
+
+    const updateItemDiscount = (
+        uniqueId: string,
+        type: 'PERCENTAGE' | 'FIXED',
+        value: number | undefined,
+    ) => {
+        setCart((prev) =>
+            prev.map((item) => {
+                if (item.uniqueId !== uniqueId) return item;
+                if (value == null || !Number.isFinite(value) || value <= 0) {
+                    return { ...item, itemDiscountType: undefined, itemDiscountValue: undefined };
+                }
+                return { ...item, itemDiscountType: type, itemDiscountValue: value };
+            }),
+        );
+    };
+
+    const clearItemDiscount = (uniqueId: string) => {
+        updateItemDiscount(uniqueId, 'PERCENTAGE', undefined);
+    };
+
+    const subtotal = useMemo(() => cart.reduce((sum, item) => sum + (effectiveItemPrice(item) * item.quantity), 0), [cart]);
+    const listSubtotal = useMemo(() => cart.reduce((sum, item) => sum + (item.price * item.quantity), 0), [cart]);
+    const itemDiscountsTotal = useMemo(
+        () =>
+            cart.reduce((sum, item) => {
+                const itemDiscount = Math.max(0, item.price - effectiveItemPrice(item));
+                return sum + itemDiscount * item.quantity;
+            }, 0),
+        [cart],
+    );
 
     const cartProductIds = useMemo(() => cart.filter(i => i.productId).map(i => i.productId as string), [cart]);
 
@@ -319,7 +375,7 @@ export function POSClient({
                     customName: item.customName ?? undefined,
                     name: item.name,
                     quantity: item.quantity,
-                    price: item.price,
+                    price: effectiveItemPrice(item),
                     options: item.options,
                     extras: item.extras,
                     bundleLabel: item.bundleLabel,
@@ -346,7 +402,7 @@ export function POSClient({
                         productId: item.productId,
                         customName: item.customName,
                         quantity: item.quantity,
-                        priceAtTime: item.price,
+                        priceAtTime: effectiveItemPrice(item),
                         customizations: item.options || item.bundleLabel || item.tag ? { ...item.options, bundleLabel: item.bundleLabel, tag: item.tag } : undefined,
                     });
                     (item.extras || []).forEach(extra => {
@@ -380,7 +436,7 @@ export function POSClient({
                         total,
                         items: cart.map(item => ({
                             name: item.name,
-                            price: item.price,
+                            price: effectiveItemPrice(item),
                             quantity: item.quantity,
                             options: item.options,
                             extras: item.extras?.map(ex => ({ name: ex.name, price: ex.price, quantity: ex.quantity }))
@@ -641,69 +697,135 @@ export function POSClient({
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                    {cart.map(item => (
-                        <div key={item.uniqueId} className="flex flex-col gap-2 p-3 bg-white border border-gray-100 rounded-xl shadow-sm">
-                            <div className="flex justify-between items-start">
-                                <div className="flex flex-col min-w-0 flex-1 pe-2">
-                                    <span className="font-semibold text-gray-900 text-sm">{item.name}</span>
-                                    {item.options && Object.keys(item.options).length > 0 && (
-                                        <div className="flex flex-wrap gap-x-1.5 gap-y-1 mt-1">
-                                            {Object.entries(item.options).map(([key, value]) => {
-                                                if (key === 'tag' || key === 'bundleLabel') return null;
-                                                return (
-                                                    <span key={key} className="text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight border border-gray-200">
-                                                        {key}: {String(value)}
+                    {cart.map((item) => {
+                        const unitEffective = effectiveItemPrice(item);
+                        const hasItemDiscount = unitEffective < item.price;
+                        const discountType = item.itemDiscountType || 'PERCENTAGE';
+                        const discountValue = item.itemDiscountValue ?? '';
+                        const isDiscountEditorOpen = discountEditorOpenById[item.uniqueId] || false;
+
+                        return (
+                            <div key={item.uniqueId} className="flex flex-col gap-2 p-3 bg-white border border-gray-100 rounded-xl shadow-sm">
+                                <div className="flex justify-between items-start">
+                                    <div className="flex flex-col min-w-0 flex-1 pe-2">
+                                        <span className="font-semibold text-gray-900 text-sm">{item.name}</span>
+                                        {item.options && Object.keys(item.options).length > 0 && (
+                                            <div className="flex flex-wrap gap-x-1.5 gap-y-1 mt-1">
+                                                {Object.entries(item.options).map(([key, value]) => {
+                                                    if (key === 'tag' || key === 'bundleLabel') return null;
+                                                    return (
+                                                        <span key={key} className="text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight border border-gray-200">
+                                                            {key}: {String(value)}
+                                                        </span>
+                                                    );
+                                                })}
+                                                {item.options.tag === 'TOGETHER' && (
+                                                    <span className="text-[10px] bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight border border-purple-100">Together</span>
+                                                )}
+                                                {item.options.bundleLabel && (
+                                                    <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight border border-indigo-100">{item.options.bundleLabel}</span>
+                                                )}
+                                                {item.options.tag === 'EXTRA' && (
+                                                    <span className="text-[10px] bg-pink-50 text-pink-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight border border-pink-100">+ Extra</span>
+                                                )}
+                                            </div>
+                                        )}
+                                        {item.extras && item.extras.length > 0 && (
+                                            <div className="flex flex-wrap gap-1 mt-1">
+                                                {item.extras.map((ex, i) => (
+                                                    <span key={i} className="text-[10px] bg-pink-50 text-pink-600 px-1.5 py-0.5 rounded border border-pink-100">
+                                                        + {ex.name} {ex.quantity > 1 ? `×${ex.quantity}` : ''}
                                                     </span>
-                                                );
-                                            })}
-                                            {item.options.tag === 'TOGETHER' && (
-                                                <span className="text-[10px] bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight border border-purple-100">Together</span>
-                                            )}
-                                            {item.options.bundleLabel && (
-                                                <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight border border-indigo-100">{item.options.bundleLabel}</span>
-                                            )}
-                                            {item.options.tag === 'EXTRA' && (
-                                                <span className="text-[10px] bg-pink-50 text-pink-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight border border-pink-100">+ Extra</span>
-                                            )}
-                                        </div>
-                                    )}
-                                    {item.extras && item.extras.length > 0 && (
-                                        <div className="flex flex-wrap gap-1 mt-1">
-                                            {item.extras.map((ex, i) => (
-                                                <span key={i} className="text-[10px] bg-pink-50 text-pink-600 px-1.5 py-0.5 rounded border border-pink-100">
-                                                    + {ex.name} {ex.quantity > 1 ? `×${ex.quantity}` : ''}
-                                                </span>
-                                            ))}
-                                        </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        {item.productId && getProductById(item.productId) && (
+                                            <button
+                                                type="button"
+                                                onClick={() => openEditCartItem(item)}
+                                                className="p-1.5 text-gray-500 hover:text-[#D95D1E] hover:bg-orange-50 rounded-lg transition-colors"
+                                                title="Edit toppings / options"
+                                                aria-label="Edit toppings"
+                                            >
+                                                <Pencil size={16} />
+                                            </button>
+                                        )}
+                                        <button type="button" onClick={() => removeItem(item.uniqueId)} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors rounded-lg">
+                                            <X size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="flex justify-between items-center text-[#D95D1E] font-bold text-sm">
+                                    <div className="flex items-center gap-2">
+                                        {hasItemDiscount && (
+                                            <span className="text-xs text-gray-400 line-through">{formatCurrency(item.price)}</span>
+                                        )}
+                                        <span>{formatCurrency(unitEffective)}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-1 border border-gray-100">
+                                        <button type="button" onClick={() => updateQuantity(item.uniqueId, -1)} className="w-6 h-6 flex items-center justify-center bg-white rounded-md shadow-sm text-gray-700 hover:text-[#D95D1E]"><Minus size={14} /></button>
+                                        <span className="text-gray-900 font-semibold w-4 text-center">{item.quantity}</span>
+                                        <button type="button" onClick={() => updateQuantity(item.uniqueId, 1)} className="w-6 h-6 flex items-center justify-center bg-white rounded-md shadow-sm text-gray-700 hover:text-[#D95D1E]"><Plus size={14} /></button>
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleDiscountEditor(item.uniqueId)}
+                                        className="text-xs font-semibold text-[#D95D1E] hover:text-[#c25016]"
+                                    >
+                                        {hasItemDiscount ? 'Edit Item Discount' : 'Add Item Discount'}
+                                    </button>
+                                    {hasItemDiscount && (
+                                        <span className="text-[10px] font-bold bg-green-50 text-green-700 px-2 py-0.5 rounded-full border border-green-200">
+                                            -{formatCurrency((item.price - unitEffective) * item.quantity)}
+                                        </span>
                                     )}
                                 </div>
-                                <div className="flex items-center gap-1 shrink-0">
-                                    {item.productId && getProductById(item.productId) && (
+                                {isDiscountEditorOpen && (
+                                    <div className="flex items-center gap-2 pt-1">
+                                        <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
+                                            <button
+                                                type="button"
+                                                onClick={() => updateItemDiscount(item.uniqueId, 'PERCENTAGE', item.itemDiscountValue)}
+                                                className={`px-2.5 py-1 text-xs font-bold ${discountType === 'PERCENTAGE' ? 'bg-[#D95D1E] text-white' : 'bg-white text-gray-600'}`}
+                                            >
+                                                %
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => updateItemDiscount(item.uniqueId, 'FIXED', item.itemDiscountValue)}
+                                                className={`px-2.5 py-1 text-xs font-bold ${discountType === 'FIXED' ? 'bg-[#D95D1E] text-white' : 'bg-white text-gray-600'}`}
+                                            >
+                                                ₱
+                                            </button>
+                                        </div>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={discountValue}
+                                            onChange={(e) => {
+                                                const next = Number(e.target.value);
+                                                updateItemDiscount(item.uniqueId, discountType, Number.isFinite(next) ? next : undefined);
+                                            }}
+                                            placeholder={discountType === 'PERCENTAGE' ? '0-100' : '0.00'}
+                                            className="w-28 px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D95D1E]/20 focus:border-[#D95D1E]"
+                                        />
                                         <button
                                             type="button"
-                                            onClick={() => openEditCartItem(item)}
-                                            className="p-1.5 text-gray-500 hover:text-[#D95D1E] hover:bg-orange-50 rounded-lg transition-colors"
-                                            title="Edit toppings / options"
-                                            aria-label="Edit toppings"
+                                            onClick={() => clearItemDiscount(item.uniqueId)}
+                                            className="text-xs font-semibold text-gray-500 hover:text-gray-700"
                                         >
-                                            <Pencil size={16} />
+                                            Clear
                                         </button>
-                                    )}
-                                    <button type="button" onClick={() => removeItem(item.uniqueId)} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors rounded-lg">
-                                        <X size={16} />
-                                    </button>
-                                </div>
+                                    </div>
+                                )}
                             </div>
-                            <div className="flex justify-between items-center text-[#D95D1E] font-bold text-sm">
-                                <span>{formatCurrency(item.price)}</span>
-                                <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-1 border border-gray-100">
-                                    <button type="button" onClick={() => updateQuantity(item.uniqueId, -1)} className="w-6 h-6 flex items-center justify-center bg-white rounded-md shadow-sm text-gray-700 hover:text-[#D95D1E]"><Minus size={14} /></button>
-                                    <span className="text-gray-900 font-semibold w-4 text-center">{item.quantity}</span>
-                                    <button type="button" onClick={() => updateQuantity(item.uniqueId, 1)} className="w-6 h-6 flex items-center justify-center bg-white rounded-md shadow-sm text-gray-700 hover:text-[#D95D1E]"><Plus size={14} /></button>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                     {cart.length === 0 && (
                         <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-2 pb-10 mt-10">
                             <ShoppingCart size={40} className="opacity-20 mb-2" />
@@ -764,8 +886,14 @@ export function POSClient({
                         <div className="space-y-1.5 pt-2">
                             <div className="flex justify-between text-sm text-gray-500 font-medium">
                                 <span>Subtotal</span>
-                                <span>{formatCurrency(subtotal)}</span>
+                                <span>{formatCurrency(listSubtotal)}</span>
                             </div>
+                            {itemDiscountsTotal > 0 && (
+                                <div className="flex justify-between text-sm text-green-600 font-medium">
+                                    <span>Item Discounts</span>
+                                    <span>-{formatCurrency(itemDiscountsTotal)}</span>
+                                </div>
+                            )}
                             {appliedPromotion && promotionDiscountAmount > 0 && (
                                 <div className="flex justify-between text-sm text-green-600 font-medium">
                                     <span>Discount ({appliedPromotion.name})</span>
