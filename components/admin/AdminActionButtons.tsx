@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createShop, createManagerAccount } from '@/app/actions/admin';
 import { slugify } from '@/lib/slug';
-import { Plus, Store, UserPlus, X, Loader2 } from 'lucide-react';
+import { Plus, Store, UserPlus, X, Loader2, Eye, EyeOff } from 'lucide-react';
 import { AlertModal } from '@/components/ui/AlertModal';
 
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'brewflow.com';
@@ -15,13 +15,22 @@ export function AdminActionButtons({ shops }: { shops: any[] }) {
     const [alertConfig, setAlertConfig] = useState<{isOpen: boolean, message: string}>({ isOpen: false, message: '' });
     const [shopName, setShopName] = useState('');
     const [subdomain, setSubdomain] = useState('');
+    const [showShopPassword, setShowShopPassword] = useState(false);
+    const [showUserPassword, setShowUserPassword] = useState(false);
 
     useEffect(() => {
         if (showShopModal) {
             setShopName('');
             setSubdomain('');
+            setShowShopPassword(false);
         }
     }, [showShopModal]);
+
+    useEffect(() => {
+        if (showUserModal) {
+            setShowUserPassword(false);
+        }
+    }, [showUserModal]);
 
     const handleCreateShop = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -117,7 +126,23 @@ export function AdminActionButtons({ shops }: { shops: any[] }) {
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-sm font-semibold text-gray-700 ml-1">Password</label>
-                                    <input name="password" type="password" required placeholder="••••••••" className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-[#D46215]" />
+                                    <div className="relative">
+                                        <input
+                                            name="password"
+                                            type={showShopPassword ? 'text' : 'password'}
+                                            required
+                                            placeholder="••••••••"
+                                            className="w-full border border-gray-200 rounded-xl pl-4 pr-11 py-3 outline-none focus:border-[#D46215]"
+                                        />
+                                        <button
+                                            type="button"
+                                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                                            onClick={() => setShowShopPassword((v) => !v)}
+                                            aria-label={showShopPassword ? 'Hide password' : 'Show password'}
+                                        >
+                                            {showShopPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             <button disabled={loading} className="w-full bg-[#D46215] text-white py-4 rounded-2xl font-bold flex justify-center items-center">
@@ -154,7 +179,23 @@ export function AdminActionButtons({ shops }: { shops: any[] }) {
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-sm font-semibold text-gray-700 ml-1">Initial Password</label>
-                                <input name="password" type="password" required placeholder="••••••••" className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-[#D46215]" />
+                                <div className="relative">
+                                    <input
+                                        name="password"
+                                        type={showUserPassword ? 'text' : 'password'}
+                                        required
+                                        placeholder="••••••••"
+                                        className="w-full border border-gray-200 rounded-xl pl-4 pr-11 py-3 outline-none focus:border-[#D46215]"
+                                    />
+                                    <button
+                                        type="button"
+                                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                                        onClick={() => setShowUserPassword((v) => !v)}
+                                        aria-label={showUserPassword ? 'Hide password' : 'Show password'}
+                                    >
+                                        {showUserPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                    </button>
+                                </div>
                             </div>
                             <button disabled={loading} className="w-full bg-[#D46215] text-white py-4 rounded-2xl font-bold flex justify-center items-center">
                                 {loading ? <Loader2 size={24} className="animate-spin" /> : 'Create Manager Account'}
