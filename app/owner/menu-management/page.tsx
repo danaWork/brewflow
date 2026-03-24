@@ -1,4 +1,7 @@
-export default function MenuManagementPage() {
+import { requireManagerRole } from '@/lib/roleGuard';
+
+export default async function MenuManagementPage() {
+  await requireManagerRole();
   return (
     <div>
       <h1>Menu Management</h1>

@@ -3,71 +3,25 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  ClipboardList,
-  QrCode,
-  Tag,
-  BarChart3,
-  UtensilsCrossed,
-  Package,
   Coffee,
   LogOut,
   X,
-  Calculator
 } from 'lucide-react';
 import Drawer from '@/components/ui/Drawer';
 import { useState, useEffect } from 'react';
 import { getPromotionsStockStatusAction } from '@/app/actions/promotions';
 import { getInventoryStockStatusAction } from '@/app/actions/inventory';
-
-type NavItem = {
-  label: string;
-  href: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
-};
-
-type NavGroup = {
-  title: string;
-  items: NavItem[];
-};
-
-const navGroups: NavGroup[] = [
-  {
-    title: 'Point of Sale',
-    items: [
-      { label: 'POS Terminal', href: '/owner/pos', icon: Calculator },
-      { label: 'Receipts', href: '/owner/pos/receipts', icon: ClipboardList },
-    ],
-  },
-  {
-    title: 'Business / Operations',
-    items: [
-      { label: 'Live Orders', href: '/owner/live-orders', icon: ClipboardList },
-      { label: 'QR Codes', href: '/owner/qr-codes', icon: QrCode },
-    ],
-  },
-  {
-    title: 'Marketing / Revenue',
-    items: [
-      { label: 'Promotions', href: '/owner/promotions', icon: Tag },
-      { label: 'Analytics', href: '/owner/analytics', icon: BarChart3 },
-    ],
-  },
-  {
-    title: 'Menu Management',
-    items: [
-      { label: 'Menu & Categories', href: '/owner/menu-categories', icon: UtensilsCrossed },
-      { label: 'Inventory', href: '/owner/inventory', icon: Package },
-    ],
-  },
-];
+import { getMobileNavGroups } from '@/components/owner/ownerNavConfig';
 
 interface OwnerNavDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   branchId: string;
+  role?: string;
 }
 
-export default function OwnerNavDrawer({ isOpen, onClose, branchId }: OwnerNavDrawerProps) {
+export default function OwnerNavDrawer({ isOpen, onClose, branchId, role }: OwnerNavDrawerProps) {
+  const navGroups = getMobileNavGroups(role);
   const pathname = usePathname();
   const [hasPromoOutOfStock, setHasPromoOutOfStock] = useState(false);
   const [hasInventoryLowStock, setHasInventoryLowStock] = useState(false);

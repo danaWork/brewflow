@@ -32,11 +32,11 @@ export default async function OwnerLayout({
     <div className="flex flex-col md:flex-row h-screen bg-gray-50 overflow-hidden">
       {/* Desktop sidebar — overflow-visible so the toggle pill can poke out */}
       <aside className="hidden md:flex shrink-0 overflow-visible relative z-20">
-        <OwnerSidebar shopName={shopName} branchId={session?.branchId || ''} />
+        <OwnerSidebar shopName={shopName} branchId={session?.branchId || ''} role={session?.role} />
       </aside>
       {/* Mobile top nav */}
       <div className="md:hidden shrink-0 w-full relative z-30 flex items-center bg-white border-b border-gray-200">
-        <div className="flex-[3]"><OwnerMobileNav shopName={shopName} branchId={session?.branchId || ''} /></div>
+        <div className="flex-[3]"><OwnerMobileNav shopName={shopName} branchId={session?.branchId || ''} role={session?.role} /></div>
         {session?.branchId && (
           <div className="pr-4 flex-shrink-0">
             <NotificationDropdown branchId={session.branchId} />

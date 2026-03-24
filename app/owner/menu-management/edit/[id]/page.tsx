@@ -5,6 +5,7 @@ import { getUserSession } from '@/app/actions/auth';
 import { getInventoryItemsAction, getProductIngredientsAction } from '@/app/actions/inventory';
 import ProductRecipeEditor from '@/components/products/ProductRecipeEditor';
 import { redirect } from 'next/navigation';
+import { requireManagerRole } from '@/lib/roleGuard';
 
 export default async function EditMenuItemPage({
   params,
@@ -12,9 +13,10 @@ export default async function EditMenuItemPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  await requireManagerRole();
   const session = await getUserSession();
 
-  if (!session || !['SUPERADMIN', 'BRANCH_MANAGER'].includes(session.role)) {
+  if (!session) {
     redirect('/login');
   }
 

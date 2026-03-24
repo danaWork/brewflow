@@ -4,74 +4,27 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import {
-  ClipboardList,
-  QrCode,
-  Tag,
-  BarChart3,
-  UtensilsCrossed,
-  Package,
   Coffee,
   LogOut,
   ChevronLeft,
   ChevronRight,
-  AlertCircle,
-  Calculator,
-  Settings
 } from 'lucide-react';
 import { getPromotionsStockStatusAction } from '@/app/actions/promotions';
 import { getInventoryStockStatusAction } from '@/app/actions/inventory';
-
-type NavItem = {
-  label: string;
-  href: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
-};
-
-type NavGroup = {
-  title: string;
-  items: NavItem[];
-};
-
-const navGroups: NavGroup[] = [
-  {
-    title: 'Point of Sale',
-    items: [
-      { label: 'POS Terminal', href: '/owner/pos', icon: Calculator },
-      { label: 'Receipts', href: '/owner/pos/receipts', icon: ClipboardList },
-    ],
-  },
-  {
-    title: 'Operations',
-    items: [
-      { label: 'Live Orders', href: '/owner/live-orders', icon: ClipboardList },
-      { label: 'QR Codes', href: '/owner/qr-codes', icon: QrCode },
-    ],
-  },
-  {
-    title: 'Marketing',
-    items: [
-      { label: 'Promotions', href: '/owner/promotions', icon: Tag },
-      { label: 'Analytics', href: '/owner/analytics', icon: BarChart3 },
-    ],
-  },
-  {
-    title: 'Menu',
-    items: [
-      { label: 'Menu & Categories', href: '/owner/menu-categories', icon: UtensilsCrossed },
-      { label: 'Inventory', href: '/owner/inventory', icon: Package },
-    ],
-  },
-  {
-    title: 'Settings',
-    items: [
-      { label: 'Shop Settings', href: '/owner/settings', icon: Settings },
-    ],
-  },
-];
+import { getDesktopNavGroups } from '@/components/owner/ownerNavConfig';
 
 const STORAGE_KEY = 'brewflow-sidebar-collapsed';
 
-export default function OwnerSidebar({ shopName = 'Admin Panel', branchId }: { shopName?: string, branchId: string }) {
+export default function OwnerSidebar({
+  shopName = 'Admin Panel',
+  branchId,
+  role,
+}: {
+  shopName?: string;
+  branchId: string;
+  role?: string;
+}) {
+  const navGroups = getDesktopNavGroups(role);
   const pathname = usePathname();
   const [hasPromoOutOfStock, setHasPromoOutOfStock] = useState(false);
   const [hasInventoryLowStock, setHasInventoryLowStock] = useState(false);

@@ -1,9 +1,6 @@
-import { Metadata } from 'next';
+import { requireManagerRole } from '@/lib/roleGuard';
 
-export const metadata: Metadata = {
-    title: 'QR Codes',
-};
-
-export default function QRCodesLayout({ children }: { children: React.ReactNode }) {
+export default async function QrCodesLayout({ children }: { children: React.ReactNode }) {
+    await requireManagerRole();
     return <>{children}</>;
 }

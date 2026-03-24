@@ -2,7 +2,7 @@
 
 import { db } from '@/lib/db';
 import { users, orders, orderItems, orderItemModifiers, categories, products } from '@/db/schema';
-import { eq, sql, and, gte, inArray } from 'drizzle-orm';
+import { eq, sql, and, gte, inArray, desc } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { getUserSession } from './auth';
 
@@ -270,6 +270,124 @@ export async function updateDashboardEmail(newEmail: string, currentPass: string
         return { success: true };
     } catch (error) {
         console.error('Error updating dashboard email:', error);
+        return { success: false, error: 'Internal server error' };
+    }
+}
+
+export type StaffMemberRow = {
+    id: string;
+    email: string;
+    notes: string | null;
+    createdAt: Date;
+};
+
+export async function getStaffMembersForBranch(): Promise<{ staff: StaffMemberRow[]; error?: string }> {
+    const session = await getUserSession();
+    if (!session || session.role !== 'BRANCH_MANAGER') {
+        return { staff: [], error: 'Unauthorized' };
+    }
+    if (!session.branchId) {
+        return { staff: [], error: 'No branch assigned' };
+    }
+
+    const staff = await db
+        .select({
+            id: users.id,
+            email: users.email,
+            notes: users.notes,
+            createdAt: users.createdAt,
+        })
+        .from(users)
+        .where(and(eq(users.branchId, session.branchId), eq(users.role, 'KITCHEN_STAFF')))
+        .orderBy(desc(users.createdAt));
+
+    return { staff };
+}
+
+export async function createStaffMember(
+    email: string,
+    passwordPlain: string,
+    notes?: string | null
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const session = await getUserSession();
+        if (!session || session.role !== 'BRANCH_MANAGER') {
+            return { success: false, error: 'Unauthorized' };
+        }
+        if (!session.branchId) {
+            return { success: false, error: 'No branch assigned' };
+        }
+
+        const trimmed = email.trim().toLowerCase();
+        if (!trimmed.includes('@') || trimmed.length < 5) {
+            return { success: false, error: 'Invalid email' };
+        }
+        if (!passwordPlain || passwordPlain.length < 8) {
+            return { success: false, error: 'Password must be at least 8 characters' };
+        }
+
+        const [existing] = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(and(eq(users.companyId, session.companyId), eq(users.email, trimmed)))
+            .limit(1);
+
+        if (existing) {
+            return { success: false, error: 'Email is already in use for this shop' };
+        }
+
+        const passwordHash = bcrypt.hashSync(passwordPlain, 10);
+        await db.insert(users).values({
+            companyId: session.companyId,
+            branchId: session.branchId,
+            email: trimmed,
+            passwordHash,
+            role: 'KITCHEN_STAFF',
+            notes: notes?.trim() || null,
+        });
+
+        return { success: true };
+    } catch (error) {
+        console.error('createStaffMember:', error);
+        return { success: false, error: 'Internal server error' };
+    }
+}
+
+export async function deleteStaffMember(userId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+        const session = await getUserSession();
+        if (!session || session.role !== 'BRANCH_MANAGER') {
+            return { success: false, error: 'Unauthorized' };
+        }
+        if (!session.branchId) {
+            return { success: false, error: 'No branch assigned' };
+        }
+
+        const [target] = await db
+            .select({
+                id: users.id,
+                branchId: users.branchId,
+                companyId: users.companyId,
+                role: users.role,
+            })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
+
+        if (!target) {
+            return { success: false, error: 'User not found' };
+        }
+        if (target.companyId !== session.companyId || target.branchId !== session.branchId) {
+            return { success: false, error: 'Unauthorized' };
+        }
+        if (target.role !== 'KITCHEN_STAFF') {
+            return { success: false, error: 'Can only remove staff members' };
+        }
+
+        await db.delete(users).where(eq(users.id, userId));
+        return { success: true };
+    } catch (error) {
+        console.error('deleteStaffMember:', error);
         return { success: false, error: 'Internal server error' };
     }
 }

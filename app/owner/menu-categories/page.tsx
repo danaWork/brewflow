@@ -4,12 +4,14 @@ import { getInventoryItemsAction } from '@/app/actions/inventory';
 import { getUserSession } from '@/app/actions/auth';
 import MenuManagementClient from './MenuManagementClient';
 import { redirect } from 'next/navigation';
+import { requireManagerRole } from '@/lib/roleGuard';
 
 export const dynamic = 'force-dynamic';
 
 export default async function MenuCategoriesPage() {
+  await requireManagerRole();
   const session = await getUserSession();
-  if (!session || !['SUPERADMIN', 'BRANCH_MANAGER'].includes(session.role)) {
+  if (!session) {
     redirect('/login');
   }
   
