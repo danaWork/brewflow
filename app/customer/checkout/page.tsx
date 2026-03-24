@@ -11,15 +11,14 @@ import OrderConfirmation from "@/components/customer/OrderConfirmation";
 import { useTable } from "@/context/TableContext";
 import FloatingOrderTabs from "@/components/customer/FloatingOrderTabs";
 import { toast } from "sonner";
+import { getBranchPaymentMethodsAction } from "@/app/actions/payment-methods";
 
 export default function CheckoutPage() {
   const { items, cartTotal, clearCart } = useCart();
   const { createOrder } = useOrder();
   const { tableId, branchId } = useTable();
   const router = useRouter();
-  const [paymentMethod, setPaymentMethod] = useState<
-    "CASH" | "GCASH" | "PAYMAYA"
-  >("CASH");
+  const [paymentMethod, setPaymentMethod] = useState<string>("CASH");
   const [note, setNote] = useState("");
   const [isPaymentDropdownOpen, setIsPaymentDropdownOpen] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -27,14 +26,13 @@ export default function CheckoutPage() {
   const [lastOrderItems, setLastOrderItems] = useState<typeof items>([]);
   const [lastOrderTotal, setLastOrderTotal] = useState<number>(0);
 
-  const paymentMethods: {
-    label: string;
-    value: "CASH" | "GCASH" | "PAYMAYA";
-  }[] = [
+  const [paymentMethods, setPaymentMethods] = useState<
+    { label: string; value: string }[]
+  >([
     { label: "Cash", value: "CASH" },
-    { label: "GCash", value: "GCASH" },
-    { label: "PayMaya", value: "PAYMAYA" },
-  ];
+    { label: "GCASH", value: "GCASH" },
+    { label: "PAYMAYA", value: "PAYMAYA" },
+  ]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -76,6 +74,23 @@ export default function CheckoutPage() {
       router.push(`/customer/table/${branchId || ""}/${tableId || "1"}`);
     }
   }, [items, router, showConfirmation, tableId]);
+
+  useEffect(() => {
+    if (!branchId) return;
+    (async () => {
+      const result = await getBranchPaymentMethodsAction(branchId);
+      if (result.success && result.methods.length > 0) {
+        const mapped = result.methods.map((m) => ({
+          label: m.name,
+          value: m.name,
+        }));
+        setPaymentMethods(mapped);
+        if (!mapped.find((m) => m.value === paymentMethod)) {
+          setPaymentMethod(mapped[0].value);
+        }
+      }
+    })();
+  }, [branchId]);
 
   if (items.length === 0 && !showConfirmation) {
     return null;

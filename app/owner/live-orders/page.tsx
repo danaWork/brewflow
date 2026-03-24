@@ -7,6 +7,7 @@ import { useOrderNotifications } from '@/hooks/useOrderNotifications';
 import LiveOrdersTabsMobile from './LiveOrdersTabsMobile';
 import { getPastOrdersAction, updateOrderPaymentMethodAction } from '@/app/actions/orders';
 import { getSessionAction } from '@/app/actions/auth';
+import { getCompanyPaymentMethodsAction } from '@/app/actions/payment-methods';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -420,6 +421,7 @@ function ActivityLogSection() {
 export default function LiveOrdersPage() {
   const { activeOrders, updateOrderStatus, isLoading, refreshActiveOrders } = useOrder();
   const [cancelModalOrder, setCancelModalOrder] = useState<Order | null>(null);
+  const [paymentMethods, setPaymentMethods] = useState<string[]>(['CASH', 'GCASH', 'PAYMAYA']);
 
   const visibleOrders = activeOrders.filter(o => o.status !== 'CANCELLED' && o.status !== 'COMPLETED');
 
@@ -453,6 +455,15 @@ export default function LiveOrdersPage() {
       alert('Failed to update payment method');
     }
   };
+
+  useEffect(() => {
+    (async () => {
+      const methodsRes = await getCompanyPaymentMethodsAction();
+      if (methodsRes.success && methodsRes.methods.length > 0) {
+        setPaymentMethods(methodsRes.methods.map((m) => m.name));
+      }
+    })();
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -501,6 +512,7 @@ export default function LiveOrdersPage() {
           updateOrderStatus={updateOrderStatus}
           onCancelClick={handleCancelClick}
           onPaymentMethodChange={handlePaymentMethodChange}
+          paymentMethods={paymentMethods}
         />
       </div>
 
@@ -544,9 +556,11 @@ export default function LiveOrdersPage() {
                             onChange={(e) => handlePaymentMethodChange(order.id, e.target.value as any)}
                             className="appearance-none inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-xs font-bold pl-2.5 py-1 pr-6 rounded-full uppercase cursor-pointer hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-[#D95D1E]"
                           >
-                            <option value="CASH">CASH</option>
-                            <option value="GCASH">GCASH</option>
-                            <option value="PAYMAYA">PAYMAYA</option>
+                            {paymentMethods.map((method) => (
+                              <option key={method} value={method}>
+                                {method}
+                              </option>
+                            ))}
                           </select>
                           <ChevronDown size={10} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                         </div>

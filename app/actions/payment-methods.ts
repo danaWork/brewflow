@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { companyPaymentMethods } from "@/db/schema";
+import { branches, companyPaymentMethods } from "@/db/schema";
 import { and, asc, eq, max } from "drizzle-orm";
 import { getUserSession } from "./auth";
 import { revalidatePath } from "next/cache";
@@ -33,6 +33,46 @@ export async function getCompanyPaymentMethodsAction() {
     methods = await db.query.companyPaymentMethods.findMany({
       where: and(
         eq(companyPaymentMethods.companyId, session.companyId),
+        eq(companyPaymentMethods.isActive, true),
+      ),
+      orderBy: [asc(companyPaymentMethods.sortOrder), asc(companyPaymentMethods.createdAt)],
+    });
+  }
+
+  return {
+    success: true as const,
+    methods: methods.map((m) => ({ id: m.id, name: m.name })),
+  };
+}
+
+export async function getBranchPaymentMethodsAction(branchId: string) {
+  if (!branchId) return { success: false as const, error: "Branch is required" };
+  const [branch] = await db
+    .select({ companyId: branches.companyId })
+    .from(branches)
+    .where(eq(branches.id, branchId))
+    .limit(1);
+  if (!branch?.companyId) return { success: false as const, error: "Branch not found" };
+
+  let methods = await db.query.companyPaymentMethods.findMany({
+    where: and(
+      eq(companyPaymentMethods.companyId, branch.companyId),
+      eq(companyPaymentMethods.isActive, true),
+    ),
+    orderBy: [asc(companyPaymentMethods.sortOrder), asc(companyPaymentMethods.createdAt)],
+  });
+
+  if (methods.length === 0) {
+    await db.insert(companyPaymentMethods).values(
+      DEFAULT_PAYMENT_METHODS.map((name, idx) => ({
+        companyId: branch.companyId,
+        name,
+        sortOrder: idx,
+      })),
+    );
+    methods = await db.query.companyPaymentMethods.findMany({
+      where: and(
+        eq(companyPaymentMethods.companyId, branch.companyId),
         eq(companyPaymentMethods.isActive, true),
       ),
       orderBy: [asc(companyPaymentMethods.sortOrder), asc(companyPaymentMethods.createdAt)],
