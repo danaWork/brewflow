@@ -33,7 +33,7 @@ export default function MenuClient({ tableId, tableName, branchId, categories, p
   }, [tableId, tableName, branchId, setTableInfo]);
 
   const [activeCategory, setActiveCategory] = useState('all');
-  const [activeType, setActiveType] = useState<'drinks' | 'snacks'>('drinks');
+  const [activeType, setActiveType] = useState<'drinks' | 'snacks' | 'meals'>('drinks');
   const [searchQuery, setSearchQuery] = useState('');
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);

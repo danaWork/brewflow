@@ -1,8 +1,8 @@
-import { Coffee, Cookie } from 'lucide-react';
+import { Coffee, Cookie, UtensilsCrossed } from 'lucide-react';
 
 interface TypeToggleProps {
-  activeType: 'drinks' | 'snacks';
-  onToggle: (type: 'drinks' | 'snacks') => void;
+  activeType: 'drinks' | 'snacks' | 'meals';
+  onToggle: (type: 'drinks' | 'snacks' | 'meals') => void;
 }
 
 export default function TypeToggle({ activeType, onToggle }: TypeToggleProps) {
@@ -32,6 +32,19 @@ export default function TypeToggle({ activeType, onToggle }: TypeToggleProps) {
       >
         <Cookie size={18} strokeWidth={2.5} />
         <span>Snacks</span>
+      </button>
+
+      <button
+        onClick={() => onToggle('meals')}
+        className={`
+          flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-colors text-sm
+          ${activeType === 'meals'
+            ? 'bg-[#D95D1E] text-white shadow-sm border border-black'
+            : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'}
+        `}
+      >
+        <UtensilsCrossed size={18} strokeWidth={2.5} />
+        <span>Meals</span>
       </button>
     </div>
   );

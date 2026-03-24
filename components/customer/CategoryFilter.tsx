@@ -10,7 +10,7 @@ interface CategoryFilterProps {
   categories: Category[];
   activeCategoryId: string;
   onSelectCategory: (id: string) => void;
-  activeType: 'drinks' | 'snacks';
+  activeType: 'drinks' | 'snacks' | 'meals';
 }
 
 export default function CategoryFilter({ categories, activeCategoryId, onSelectCategory, activeType }: CategoryFilterProps) {
@@ -25,7 +25,11 @@ export default function CategoryFilter({ categories, activeCategoryId, onSelectC
             : 'bg-white text-gray-600'}
         `}
       >
-        {activeType === 'drinks' ? 'All Drinks' : 'All Snacks'}
+        {activeType === 'drinks'
+          ? 'All Drinks'
+          : activeType === 'snacks'
+            ? 'All Snacks'
+            : 'All Meals'}
       </button>
       
       {categories.map((category) => (
