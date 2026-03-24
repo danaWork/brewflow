@@ -2,7 +2,7 @@
 
 import { db } from '@/lib/db';
 import { users, orders, orderItems, orderItemModifiers, categories, products } from '@/db/schema';
-import { eq, sql, and, gte, inArray, desc } from 'drizzle-orm';
+import { eq, sql, and, gte, inArray, desc, ne } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { getUserSession } from './auth';
 
@@ -388,6 +388,90 @@ export async function deleteStaffMember(userId: string): Promise<{ success: bool
         return { success: true };
     } catch (error) {
         console.error('deleteStaffMember:', error);
+        return { success: false, error: 'Internal server error' };
+    }
+}
+
+export async function updateStaffMember(
+    userId: string,
+    updates: {
+        email: string;
+        notes: string | null;
+        newPasswordPlain?: string;
+    }
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const session = await getUserSession();
+        if (!session || session.role !== 'BRANCH_MANAGER') {
+            return { success: false, error: 'Unauthorized' };
+        }
+        if (!session.branchId) {
+            return { success: false, error: 'No branch assigned' };
+        }
+
+        const trimmedEmail = updates.email.trim().toLowerCase();
+        if (!trimmedEmail.includes('@') || trimmedEmail.length < 5) {
+            return { success: false, error: 'Invalid email' };
+        }
+
+        if (updates.newPasswordPlain !== undefined && updates.newPasswordPlain !== '') {
+            if (updates.newPasswordPlain.length < 8) {
+                return { success: false, error: 'Password must be at least 8 characters' };
+            }
+        }
+
+        const [target] = await db
+            .select({
+                id: users.id,
+                branchId: users.branchId,
+                companyId: users.companyId,
+                role: users.role,
+            })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
+
+        if (!target) {
+            return { success: false, error: 'User not found' };
+        }
+        if (target.companyId !== session.companyId || target.branchId !== session.branchId) {
+            return { success: false, error: 'Unauthorized' };
+        }
+        if (target.role !== 'KITCHEN_STAFF') {
+            return { success: false, error: 'Can only edit staff members' };
+        }
+
+        const [emailTaken] = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(
+                and(
+                    eq(users.companyId, session.companyId),
+                    eq(users.email, trimmedEmail),
+                    ne(users.id, userId)
+                )
+            )
+            .limit(1);
+
+        if (emailTaken) {
+            return { success: false, error: 'Email is already in use for this shop' };
+        }
+
+        const noteValue = updates.notes?.trim() || null;
+        const patch: { email: string; notes: string | null; passwordHash?: string } = {
+            email: trimmedEmail,
+            notes: noteValue,
+        };
+
+        if (updates.newPasswordPlain) {
+            patch.passwordHash = bcrypt.hashSync(updates.newPasswordPlain, 10);
+        }
+
+        await db.update(users).set(patch).where(eq(users.id, userId));
+
+        return { success: true };
+    } catch (error) {
+        console.error('updateStaffMember:', error);
         return { success: false, error: 'Internal server error' };
     }
 }
