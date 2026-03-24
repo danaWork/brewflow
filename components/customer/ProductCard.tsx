@@ -15,7 +15,7 @@ interface Product {
 interface ProductCardProps {
   product: Product;
   onClick?: () => void;
-  type?: 'drinks' | 'snacks';
+  type?: 'drinks' | 'snacks' | 'meals';
 }
 
 export default function ProductCard({ product, onClick, type = 'drinks' }: ProductCardProps) {
