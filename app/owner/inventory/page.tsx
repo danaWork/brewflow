@@ -4,10 +4,12 @@ import { getInventoryItemsAction } from '@/app/actions/inventory';
 import InventoryList from '@/components/inventory/InventoryList';
 import AddInventoryModal from '@/components/inventory/AddInventoryModal';
 import { redirect } from 'next/navigation';
+import { requireManagerRole } from '@/lib/roleGuard';
 
 export default async function InventoryPage() {
+  await requireManagerRole();
   const session = await getUserSession();
-  if (!session || !['SUPERADMIN', 'BRANCH_MANAGER'].includes(session.role)) {
+  if (!session) {
     redirect('/login');
   }
 

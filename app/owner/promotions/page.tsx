@@ -1,10 +1,15 @@
 import PromotionsTabs from './_components/PromotionsTabs';
 import { getSessionAction } from '@/app/actions/auth';
 import { getProductsAction, getPromotionsAction } from '@/app/actions/promotions';
+import { requireManagerRole } from '@/lib/roleGuard';
+import { redirect } from 'next/navigation';
 
 export default async function PromotionsPage() {
+  await requireManagerRole();
   const session = await getSessionAction();
-  if (!session || !session.user) return null;
+  if (!session?.user?.branchId) {
+    redirect('/login');
+  }
 
   const branchId = session.user.branchId;
   const [productsRes, promotionsRes] = await Promise.all([

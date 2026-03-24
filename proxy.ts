@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { getTenantFromHost, getRootDomain } from '@/lib/tenant';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
     const session = await getSession();
     const path = request.nextUrl.pathname;
     const host = request.nextUrl.host;
@@ -35,7 +35,7 @@ export async function middleware(request: NextRequest) {
             return NextResponse.redirect(new URL('/admin/dashboard', adminOrigin));
         }
         if (role === 'BRANCH_MANAGER') return NextResponse.redirect(new URL('/owner/analytics', request.url));
-        if (role === 'KITCHEN_STAFF') return NextResponse.redirect(new URL('/staff/orders', request.url));
+        if (role === 'KITCHEN_STAFF') return NextResponse.redirect(new URL('/owner/live-orders', request.url));
     }
 
     return NextResponse.next();

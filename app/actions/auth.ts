@@ -57,7 +57,7 @@ export async function loginAction(formData: FormData) {
         });
         const role = user.role;
         if (role === 'BRANCH_MANAGER') redirect('/owner/analytics');
-        if (role === 'KITCHEN_STAFF') redirect('/staff/orders');
+        if (role === 'KITCHEN_STAFF') redirect('/owner/live-orders');
         redirect('/');
     }
 

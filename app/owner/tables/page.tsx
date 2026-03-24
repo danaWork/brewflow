@@ -1,4 +1,7 @@
-export default function TablesPage() {
+import { requireManagerRole } from '@/lib/roleGuard';
+
+export default async function TablesPage() {
+  await requireManagerRole();
   return (
     <div className="p-4 md:p-8">
       <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">Table Management</h1>

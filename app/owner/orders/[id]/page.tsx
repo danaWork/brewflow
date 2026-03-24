@@ -1,8 +1,11 @@
+import { requireManagerRole } from '@/lib/roleGuard';
+
 export default async function OwnerOrderDetailsPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireManagerRole();
   const { id } = await params;
   return (
     <div>
