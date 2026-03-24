@@ -36,7 +36,7 @@ export interface Order {
   table: string;
   tableId?: string;
   timestamp: Date;
-  paymentMethod: "CASH" | "GCASH" | "PAYMAYA";
+  paymentMethod: string;
   paymentStatus: "UNPAID" | "PAID";
   discountAmount?: number;
   discountName?: string | null;
@@ -50,7 +50,7 @@ interface OrderContextType {
   createOrder: (
     items: CartItem[],
     total: number,
-    paymentMethod: "CASH" | "GCASH" | "PAYMAYA",
+    paymentMethod: string,
     note?: string,
   ) => Promise<
     | { id: string; orderNumber: number }
@@ -64,7 +64,7 @@ interface OrderContextType {
     discountAmount: number,
     discountName: string | null,
     totalAmount: number,
-    paymentMethod: "CASH" | "GCASH" | "PAYMAYA",
+    paymentMethod: string,
     paymentStatus: "UNPAID" | "PAID",
     status: OrderStatus,
     note?: string,
@@ -296,7 +296,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   const createOrder = async (
     items: CartItem[],
     total: number,
-    paymentMethod: "CASH" | "GCASH" | "PAYMAYA",
+    paymentMethod: string,
     note?: string,
   ) => {
     try {
@@ -400,7 +400,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     discountAmount: number,
     discountName: string | null,
     totalAmount: number,
-    paymentMethod: "CASH" | "GCASH" | "PAYMAYA",
+    paymentMethod: string,
     paymentStatus: "UNPAID" | "PAID",
     status: OrderStatus,
     note?: string,

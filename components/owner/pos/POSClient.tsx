@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { toast } from 'sonner';
 import { ShoppingCart, Plus, Minus, X, CreditCard, Banknote, HelpCircle, UtensilsCrossed, Tag, Package, Search, Bell, CheckCircle, Pencil, Printer } from 'lucide-react';
 import { createPOSOrderAction } from '@/app/actions/orders';
+import { addCompanyPaymentMethodAction, getCompanyPaymentMethodsAction, removeCompanyPaymentMethodAction } from '@/app/actions/payment-methods';
 import { useOrder } from '@/context/OrderContext';
 import type { CartItem as OrderCartItem } from '@/context/CartContext';
 import { ProductAddModal } from './ProductAddModal';
@@ -86,17 +87,24 @@ export function POSClient({
   branchId,
   promotions = [],
   productIdToCategoryType = {},
+  initialPaymentMethods = ['CASH', 'GCASH', 'PAYMAYA'],
 }: {
   categories: Category[];
   branchId: string;
   promotions?: PromotionForPOS[];
   productIdToCategoryType?: Record<string, string>;
+  initialPaymentMethods?: string[];
 }) {
     const { activeOrders, updateOrderStatus, updateOrderPaymentStatus, updateOrder } = useOrder();
     const [cart, setCart] = useState<CartItem[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [discountName, setDiscountName] = useState<string>('None');
-    const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'GCASH' | 'PAYMAYA'>('CASH');
+    const [paymentMethods, setPaymentMethods] = useState<{ id: string; name: string }[]>([]);
+    const [paymentMethod, setPaymentMethod] = useState<string>(initialPaymentMethods[0] || 'CASH');
+    const [newPaymentMethod, setNewPaymentMethod] = useState('');
+    const [isSavingPaymentMethod, setIsSavingPaymentMethod] = useState(false);
+    const [isLoadingPaymentMethods, setIsLoadingPaymentMethods] = useState(false);
+    const [showPaymentMethodsManager, setShowPaymentMethodsManager] = useState(false);
     const [cashReceived, setCashReceived] = useState<string>('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -136,7 +144,7 @@ export function POSClient({
 
             if (savedCart) setCart(JSON.parse(savedCart));
             if (savedDiscount) setDiscountName(savedDiscount);
-            if (savedPayment) setPaymentMethod(savedPayment as 'CASH' | 'GCASH' | 'PAYMAYA');
+            if (savedPayment) setPaymentMethod(savedPayment);
             if (savedCash) setCashReceived(savedCash);
         } catch (e) {
             console.error('Failed to load POS state from local storage', e);
@@ -156,6 +164,28 @@ export function POSClient({
             console.error('Failed to save POS state to local storage', e);
         }
     }, [cart, discountName, paymentMethod, cashReceived, isInitialized]);
+
+    useEffect(() => {
+        const fallback = initialPaymentMethods.map((name, idx) => ({
+            id: `fallback-${idx}`,
+            name,
+        }));
+        setPaymentMethods(fallback);
+    }, [initialPaymentMethods]);
+
+    useEffect(() => {
+        (async () => {
+            setIsLoadingPaymentMethods(true);
+            const result = await getCompanyPaymentMethodsAction();
+            if (result.success) {
+                setPaymentMethods(result.methods);
+                if (!result.methods.find((m) => m.name === paymentMethod)) {
+                    setPaymentMethod(result.methods[0]?.name || 'CASH');
+                }
+            }
+            setIsLoadingPaymentMethods(false);
+        })();
+    }, []);
 
     const pendingOrders = activeOrders.filter(o => o.status === 'PENDING');
     const unpaidOrders = activeOrders.filter(o => o.paymentStatus === 'UNPAID' && o.status !== 'PENDING' && o.status !== 'COMPLETED' && o.status !== 'CANCELLED');
@@ -307,6 +337,44 @@ export function POSClient({
         updateItemDiscount(uniqueId, 'PERCENTAGE', undefined);
     };
 
+    const refreshPaymentMethods = async () => {
+        const result = await getCompanyPaymentMethodsAction();
+        if (!result.success) return;
+        setPaymentMethods(result.methods);
+        if (!result.methods.find((m) => m.name === paymentMethod)) {
+            setPaymentMethod(result.methods[0]?.name || 'CASH');
+        }
+    };
+
+    const handleAddPaymentMethod = async () => {
+        const name = newPaymentMethod.trim();
+        if (!name) return;
+        setIsSavingPaymentMethod(true);
+        const result = await addCompanyPaymentMethodAction(name);
+        if (!result.success) {
+            toast.error(result.error || 'Failed to add payment method');
+            setIsSavingPaymentMethod(false);
+            return;
+        }
+        setNewPaymentMethod('');
+        await refreshPaymentMethods();
+        toast.success('Payment method added');
+        setIsSavingPaymentMethod(false);
+    };
+
+    const handleRemovePaymentMethod = async (methodId: string, methodName: string) => {
+        setIsSavingPaymentMethod(true);
+        const result = await removeCompanyPaymentMethodAction(methodId);
+        if (!result.success) {
+            toast.error(result.error || 'Failed to remove payment method');
+            setIsSavingPaymentMethod(false);
+            return;
+        }
+        await refreshPaymentMethods();
+        toast.success(`${methodName} removed`);
+        setIsSavingPaymentMethod(false);
+    };
+
     const subtotal = useMemo(() => cart.reduce((sum, item) => sum + (effectiveItemPrice(item) * item.quantity), 0), [cart]);
     const listSubtotal = useMemo(() => cart.reduce((sum, item) => sum + (item.price * item.quantity), 0), [cart]);
     const itemDiscountsTotal = useMemo(
@@ -388,7 +456,7 @@ export function POSClient({
                     toast.success('Order updated. Customer will see the changes.');
                     setCart([]);
                     setDiscountName('None');
-                    setPaymentMethod('CASH');
+                    setPaymentMethod(paymentMethods[0]?.name || 'CASH');
                     setCashReceived('');
                     setEditingOrderId(null);
                     setCartDrawerOpen(false);
@@ -446,7 +514,7 @@ export function POSClient({
                     });
                     setCart([]);
                     setDiscountName('None');
-                    setPaymentMethod('CASH');
+                    setPaymentMethod(paymentMethods[0]?.name || 'CASH');
                     setCashReceived('');
                     setEditingOrderId(null);
                     setCartDrawerOpen(false);
@@ -484,7 +552,7 @@ export function POSClient({
 
     const cancelEdit = () => {
         setCart([]);
-        setPaymentMethod('CASH');
+        setPaymentMethod(paymentMethods[0]?.name || 'CASH');
         setCashReceived('');
         setEditingOrderId(null);
     };
@@ -859,28 +927,68 @@ export function POSClient({
                             </select>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-2">
+                            <div className="grid grid-cols-3 gap-2">
+                                {paymentMethods.map((method) => {
+                                    const upper = method.name.toUpperCase();
+                                    const isCash = upper === 'CASH';
+                                    return (
+                                        <button
+                                            key={method.id}
+                                            onClick={() => setPaymentMethod(method.name)}
+                                            className={`flex flex-col items-center justify-center p-2 rounded-lg border ${paymentMethod === method.name ? 'border-[#D95D1E] bg-orange-50 text-[#D95D1E]' : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'}`}
+                                        >
+                                            {isCash ? <Banknote size={18} className="mb-1" /> : <CreditCard size={18} className="mb-1" />}
+                                            <span className="text-[10px] font-bold uppercase">{method.name}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
                             <button
-                                onClick={() => setPaymentMethod('CASH')}
-                                className={`flex flex-col items-center justify-center p-2 rounded-lg border ${paymentMethod === 'CASH' ? 'border-[#D95D1E] bg-orange-50 text-[#D95D1E]' : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'}`}
+                                type="button"
+                                onClick={() => setShowPaymentMethodsManager((v) => !v)}
+                                className="w-full text-xs font-semibold text-gray-600 hover:text-gray-900"
                             >
-                                <Banknote size={18} className="mb-1" />
-                                <span className="text-[10px] font-bold">CASH</span>
+                                {showPaymentMethodsManager ? 'Hide Payment Methods Manager' : 'Manage Payment Methods'}
                             </button>
-                            <button
-                                onClick={() => setPaymentMethod('GCASH')}
-                                className={`flex flex-col items-center justify-center p-2 rounded-lg border ${paymentMethod === 'GCASH' ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'}`}
-                            >
-                                <CreditCard size={18} className="mb-1" />
-                                <span className="text-[10px] font-bold">GCASH</span>
-                            </button>
-                            <button
-                                onClick={() => setPaymentMethod('PAYMAYA')}
-                                className={`flex flex-col items-center justify-center p-2 rounded-lg border ${paymentMethod === 'PAYMAYA' ? 'border-green-500 bg-green-50 text-green-600' : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'}`}
-                            >
-                                <CreditCard size={18} className="mb-1" />
-                                <span className="text-[10px] font-bold">PAYMAYA</span>
-                            </button>
+                            {showPaymentMethodsManager && (
+                                <div className="space-y-2 p-3 bg-white rounded-lg border border-gray-200">
+                                    <div className="flex gap-2">
+                                        <input
+                                            value={newPaymentMethod}
+                                            onChange={(e) => setNewPaymentMethod(e.target.value)}
+                                            placeholder="Add payment method"
+                                            className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#D95D1E]/20 focus:border-[#D95D1E]"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleAddPaymentMethod}
+                                            disabled={isSavingPaymentMethod || !newPaymentMethod.trim()}
+                                            className="px-3 py-2 text-sm font-bold rounded-lg bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50"
+                                        >
+                                            Add
+                                        </button>
+                                    </div>
+                                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                                        {paymentMethods.map((method) => (
+                                            <div key={method.id} className="flex items-center justify-between px-2 py-1.5 bg-gray-50 rounded text-sm">
+                                                <span className="font-medium text-gray-800 uppercase">{method.name}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemovePaymentMethod(method.id, method.name)}
+                                                    disabled={isSavingPaymentMethod || paymentMethods.length <= 1}
+                                                    className="text-red-600 hover:text-red-700 font-semibold disabled:opacity-50"
+                                                >
+                                                    Remove
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {isLoadingPaymentMethods && (
+                                        <div className="text-xs text-gray-500">Loading payment methods...</div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <div className="space-y-1.5 pt-2">
@@ -911,7 +1019,7 @@ export function POSClient({
                                 <span className="text-2xl font-black text-[#D95D1E]">{formatCurrency(total)}</span>
                             </div>
 
-                            {paymentMethod === 'CASH' && (
+                            {paymentMethod.toUpperCase() === 'CASH' && (
                                 <div className="space-y-2 pt-2 border-t border-gray-200">
                                     <div>
                                         <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">Cash Received</label>

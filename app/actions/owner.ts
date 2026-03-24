@@ -71,9 +71,9 @@ export async function getOwnerAnalytics(branchId: string, days: number = 30): Pr
             const revenue = parseFloat(order.totalAmount.toString());
             totalRevenue += revenue;
 
-            if (order.paymentMethod === 'CASH') {
+            if ((order.paymentMethod || '').toUpperCase() === 'CASH') {
                 totalCashRevenue += revenue;
-            } else if (order.paymentMethod === 'GCASH' || order.paymentMethod === 'PAYMAYA') {
+            } else if (order.paymentMethod) {
                 totalDigitalRevenue += revenue;
             }
 
@@ -83,8 +83,8 @@ export async function getOwnerAnalytics(branchId: string, days: number = 30): Pr
             
             let cashToAdd = 0;
             let digitalToAdd = 0;
-            if (order.paymentMethod === 'CASH') cashToAdd = revenue;
-            else if (order.paymentMethod === 'GCASH' || order.paymentMethod === 'PAYMAYA') digitalToAdd = revenue;
+            if ((order.paymentMethod || '').toUpperCase() === 'CASH') cashToAdd = revenue;
+            else if (order.paymentMethod) digitalToAdd = revenue;
 
             revenueByDate.set(dateKey, {
                 revenue: existing.revenue + revenue,

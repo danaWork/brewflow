@@ -444,7 +444,7 @@ export default function LiveOrdersPage() {
     }
   };
 
-  const handlePaymentMethodChange = async (orderId: string, newMethod: 'CASH' | 'GCASH' | 'PAYMAYA') => {
+  const handlePaymentMethodChange = async (orderId: string, newMethod: string) => {
     const res = await updateOrderPaymentMethodAction(orderId, newMethod);
     if (res.success) {
       alert('Payment method updated');

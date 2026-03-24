@@ -120,7 +120,7 @@ export const orders = pgTable('orders', {
   tableId: uuid('table_id').references(() => tables.id).notNull(),
   orderNumber: integer('order_number').notNull(), // Manually computed per shop instead of global identity
   status: orderStatusEnum('status').default('PENDING').notNull(),
-  paymentMethod: paymentMethodEnum('payment_method'),
+  paymentMethod: text('payment_method'),
   paymentStatus: paymentStatusEnum('payment_status').default('UNPAID').notNull(),
   note: text('note'),
   subtotalAmount: decimal('subtotal_amount', { precision: 10, scale: 2 }), // Before discounts
@@ -132,6 +132,15 @@ export const orders = pgTable('orders', {
   readyAt: timestamp('ready_at'),
   completedAt: timestamp('completed_at'),
   cancellationReason: text('cancellation_reason'),
+});
+
+export const companyPaymentMethods = pgTable('company_payment_methods', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  companyId: uuid('company_id').references(() => companies.id).notNull(),
+  name: text('name').notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
 export const orderItems = pgTable('order_items', {
@@ -208,6 +217,7 @@ export const companiesRelations = relations(companies, ({ many }) => ({
   users: many(users),
   categories: many(categories),
   modifierGroups: many(modifierGroups),
+  paymentMethods: many(companyPaymentMethods),
 }));
 
 export const branchesRelations = relations(branches, ({ one, many }) => ({
@@ -271,6 +281,10 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
   branch: one(branches, { fields: [orders.branchId], references: [branches.id] }),
   table: one(tables, { fields: [orders.tableId], references: [tables.id] }),
   items: many(orderItems),
+}));
+
+export const companyPaymentMethodsRelations = relations(companyPaymentMethods, ({ one }) => ({
+  company: one(companies, { fields: [companyPaymentMethods.companyId], references: [companies.id] }),
 }));
 
 export const orderItemsRelations = relations(orderItems, ({ one, many }) => ({

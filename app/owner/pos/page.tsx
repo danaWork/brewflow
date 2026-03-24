@@ -3,6 +3,7 @@ import { POSClient } from '@/components/owner/pos/POSClient';
 import { getMenuCategoriesForPOS } from '@/app/actions/menu-management';
 import { getPromotionsAction } from '@/app/actions/promotions';
 import { getUserSession } from '@/app/actions/auth';
+import { getCompanyPaymentMethodsAction } from '@/app/actions/payment-methods';
 import { redirect } from 'next/navigation';
 import { resolveProductMenuPrice } from '@/lib/product-sale-price';
 
@@ -91,12 +92,19 @@ export default async function POSPage() {
     items: (p.items || []).map((i: any) => ({ productId: i.productId || i.product?.id })),
   }));
 
+  const paymentMethodsRes = await getCompanyPaymentMethodsAction();
+  const paymentMethods =
+    paymentMethodsRes.success && paymentMethodsRes.methods.length > 0
+      ? paymentMethodsRes.methods.map((m) => m.name)
+      : ['CASH', 'GCASH', 'PAYMAYA'];
+
   return (
     <POSClient
       categories={categories}
       branchId={session.branchId}
       promotions={promotions}
       productIdToCategoryType={productIdToCategoryType}
+      initialPaymentMethods={paymentMethods}
     />
   );
 }
