@@ -16,7 +16,7 @@ export interface OrderData {
   tableId: string;
   tableNumber: string;
   createdAt: Date;
-  paymentMethod: "CASH" | "GCASH" | "PAYMAYA" | null;
+  paymentMethod: string | null;
   paymentStatus: "UNPAID" | "PAID";
 }
 
@@ -54,7 +54,7 @@ export async function createOrderAction(data: {
     customizations?: any;
   }[];
   totalAmount: number;
-  paymentMethod: "CASH" | "GCASH" | "PAYMAYA";
+  paymentMethod: string;
   note?: string;
 }) {
   try {
@@ -485,7 +485,7 @@ export async function createPOSOrderAction(data: {
   discountAmount: number;
   discountName: string | null;
   totalAmount: number;
-  paymentMethod: "CASH" | "GCASH" | "PAYMAYA";
+  paymentMethod: string;
   note?: string;
 }) {
   try {
@@ -548,7 +548,7 @@ export async function createPOSOrderAction(data: {
 
 export async function updateOrderPaymentMethodAction(
   orderId: string,
-  paymentMethod: "CASH" | "GCASH" | "PAYMAYA",
+  paymentMethod: string,
 ) {
   try {
     await db
@@ -591,7 +591,7 @@ export async function updatePOSOrderAction(data: {
   discountAmount: number;
   discountName: string | null;
   totalAmount: number;
-  paymentMethod: "CASH" | "GCASH" | "PAYMAYA";
+  paymentMethod: string;
   paymentStatus: "UNPAID" | "PAID";
   status: "PENDING" | "PREPARING" | "READY" | "COMPLETED" | "CANCELLED";
   note?: string;

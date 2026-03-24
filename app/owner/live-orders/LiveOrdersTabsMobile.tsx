@@ -24,7 +24,7 @@ interface LiveOrdersTabsMobileProps {
   getOrdersByStatus: (status: OrderStatus) => Order[];
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   onCancelClick: (order: Order) => void;
-  onPaymentMethodChange: (orderId: string, newMethod: 'CASH' | 'GCASH' | 'PAYMAYA') => Promise<void>;
+  onPaymentMethodChange: (orderId: string, newMethod: string) => Promise<void>;
 }
 
 export default function LiveOrdersTabsMobile({
