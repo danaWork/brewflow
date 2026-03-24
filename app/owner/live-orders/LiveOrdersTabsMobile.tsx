@@ -25,6 +25,7 @@ interface LiveOrdersTabsMobileProps {
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   onCancelClick: (order: Order) => void;
   onPaymentMethodChange: (orderId: string, newMethod: string) => Promise<void>;
+  paymentMethods: string[];
 }
 
 export default function LiveOrdersTabsMobile({
@@ -33,6 +34,7 @@ export default function LiveOrdersTabsMobile({
   updateOrderStatus,
   onCancelClick,
   onPaymentMethodChange,
+  paymentMethods,
 }: LiveOrdersTabsMobileProps) {
   const [activeTab, setActiveTab] = useState<OrderStatus>(columns[0]?.id ?? 'PENDING');
   const activeCol = columns.find((c) => c.id === activeTab) ?? columns[0];
@@ -113,9 +115,11 @@ export default function LiveOrdersTabsMobile({
                     onChange={(e) => onPaymentMethodChange(order.id, e.target.value as any)}
                     className="appearance-none inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-xs font-bold pl-2.5 py-1 pr-6 rounded-full uppercase cursor-pointer hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-[#D95D1E]"
                   >
-                    <option value="CASH">CASH</option>
-                    <option value="GCASH">GCASH</option>
-                    <option value="PAYMAYA">PAYMAYA</option>
+                    {paymentMethods.map((method) => (
+                      <option key={method} value={method}>
+                        {method}
+                      </option>
+                    ))}
                   </select>
                   <ChevronDown size={10} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 </div>
