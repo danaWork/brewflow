@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, type Dispatch, type SetStateAction } from "react";
+import { useState, useRef, useEffect, useMemo, type Dispatch, type SetStateAction } from "react";
 import React from "react";
 import Image from "next/image";
 import {
@@ -35,7 +35,9 @@ import {
 import {
   InventoryItem,
   linkProductToIngredientsAction,
+  getProductModifierOptionIngredientsAction,
 } from "@/app/actions/inventory";
+import ModifierOptionRecipeEditor from "@/components/products/ModifierOptionRecipeEditor";
 import { AlertModal } from "@/components/ui/AlertModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import {
@@ -630,6 +632,15 @@ export default function MenuManagementClient({
     { inventoryItemId: string; quantityRequired: number }[]
   >([]);
 
+  type ModifierOptionIngredientRow = {
+    modifierOptionId: string;
+    inventoryItemId: string;
+    quantityRequired: number;
+    inventoryItem: InventoryItem;
+  };
+  const [modifierOptionIngredientsInitial, setModifierOptionIngredientsInitial] =
+    useState<ModifierOptionIngredientRow[]>([]);
+
   const [defaultModifierOptions, setDefaultModifierOptions] = useState<
     Record<string, string>
   >({});
@@ -730,6 +741,43 @@ export default function MenuManagementClient({
     }
     setIsProductModalOpen(true);
   };
+
+  useEffect(() => {
+    if (!isProductModalOpen || !editingProduct?.id || !branchId) {
+      setModifierOptionIngredientsInitial([]);
+      return;
+    }
+    let cancelled = false;
+    void getProductModifierOptionIngredientsAction(branchId, editingProduct.id).then(
+      (res) => {
+        if (cancelled) return;
+        if (res.success && Array.isArray(res.ingredients)) {
+          setModifierOptionIngredientsInitial(res.ingredients);
+        } else {
+          setModifierOptionIngredientsInitial([]);
+        }
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [isProductModalOpen, editingProduct?.id, branchId]);
+
+  const linkedModifierGroupsForRecipe = useMemo(() => {
+    return modifierGroups
+      .filter((g) => selectedModifierGroups.includes(g.id))
+      .map((g) => ({
+        id: g.id,
+        name: g.name,
+        displayMode: g.displayMode,
+        options: g.options.map((o) => ({
+          id: o.id,
+          name: o.name,
+          price: o.price,
+          imageUrl: o.imageUrl ?? null,
+        })),
+      }));
+  }, [modifierGroups, selectedModifierGroups]);
 
   useEffect(() => {
     if (!isProductModalOpen) return;
@@ -1855,6 +1903,26 @@ export default function MenuManagementClient({
                 </div>
               </div>
 
+              {branchId && editingProduct?.id ? (
+                <ModifierOptionRecipeEditor
+                  branchId={branchId}
+                  productId={editingProduct.id}
+                  linkedGroups={linkedModifierGroupsForRecipe}
+                  inventoryItems={inventoryItems}
+                  initialModifierIngredients={modifierOptionIngredientsInitial}
+                  variant="embedded"
+                />
+              ) : isProductModalOpen && !editingProduct ? (
+                <div className="border-t border-gray-100 pt-6">
+                  <p className="text-xs text-gray-600 bg-amber-50/80 rounded-xl px-4 py-3 border border-amber-100">
+                    <span className="font-bold text-gray-800">Inventory per modifier:</span> After you save this
+                    new product, open <strong>Edit</strong> again — the section{" "}
+                    <strong>Modifier option recipes</strong> appears below the base recipe so you can set stock
+                    amounts for each size, topping, etc.
+                  </p>
+                </div>
+              ) : null}
+
               <div className="flex justify-end gap-3 pt-8 pb-4">
                 <button
                   type="button"
@@ -2151,6 +2219,12 @@ export default function MenuManagementClient({
                     <Plus size={16} />
                     Add Option
                   </button>
+                  <p className="mt-4 text-xs text-gray-500 leading-relaxed bg-slate-50 border border-slate-100 rounded-xl px-4 py-3">
+                    <span className="font-semibold text-gray-700">Inventory / stock:</span> This screen only
+                    defines option names and prices. To set how much of each ingredient is used per option (e.g.
+                    Large vs Medium), go to the <strong>Menu</strong> tab → edit the product → scroll to{" "}
+                    <strong>Modifier option recipes</strong> (below the base recipe).
+                  </p>
                 </div>
               </div>
               <div className="p-4 md:p-6 border-t border-gray-50 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 bg-white shrink-0">

@@ -392,6 +392,7 @@ export async function linkModifierOptionToIngredientsAction(
         });
 
         revalidatePath(`/owner/menu-management/edit/${productId}`);
+        revalidatePath('/owner/menu-categories');
         return { success: true };
     } catch (error) {
         console.error('linkModifierOptionToIngredientsAction error:', error);
