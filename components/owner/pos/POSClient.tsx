@@ -780,7 +780,7 @@ export function POSClient({
                                         {item.options && Object.keys(item.options).length > 0 && (
                                             <div className="flex flex-wrap gap-x-1.5 gap-y-1 mt-1">
                                                 {Object.entries(item.options).map(([key, value]) => {
-                                                    if (key === 'tag' || key === 'bundleLabel') return null;
+                                                    if (key === 'tag' || key === 'bundleLabel' || key === '__optionIds') return null;
                                                     return (
                                                         <span key={key} className="text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight border border-gray-200">
                                                             {key}: {String(value)}
@@ -1166,7 +1166,7 @@ export function POSClient({
                                                                     {item.options && Object.keys(item.options).length > 0 && (
                                                                         <div className="flex flex-wrap gap-x-1.5 gap-y-1 mt-1">
                                                                             {Object.entries(item.options).map(([key, value]) => {
-                                                                                if (key === 'tag' || key === 'bundleLabel') return null;
+                                                                                if (key === 'tag' || key === 'bundleLabel' || key === '__optionIds') return null;
                                                                                 return (
                                                                                     <span
                                                                                         key={key}
@@ -1323,7 +1323,7 @@ export function POSClient({
                                         {item.options && Object.keys(item.options).length > 0 && (
                                             <div className="pl-4 mt-1 text-xs text-gray-500 space-y-0.5">
                                                 {Object.entries(item.options).map(([key, val]) => {
-                                                     if (key === 'tag' || key === 'bundleLabel') return null;
+                                                     if (key === 'tag' || key === 'bundleLabel' || key === '__optionIds') return null;
                                                      return <div key={key}>- {key}: {String(val)}</div>;
                                                 })}
                                                 {item.options.tag ? <div>- Tag: {String(item.options.tag)}</div> : null}

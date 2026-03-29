@@ -149,7 +149,7 @@ export default function LiveOrdersTabsMobile({
                             {item.options && (
                               <div className="flex flex-wrap gap-x-2 gap-y-1 mt-1">
                                 {Object.entries(item.options).map(([key, value]) => {
-                                  if (key === 'tag' || key === 'bundleLabel') return null;
+                                  if (key === 'tag' || key === 'bundleLabel' || key === '__optionIds') return null;
                                   return (
                                     <span
                                       key={key}

@@ -101,7 +101,7 @@ export async function getOwnerAnalytics(branchId: string, days: number = 30): Pr
                     const parsed = typeof i.customizations === 'string' ? JSON.parse(i.customizations) : i.customizations;
                     const keys = Object.keys(parsed).filter(k => {
                         const lowerKey = k.toLowerCase();
-                        return lowerKey !== 'size' && lowerKey !== 'bundlelabel' && lowerKey !== 'tag';
+                        return lowerKey !== 'size' && lowerKey !== 'bundlelabel' && lowerKey !== 'tag' && lowerKey !== '__optionids';
                     });
                     return keys.length > 0;
                 } catch(e) { return false; }

@@ -210,6 +210,15 @@ export const productIngredients = pgTable('product_ingredients', {
   quantityRequired: decimal('quantity_required', { precision: 10, scale: 2 }).notNull(),
 });
 
+/** Per-product recipe overrides when a specific modifier option is selected (e.g. Large vs Medium). */
+export const productModifierOptionIngredients = pgTable('product_modifier_option_ingredients', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  productId: uuid('product_id').references(() => products.id).notNull(),
+  modifierOptionId: uuid('modifier_option_id').references(() => modifierOptions.id).notNull(),
+  inventoryItemId: uuid('inventory_item_id').references(() => inventoryItems.id).notNull(),
+  quantityRequired: decimal('quantity_required', { precision: 10, scale: 2 }).notNull(),
+});
+
 // Relations
 
 export const companiesRelations = relations(companies, ({ many }) => ({
@@ -248,6 +257,7 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   branchAvailability: many(branchProductAvailability),
   promotionItems: many(promotionItems),
   productIngredients: many(productIngredients),
+  productModifierOptionIngredients: many(productModifierOptionIngredients),
   notifications: many(notifications),
 }));
 
@@ -270,6 +280,7 @@ export const productModifierLinksRelations = relations(productModifierLinks, ({ 
 export const modifierOptionsRelations = relations(modifierOptions, ({ one, many }) => ({
   group: one(modifierGroups, { fields: [modifierOptions.modifierGroupId], references: [modifierGroups.id] }),
   orderItemModifiers: many(orderItemModifiers),
+  productModifierOptionIngredients: many(productModifierOptionIngredients),
 }));
 
 export const tablesRelations = relations(tables, ({ one, many }) => ({
@@ -329,11 +340,18 @@ export const promotionItemsRelations = relations(promotionItems, ({ one }) => ({
 export const inventoryItemsRelations = relations(inventoryItems, ({ one, many }) => ({
   branch: one(branches, { fields: [inventoryItems.branchId], references: [branches.id] }),
   productIngredients: many(productIngredients),
+  productModifierOptionIngredients: many(productModifierOptionIngredients),
 }));
 
 export const productIngredientsRelations = relations(productIngredients, ({ one }) => ({
   product: one(products, { fields: [productIngredients.productId], references: [products.id] }),
   inventoryItem: one(inventoryItems, { fields: [productIngredients.inventoryItemId], references: [inventoryItems.id] }),
+}));
+
+export const productModifierOptionIngredientsRelations = relations(productModifierOptionIngredients, ({ one }) => ({
+  product: one(products, { fields: [productModifierOptionIngredients.productId], references: [products.id] }),
+  modifierOption: one(modifierOptions, { fields: [productModifierOptionIngredients.modifierOptionId], references: [modifierOptions.id] }),
+  inventoryItem: one(inventoryItems, { fields: [productModifierOptionIngredients.inventoryItemId], references: [inventoryItems.id] }),
 }));
 
 export const notificationsRelations = relations(notifications, ({ one }) => ({

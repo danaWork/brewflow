@@ -140,16 +140,16 @@ export default function CheckoutPage() {
                             {item.name}
                           </h3>
                           <div className="text-xs text-gray-400 font-medium flex flex-wrap gap-1 mt-1">
-                            {Object.entries(item.options || {}).map(
-                              ([key, value]) => (
+                            {Object.entries(item.options || {})
+                              .filter(([key]) => key !== "__optionIds")
+                              .map(([key, value]) => (
                                 <span key={key}>
                                   <span className="font-semibold text-gray-600">
                                     {key}:
                                   </span>{" "}
                                   {String(value)}{" "}
                                 </span>
-                              ),
-                            )}
+                              ))}
                           </div>
                         </div>
                       </div>
@@ -209,16 +209,16 @@ export default function CheckoutPage() {
                             {item.name}
                           </h3>
                           <div className="text-xs text-gray-400 font-medium flex flex-wrap gap-1 mt-1">
-                            {Object.entries(item.options || {}).map(
-                              ([key, value]) => (
+                            {Object.entries(item.options || {})
+                              .filter(([key]) => key !== "__optionIds")
+                              .map(([key, value]) => (
                                 <span key={key}>
                                   <span className="font-semibold text-gray-600">
                                     {key}:
                                   </span>{" "}
                                   {String(value)}{" "}
                                 </span>
-                              ),
-                            )}
+                              ))}
                           </div>
                         </div>
                       </div>

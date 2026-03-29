@@ -47,6 +47,20 @@ function optionIdsFromReadable(
     }
   });
   if (!readable || typeof readable !== 'object') return result;
+  const rawIds = readable.__optionIds;
+  if (Array.isArray(rawIds) && rawIds.length > 0) {
+    const idSet = new Set(rawIds.filter((x): x is string => typeof x === 'string' && x.length > 0));
+    sortedModifiers.forEach((group) => {
+      if (group.displayMode === 'cards') {
+        const ids = group.options.map((o) => o.id).filter((id) => idSet.has(id));
+        if (ids.length) result[group.id] = ids;
+      } else {
+        const found = group.options.find((o) => idSet.has(o.id));
+        if (found) result[group.id] = found.id;
+      }
+    });
+    return result;
+  }
   sortedModifiers.forEach((group) => {
     const val = readable[group.name];
     if (val == null) return;
@@ -151,6 +165,7 @@ export function ProductAddModal({
 
   const handleAdd = () => {
     const readableOptions: Record<string, unknown> = {};
+    const optionIdsForInventory: string[] = [];
     sortedModifiers.forEach((group) => {
       const selection = selectedOptions[group.id];
       if (selection) {
@@ -160,13 +175,18 @@ export function ProductAddModal({
               .map((id) => group.options.find((o) => o.id === id)?.name)
               .filter(Boolean);
             readableOptions[group.name] = names.join(', ');
+            optionIdsForInventory.push(...selection);
           }
         } else {
           const name = group.options.find((o) => o.id === selection)?.name;
           if (name) readableOptions[group.name] = name;
+          optionIdsForInventory.push(selection);
         }
       }
     });
+    if (optionIdsForInventory.length > 0) {
+      readableOptions.__optionIds = optionIdsForInventory;
+    }
 
     onAdd({
       productId: product.id,

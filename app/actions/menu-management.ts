@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { categories, products, modifierGroups, modifierOptions, productModifierLinks, productIngredients, branchProductAvailability, promotionItems, notifications, orderItems } from '@/db/schema';
+import { categories, products, modifierGroups, modifierOptions, productModifierLinks, productIngredients, productModifierOptionIngredients, branchProductAvailability, promotionItems, notifications, orderItems } from '@/db/schema';
 import type { SaleDiscountType } from '@/lib/product-sale-price';
 import { eq, and, inArray, sql, asc, max } from 'drizzle-orm';
 import { getUserSession } from './auth';
@@ -443,6 +443,9 @@ export async function updateModifierGroup(
     // Delete removed options
     if (optionsToDelete.length > 0) {
         try {
+            await db.delete(productModifierOptionIngredients).where(
+                inArray(productModifierOptionIngredients.modifierOptionId, optionsToDelete)
+            );
             await db.delete(modifierOptions).where(inArray(modifierOptions.id, optionsToDelete));
         } catch (e: any) {
             if (e.message?.includes('violates foreign key constraint') || e.message?.includes('order_item_modifiers')) {
@@ -489,6 +492,17 @@ export async function deleteModifierGroup(id: string) {
 
         // 2. Delete product links which also reference modifier options
         await db.delete(productModifierLinks).where(eq(productModifierLinks.modifierGroupId, id));
+
+        const groupOptionIds = await db
+            .select({ id: modifierOptions.id })
+            .from(modifierOptions)
+            .where(eq(modifierOptions.modifierGroupId, id));
+        const optIds = groupOptionIds.map((o) => o.id);
+        if (optIds.length > 0) {
+            await db
+                .delete(productModifierOptionIngredients)
+                .where(inArray(productModifierOptionIngredients.modifierOptionId, optIds));
+        }
 
         // 3. Delete the options themselves
         await db.delete(modifierOptions).where(eq(modifierOptions.modifierGroupId, id));

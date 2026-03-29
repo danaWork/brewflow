@@ -33,6 +33,9 @@ async function clearDb() {
     console.log('Clearing product ingredients...');
     await db.delete(schema.productIngredients);
 
+    console.log('Clearing product modifier option ingredients...');
+    await db.delete(schema.productModifierOptionIngredients);
+
     console.log('Clearing inventory items...');
     await db.delete(schema.inventoryItems);
 

@@ -201,7 +201,7 @@ function ActivityLogEntry({ order }: { order: PastOrder }) {
                   {item.options && (
                     <div className="flex flex-wrap gap-1">
                       {Object.entries(item.options).map(([key, value]) => {
-                        if (key === 'tag' || key === 'bundleLabel') return null;
+                        if (key === 'tag' || key === 'bundleLabel' || key === '__optionIds') return null;
                         return (
                           <span key={key} className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight border border-gray-200">
                             {key}: {String(value)}
@@ -589,7 +589,7 @@ export default function LiveOrdersPage() {
                                   {item.options && (
                                     <div className="flex flex-wrap gap-x-2 gap-y-1 mt-1">
                                       {Object.entries(item.options).map(([key, value]) => {
-                                          if (key === 'tag' || key === 'bundleLabel') return null;
+                                          if (key === 'tag' || key === 'bundleLabel' || key === '__optionIds') return null;
                                           return (
                                             <span key={key} className="text-[10px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-bold uppercase tracking-tight border border-gray-200">
                                                 {key}: {String(value)}
