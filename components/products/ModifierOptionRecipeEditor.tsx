@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
     InventoryItem,
     linkModifierOptionToIngredientsAction,
@@ -45,6 +45,20 @@ interface ModifierOptionRecipeEditorProps {
     linkedGroups: ModifierGroup[];
     inventoryItems: InventoryItem[];
     initialModifierIngredients: InitialRow[];
+    /** Lighter layout when nested inside the menu product modal */
+    variant?: 'standalone' | 'embedded';
+}
+
+function buildRecipesState(
+    optionIds: string[],
+    initialModifierIngredients: InitialRow[]
+): Record<string, IngredientLine[]> {
+    const fromDb = groupInitialByOption(initialModifierIngredients);
+    const next: Record<string, IngredientLine[]> = {};
+    for (const oid of optionIds) {
+        next[oid] = fromDb[oid]?.length ? [...fromDb[oid]] : [];
+    }
+    return next;
 }
 
 export default function ModifierOptionRecipeEditor({
@@ -53,20 +67,26 @@ export default function ModifierOptionRecipeEditor({
     linkedGroups,
     inventoryItems,
     initialModifierIngredients,
+    variant = 'standalone',
 }: ModifierOptionRecipeEditorProps) {
     const optionIds = useMemo(
         () => linkedGroups.flatMap((g) => g.options.map((o) => o.id)),
         [linkedGroups]
     );
 
-    const [recipesByOption, setRecipesByOption] = useState<Record<string, IngredientLine[]>>(() => {
-        const fromDb = groupInitialByOption(initialModifierIngredients);
-        const next: Record<string, IngredientLine[]> = {};
-        for (const oid of optionIds) {
-            next[oid] = fromDb[oid]?.length ? [...fromDb[oid]] : [];
-        }
-        return next;
-    });
+    const [recipesByOption, setRecipesByOption] = useState<Record<string, IngredientLine[]>>(() =>
+        buildRecipesState(optionIds, initialModifierIngredients)
+    );
+
+    const initialSig = useMemo(
+        () =>
+            `${productId}:${initialModifierIngredients.map((r) => `${r.modifierOptionId}:${r.inventoryItemId}:${r.quantityRequired}`).join('|')}`,
+        [productId, initialModifierIngredients]
+    );
+
+    useEffect(() => {
+        setRecipesByOption(buildRecipesState(optionIds, initialModifierIngredients));
+    }, [productId, optionIds.join(','), initialSig]);
 
     const [isSaving, setIsSaving] = useState(false);
     const [alertConfig, setAlertConfig] = useState<{ isOpen: boolean; message: string }>({
@@ -129,21 +149,30 @@ export default function ModifierOptionRecipeEditor({
         setIsSaving(false);
     };
 
+    const shell =
+        variant === 'embedded'
+            ? 'mt-6 rounded-2xl border border-gray-100 bg-gray-50/50 p-4 md:p-5'
+            : 'bg-white p-6 rounded-lg shadow mt-8';
+
     if (linkedGroups.length === 0) {
         return (
-            <div className="bg-white p-6 rounded-lg shadow mt-8">
-                <h3 className="text-lg font-bold mb-2">Modifier option recipes</h3>
+            <div className={shell}>
+                <h3 className={`font-bold mb-2 ${variant === 'embedded' ? 'text-base text-gray-900' : 'text-lg'}`}>
+                    Modifier option recipes
+                </h3>
                 <p className="text-sm text-gray-500">
-                    This product has no modifier groups linked. Add modifiers in the main menu categories
-                    management, then return here to set ingredient amounts per option (e.g. Large vs Medium).
+                    This product has no modifier groups linked. Check the groups above under Linked Modifiers, then
+                    set ingredient amounts per option (e.g. Large vs Medium).
                 </p>
             </div>
         );
     }
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow mt-8">
-            <h3 className="text-lg font-bold mb-2">Modifier option recipes</h3>
+        <div className={shell}>
+            <h3 className={`font-bold mb-2 ${variant === 'embedded' ? 'text-base text-gray-900' : 'text-lg'}`}>
+                Modifier option recipes
+            </h3>
             <p className="text-sm text-gray-500 mb-6">
                 Set ingredients per modifier option for this product only. When an order includes{' '}
                 <code className="text-xs bg-gray-100 px-1 rounded">__optionIds</code>, amounts here override the
