@@ -71,7 +71,7 @@ export function generateReceiptDataUrl(data: ReceiptData): string {
 
     if (item.options) {
       const optEntries = Object.entries(item.options).filter(
-        ([k]) => k !== 'tag' && k !== 'bundleLabel'
+        ([k]) => k !== 'tag' && k !== 'bundleLabel' && k !== '__optionIds'
       );
       estimatedH += optEntries.length * 18;
     }
@@ -166,7 +166,7 @@ export function generateReceiptDataUrl(data: ReceiptData): string {
       ctx.font = '11px system-ui, sans-serif';
       ctx.fillStyle = '#6b7280';
       for (const [k, v] of Object.entries(item.options)) {
-        if (k === 'tag' || k === 'bundleLabel') continue;
+        if (k === 'tag' || k === 'bundleLabel' || k === '__optionIds') continue;
         ctx.fillText(`  ${k}: ${v}`, PAD + 8, y + 11);
         y += 18;
       }

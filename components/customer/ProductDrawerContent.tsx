@@ -209,6 +209,7 @@ export default function ProductDrawerContent({
     // Construct readable options object
     const readableOptions: Record<string, any> = {};
 
+    const optionIdsForInventory: string[] = [];
     sortedModifiers.forEach((group: any) => {
       const selection = selectedOptions[group.id];
       if (selection) {
@@ -218,13 +219,18 @@ export default function ProductDrawerContent({
               .map((id) => group.options.find((o: any) => o.id === id)?.name)
               .filter(Boolean);
             readableOptions[group.name] = names.join(", ");
+            optionIdsForInventory.push(...selection);
           }
         } else {
           const name = group.options.find((o: any) => o.id === selection)?.name;
           if (name) readableOptions[group.name] = name;
+          optionIdsForInventory.push(selection as string);
         }
       }
     });
+    if (optionIdsForInventory.length > 0) {
+      readableOptions.__optionIds = optionIdsForInventory;
+    }
 
     addItem({
       productId: product.id,

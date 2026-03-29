@@ -238,8 +238,9 @@ export async function getInventoryStockStatusAction(branchId: string) {
 
 // Ingredient Linking & Logic
 
-import { productIngredients, orderItems, orders } from '@/db/schema';
+import { productIngredients, productModifierOptionIngredients, orderItems, orders } from '@/db/schema';
 import { sql, inArray } from 'drizzle-orm';
+import { parseCustomizationOptionIds } from '@/lib/parse-customization-option-ids';
 
 export async function linkProductToIngredientsAction(branchId: string, productId: string, ingredients: { inventoryItemId: string; quantityRequired: number }[]) {
     try {
@@ -310,6 +311,94 @@ export async function getProductIngredientsAction(branchId: string, productId: s
     }
 }
 
+export async function getProductModifierOptionIngredientsAction(branchId: string, productId: string) {
+    try {
+        if (!branchId || !productId) return { success: true, ingredients: [] as Array<{
+            modifierOptionId: string;
+            inventoryItemId: string;
+            quantityRequired: number;
+            inventoryItem: typeof inventoryItems.$inferSelect;
+        }> };
+
+        const rows = await db
+            .select({
+                modifierOptionId: productModifierOptionIngredients.modifierOptionId,
+                inventoryItemId: productModifierOptionIngredients.inventoryItemId,
+                quantityRequired: productModifierOptionIngredients.quantityRequired,
+                inventoryItem: inventoryItems,
+            })
+            .from(productModifierOptionIngredients)
+            .innerJoin(inventoryItems, eq(productModifierOptionIngredients.inventoryItemId, inventoryItems.id))
+            .where(
+                and(
+                    eq(productModifierOptionIngredients.productId, productId),
+                    eq(inventoryItems.branchId, branchId)
+                )
+            );
+
+        const formatted = rows.map((r) => ({
+            modifierOptionId: r.modifierOptionId,
+            inventoryItemId: r.inventoryItemId,
+            quantityRequired: parseFloat(r.quantityRequired),
+            inventoryItem: r.inventoryItem,
+        }));
+
+        return { success: true, ingredients: formatted };
+    } catch (error) {
+        console.error('getProductModifierOptionIngredientsAction error:', error);
+        return { success: false, error: 'Failed to fetch modifier option ingredients' };
+    }
+}
+
+export async function linkModifierOptionToIngredientsAction(
+    branchId: string,
+    productId: string,
+    modifierOptionId: string,
+    ingredients: { inventoryItemId: string; quantityRequired: number }[]
+) {
+    try {
+        if (!branchId || !productId || !modifierOptionId) {
+            return { success: false, error: 'Invalid branch, product, or modifier option ID' };
+        }
+
+        await db.transaction(async (tx) => {
+            const existing = await tx
+                .select({ id: productModifierOptionIngredients.id })
+                .from(productModifierOptionIngredients)
+                .innerJoin(inventoryItems, eq(productModifierOptionIngredients.inventoryItemId, inventoryItems.id))
+                .where(
+                    and(
+                        eq(productModifierOptionIngredients.productId, productId),
+                        eq(productModifierOptionIngredients.modifierOptionId, modifierOptionId),
+                        eq(inventoryItems.branchId, branchId)
+                    )
+                );
+
+            const idsToDelete = existing.map((i) => i.id);
+            if (idsToDelete.length > 0) {
+                await tx.delete(productModifierOptionIngredients).where(inArray(productModifierOptionIngredients.id, idsToDelete));
+            }
+
+            if (ingredients.length > 0) {
+                await tx.insert(productModifierOptionIngredients).values(
+                    ingredients.map((ing) => ({
+                        productId,
+                        modifierOptionId,
+                        inventoryItemId: ing.inventoryItemId,
+                        quantityRequired: ing.quantityRequired.toString(),
+                    }))
+                );
+            }
+        });
+
+        revalidatePath(`/owner/menu-management/edit/${productId}`);
+        return { success: true };
+    } catch (error) {
+        console.error('linkModifierOptionToIngredientsAction error:', error);
+        return { success: false, error: 'Failed to update modifier option ingredients' };
+    }
+}
+
 import { syncStockNotificationsInternal } from './notifications';
 
 export async function deductInventoryForOrder(orderId: string) {
@@ -340,23 +429,73 @@ export async function deductInventoryForOrder(orderId: string) {
 
         await db.transaction(async (tx) => {
             for (const item of items) {
+                if (!item.productId) continue;
+
                 const product = Array.isArray(item.product) ? item.product[0] : item.product;
-                const productIngredients = product && typeof product === 'object' && 'productIngredients' in product
-                    ? (product.productIngredients as Array<{ inventoryItem: { branchId: string }; quantityRequired: string; inventoryItemId: string }>)
-                    : [];
-                const ingredients = productIngredients.filter(
-                    pi => pi.inventoryItem.branchId === order.branchId
+                const productIngredientsList =
+                    product && typeof product === 'object' && 'productIngredients' in product
+                        ? (product.productIngredients as Array<{
+                              inventoryItem: { branchId: string };
+                              quantityRequired: string;
+                              inventoryItemId: string;
+                          }>)
+                        : [];
+                const baseBranchIngredients = productIngredientsList.filter(
+                    (pi) => pi.inventoryItem.branchId === order.branchId
                 );
 
-                for (const ing of ingredients) {
-                    const deduction = parseFloat(ing.quantityRequired) * item.quantity;
-                    
-                    await tx.update(inventoryItems)
-                        .set({ 
-                            quantity: sql`${inventoryItems.quantity} - ${deduction}`,
-                            updatedAt: new Date()
+                const optionIds = parseCustomizationOptionIds(item.customizations);
+
+                let modifierRows: Array<{ inventoryItemId: string; quantityRequired: string }> = [];
+                if (optionIds.length > 0) {
+                    modifierRows = await tx
+                        .select({
+                            inventoryItemId: productModifierOptionIngredients.inventoryItemId,
+                            quantityRequired: productModifierOptionIngredients.quantityRequired,
                         })
-                        .where(eq(inventoryItems.id, ing.inventoryItemId));
+                        .from(productModifierOptionIngredients)
+                        .innerJoin(
+                            inventoryItems,
+                            eq(productModifierOptionIngredients.inventoryItemId, inventoryItems.id)
+                        )
+                        .where(
+                            and(
+                                eq(productModifierOptionIngredients.productId, item.productId),
+                                inArray(productModifierOptionIngredients.modifierOptionId, optionIds),
+                                eq(inventoryItems.branchId, order.branchId)
+                            )
+                        );
+                }
+
+                /** Sum per inventory item across all selected modifier option recipes (e.g. multiple toppings). */
+                const modSumByInv = new Map<string, number>();
+                const invTouchedByModifier = new Set<string>();
+                for (const row of modifierRows) {
+                    invTouchedByModifier.add(row.inventoryItemId);
+                    const q = parseFloat(row.quantityRequired);
+                    modSumByInv.set(row.inventoryItemId, (modSumByInv.get(row.inventoryItemId) ?? 0) + q);
+                }
+
+                const perUnitByInv = new Map<string, number>();
+                for (const ing of baseBranchIngredients) {
+                    if (!invTouchedByModifier.has(ing.inventoryItemId)) {
+                        perUnitByInv.set(ing.inventoryItemId, parseFloat(ing.quantityRequired));
+                    }
+                }
+                for (const [invId, qty] of modSumByInv) {
+                    perUnitByInv.set(invId, qty);
+                }
+
+                for (const [inventoryItemId, perUnit] of perUnitByInv) {
+                    const deduction = perUnit * item.quantity;
+
+                    await tx
+                        .update(inventoryItems)
+                        .set({
+                            quantity: sql`${inventoryItems.quantity} - ${deduction}`,
+                            updatedAt: new Date(),
+                        })
+                        .where(eq(inventoryItems.id, inventoryItemId));
                 }
             }
         });
