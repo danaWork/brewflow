@@ -141,7 +141,7 @@ export default function CheckoutPage() {
                           </h3>
                           <div className="text-xs text-gray-400 font-medium flex flex-wrap gap-1 mt-1">
                             {Object.entries(item.options || {})
-                              .filter(([key]) => key !== "__optionIds")
+                              .filter(([key]) => key !== "__optionIds" && key !== "itemDiscount")
                               .map(([key, value]) => (
                                 <span key={key}>
                                   <span className="font-semibold text-gray-600">
@@ -210,7 +210,7 @@ export default function CheckoutPage() {
                           </h3>
                           <div className="text-xs text-gray-400 font-medium flex flex-wrap gap-1 mt-1">
                             {Object.entries(item.options || {})
-                              .filter(([key]) => key !== "__optionIds")
+                              .filter(([key]) => key !== "__optionIds" && key !== "itemDiscount")
                               .map(([key, value]) => (
                                 <span key={key}>
                                   <span className="font-semibold text-gray-600">

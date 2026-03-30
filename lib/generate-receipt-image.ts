@@ -71,9 +71,11 @@ export function generateReceiptDataUrl(data: ReceiptData): string {
 
     if (item.options) {
       const optEntries = Object.entries(item.options).filter(
-        ([k]) => k !== 'tag' && k !== 'bundleLabel' && k !== '__optionIds'
+        ([k]) => k !== 'tag' && k !== 'bundleLabel' && k !== '__optionIds' && k !== 'itemDiscount'
       );
       estimatedH += optEntries.length * 18;
+      const discountLabel = (item.options as any)?.itemDiscount?.label;
+      if (typeof discountLabel === 'string' && discountLabel.trim()) estimatedH += 18;
     }
     if (item.extras?.length) {
       estimatedH += item.extras.length * 18;
@@ -166,8 +168,15 @@ export function generateReceiptDataUrl(data: ReceiptData): string {
       ctx.font = '11px system-ui, sans-serif';
       ctx.fillStyle = '#6b7280';
       for (const [k, v] of Object.entries(item.options)) {
-        if (k === 'tag' || k === 'bundleLabel' || k === '__optionIds') continue;
+        if (k === 'tag' || k === 'bundleLabel' || k === '__optionIds' || k === 'itemDiscount') continue;
         ctx.fillText(`  ${k}: ${v}`, PAD + 8, y + 11);
+        y += 18;
+      }
+      const discountLabel = (item.options as any)?.itemDiscount?.label;
+      if (typeof discountLabel === 'string' && discountLabel.trim()) {
+        ctx.fillStyle = '#16a34a';
+        ctx.fillText(`  Discount: ${discountLabel.trim()}`, PAD + 8, y + 11);
+        ctx.fillStyle = '#6b7280';
         y += 18;
       }
     }

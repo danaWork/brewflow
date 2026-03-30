@@ -192,7 +192,7 @@ export default function OrderStatusPage() {
                                             {item.options && Object.keys(item.options).length > 0 && (
                                                 <div className="text-xs text-gray-400 font-medium mt-0.5">
                                                     {Object.entries(item.options)
-                                                        .filter(([k]) => k !== 'tag' && k !== 'bundleLabel' && k !== '__optionIds')
+                                                        .filter(([k]) => k !== 'tag' && k !== 'bundleLabel' && k !== '__optionIds' && k !== 'itemDiscount')
                                                         .map(([key, value]) => `${key}: ${String(value)}`)
                                                         .join(' · ')}
                                                 </div>
