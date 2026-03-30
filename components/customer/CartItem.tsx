@@ -65,7 +65,7 @@ export default function CartItem({ item }: CartItemProps) {
                             <h3 className="font-bold text-gray-900 text-lg leading-tight mb-1">{item.name}</h3>
                             <div className="text-xs text-gray-400 font-medium flex flex-wrap gap-1">
                                 {Object.entries(item.options || {})
-                                    .filter(([key]) => key !== '__optionIds')
+                                    .filter(([key]) => key !== '__optionIds' && key !== 'itemDiscount')
                                     .map(([key, value]) => (
                                     <span key={key} className="bg-gray-50 px-1.5 py-0.5 rounded text-gray-600">
                                         {key}: {String(value)}
@@ -153,7 +153,7 @@ export default function CartItem({ item }: CartItemProps) {
                         <h3 className="font-bold text-gray-900 text-lg leading-tight mb-1">{item.name}</h3>
                             <div className="text-xs text-gray-400 font-medium flex flex-wrap gap-1">
                                 {Object.entries(item.options || {})
-                                    .filter(([key]) => key !== '__optionIds')
+                                    .filter(([key]) => key !== '__optionIds' && key !== 'itemDiscount')
                                     .map(([key, value]) => (
                                     <span key={key} className="bg-gray-50 px-1.5 py-0.5 rounded text-gray-600">
                                         {key}: {String(value)}

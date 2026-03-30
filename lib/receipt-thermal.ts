@@ -73,6 +73,10 @@ export function buildReceiptText(
     const lineTotal = (item.price * item.quantity).toFixed(2);
     const detail = `  ${qty} x ${unit} = ${lineTotal}`;
     lines.push(padRight(detail, WIDTH));
+    const discountLabel = (item.options as any)?.itemDiscount?.label;
+    if (typeof discountLabel === 'string' && discountLabel.trim()) {
+      lines.push(padRight(`  Discount: ${discountLabel.trim()}`, WIDTH));
+    }
     if (item.extras?.length) {
       for (const ex of item.extras) {
         const exName = `  + ${ex.name}`.slice(0, WIDTH);

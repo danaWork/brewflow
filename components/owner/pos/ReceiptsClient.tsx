@@ -211,9 +211,10 @@ export default function ReceiptsClient({ branchId }: { branchId: string }) {
                                         {item.options && Object.keys(item.options).length > 0 && (
                                             <div className="pl-4 mt-1 text-xs text-gray-500 space-y-0.5">
                                                 {Object.entries(item.options).map(([key, val]) => {
-                                                     if (key === 'tag' || key === 'bundleLabel' || key === '__optionIds') return null;
-                                                     return <div key={key}>- {key}: {String(val)}</div>;
+                                                    if (key === 'tag' || key === 'bundleLabel' || key === '__optionIds' || key === 'itemDiscount') return null;
+                                                    return <div key={key}>- {key}: {String(val)}</div>;
                                                 })}
+                                                {item.options.itemDiscount?.label ? <div>- Discount: {String(item.options.itemDiscount.label)}</div> : null}
                                                 {item.options.tag ? <div>- Tag: {String(item.options.tag)}</div> : null}
                                                 {item.options.bundleLabel ? <div>- Bundle: {String(item.options.bundleLabel)}</div> : null}
                                             </div>

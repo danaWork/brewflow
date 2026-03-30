@@ -201,13 +201,18 @@ function ActivityLogEntry({ order }: { order: PastOrder }) {
                   {item.options && (
                     <div className="flex flex-wrap gap-1">
                       {Object.entries(item.options).map(([key, value]) => {
-                        if (key === 'tag' || key === 'bundleLabel' || key === '__optionIds') return null;
+                        if (key === 'tag' || key === 'bundleLabel' || key === '__optionIds' || key === 'itemDiscount') return null;
                         return (
                           <span key={key} className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight border border-gray-200">
                             {key}: {String(value)}
                           </span>
                         );
                       })}
+                      {item.options.itemDiscount?.label ? (
+                        <span className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-tight border border-emerald-100">
+                          Discount: {String(item.options.itemDiscount.label)}
+                        </span>
+                      ) : null}
                     </div>
                   )}
                 </div>
