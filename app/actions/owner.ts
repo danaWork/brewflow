@@ -19,12 +19,68 @@ export type OwnerAnalytics = {
     totalOrders: number;
     averageOrderValue: number;
     revenueOverTime: Array<{ date: string; revenue: number; cashRevenue: number; digitalRevenue: number; orders: number }>;
+    revenueWeekly: Array<{ date: string; revenue: number; cashRevenue: number; digitalRevenue: number; orders: number }>;
+    revenueMonthly: Array<{ date: string; revenue: number; cashRevenue: number; digitalRevenue: number; orders: number }>;
+    revenueYearly: Array<{ date: string; revenue: number; cashRevenue: number; digitalRevenue: number; orders: number }>;
 };
 
 export async function getOwnerAnalytics(branchId: string, days: number = 30): Promise<OwnerAnalytics> {
     try {
+        const clampInt = (n: number, min: number, max: number) => Math.max(min, Math.min(max, Math.trunc(n)));
+        const dailyDays = clampInt(days, 1, 365);
+        const weeklyWeeks = 12;
+        const monthlyMonths = 12;
+        const yearlyYears = 5;
+
+        const pad2 = (n: number) => String(n).padStart(2, '0');
+        const toUtcDateKey = (d: Date) => d.toISOString().split('T')[0];
+        const utcStartOfDay = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+
+        const isoWeekKeyAndStart = (dateUtc: Date): { key: string; weekStartUtc: Date } => {
+            // ISO week is based on Thursday; week starts Monday.
+            const d = utcStartOfDay(dateUtc);
+            const day = d.getUTCDay(); // 0..6 (Sun..Sat)
+            const isoDay = day === 0 ? 7 : day; // 1..7 (Mon..Sun)
+            const weekStart = new Date(d);
+            weekStart.setUTCDate(d.getUTCDate() - (isoDay - 1)); // Monday
+
+            const thursday = new Date(weekStart);
+            thursday.setUTCDate(weekStart.getUTCDate() + 3);
+            const isoYear = thursday.getUTCFullYear();
+
+            const jan4 = new Date(Date.UTC(isoYear, 0, 4));
+            const jan4Day = jan4.getUTCDay();
+            const jan4IsoDay = jan4Day === 0 ? 7 : jan4Day;
+            const isoYearWeek1Start = new Date(jan4);
+            isoYearWeek1Start.setUTCDate(jan4.getUTCDate() - (jan4IsoDay - 1));
+
+            const weekNum = Math.floor((weekStart.getTime() - isoYearWeek1Start.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+            return { key: `${isoYear}-W${pad2(weekNum)}`, weekStartUtc: weekStart };
+        };
+
+        const monthKeyAndStart = (dateUtc: Date): { key: string; monthStartUtc: Date } => {
+            const start = new Date(Date.UTC(dateUtc.getUTCFullYear(), dateUtc.getUTCMonth(), 1));
+            return { key: `${start.getUTCFullYear()}-${pad2(start.getUTCMonth() + 1)}`, monthStartUtc: start };
+        };
+
+        const yearKeyAndStart = (dateUtc: Date): { key: string; yearStartUtc: Date } => {
+            const start = new Date(Date.UTC(dateUtc.getUTCFullYear(), 0, 1));
+            return { key: `${start.getUTCFullYear()}`, yearStartUtc: start };
+        };
+
+        type Bucket = { revenue: number; cashRevenue: number; digitalRevenue: number; orders: number };
+        const addToBucket = (map: Map<string, Bucket>, key: string, revenue: number, cashRevenue: number, digitalRevenue: number) => {
+            const existing = map.get(key) || { revenue: 0, cashRevenue: 0, digitalRevenue: 0, orders: 0 };
+            map.set(key, {
+                revenue: existing.revenue + revenue,
+                cashRevenue: existing.cashRevenue + cashRevenue,
+                digitalRevenue: existing.digitalRevenue + digitalRevenue,
+                orders: existing.orders + 1
+            });
+        };
+
         const startDate = new Date();
-        startDate.setDate(startDate.getDate() - days);
+        startDate.setDate(startDate.getDate() - dailyDays);
 
         // Get all orders for this branch within the time period
         const branchOrders = await db.select({
@@ -64,34 +120,38 @@ export async function getOwnerAnalytics(branchId: string, days: number = 30): Pr
         let crossSellItems = 0;
         let customizedItems = 0;
 
-        const revenueByDate = new Map<string, { revenue: number; cashRevenue: number; digitalRevenue: number; orders: number }>();
+        const revenueByDate = new Map<string, Bucket>();
+        const revenueByWeek = new Map<string, Bucket>();
+        const revenueByMonth = new Map<string, Bucket>();
+        const revenueByYear = new Map<string, Bucket>();
+        const weekStartByKey = new Map<string, Date>();
 
         branchOrders.forEach(order => {
             totalOrders++;
             const revenue = parseFloat(order.totalAmount.toString());
             totalRevenue += revenue;
 
-            if ((order.paymentMethod || '').toUpperCase() === 'CASH') {
-                totalCashRevenue += revenue;
-            } else if (order.paymentMethod) {
-                totalDigitalRevenue += revenue;
-            }
+            const isCash = (order.paymentMethod || '').toUpperCase() === 'CASH';
+            const isDigital = !isCash && !!order.paymentMethod;
+            if (isCash) totalCashRevenue += revenue;
+            else if (isDigital) totalDigitalRevenue += revenue;
+            const cashToAdd = isCash ? revenue : 0;
+            const digitalToAdd = isDigital ? revenue : 0;
 
             // Group by date
-            const dateKey = order.createdAt.toISOString().split('T')[0];
-            const existing = revenueByDate.get(dateKey) || { revenue: 0, cashRevenue: 0, digitalRevenue: 0, orders: 0 };
-            
-            let cashToAdd = 0;
-            let digitalToAdd = 0;
-            if ((order.paymentMethod || '').toUpperCase() === 'CASH') cashToAdd = revenue;
-            else if (order.paymentMethod) digitalToAdd = revenue;
+            const createdUtc = utcStartOfDay(order.createdAt);
+            const dateKey = toUtcDateKey(createdUtc);
+            addToBucket(revenueByDate, dateKey, revenue, cashToAdd, digitalToAdd);
 
-            revenueByDate.set(dateKey, {
-                revenue: existing.revenue + revenue,
-                cashRevenue: existing.cashRevenue + cashToAdd,
-                digitalRevenue: existing.digitalRevenue + digitalToAdd,
-                orders: existing.orders + 1
-            });
+            const { key: weekKey, weekStartUtc } = isoWeekKeyAndStart(createdUtc);
+            addToBucket(revenueByWeek, weekKey, revenue, cashToAdd, digitalToAdd);
+            if (!weekStartByKey.has(weekKey)) weekStartByKey.set(weekKey, weekStartUtc);
+
+            const { key: monthKey } = monthKeyAndStart(createdUtc);
+            addToBucket(revenueByMonth, monthKey, revenue, cashToAdd, digitalToAdd);
+
+            const { key: yearKey } = yearKeyAndStart(createdUtc);
+            addToBucket(revenueByYear, yearKey, revenue, cashToAdd, digitalToAdd);
 
             const items = order.items as any[];
             const types = new Set(items.map((i: any) => i.categoryType));
@@ -144,12 +204,60 @@ export async function getOwnerAnalytics(branchId: string, days: number = 30): Pr
 
         // Fill in missing dates with zero values
         const filledRevenueOverTime: Array<{ date: string; revenue: number; cashRevenue: number; digitalRevenue: number; orders: number }> = [];
-        for (let i = 0; i < days; i++) {
+        for (let i = 0; i < dailyDays; i++) {
             const date = new Date();
-            date.setDate(date.getDate() - (days - 1 - i));
-            const dateKey = date.toISOString().split('T')[0];
+            date.setDate(date.getDate() - (dailyDays - 1 - i));
+            const dateKey = toUtcDateKey(date);
             const existing = revenueOverTime.find(r => r.date === dateKey);
             filledRevenueOverTime.push(existing || { date: dateKey, revenue: 0, cashRevenue: 0, digitalRevenue: 0, orders: 0 });
+        }
+
+        const filledRevenueWeekly: Array<{ date: string; revenue: number; cashRevenue: number; digitalRevenue: number; orders: number }> = [];
+        for (let i = 0; i < weeklyWeeks; i++) {
+            const d = new Date();
+            d.setUTCDate(d.getUTCDate() - (weeklyWeeks - 1 - i) * 7);
+            const { key } = isoWeekKeyAndStart(d);
+            const existing = revenueByWeek.get(key);
+            const data = existing || { revenue: 0, cashRevenue: 0, digitalRevenue: 0, orders: 0 };
+            filledRevenueWeekly.push({
+                date: key,
+                revenue: parseFloat(data.revenue.toFixed(2)),
+                cashRevenue: parseFloat(data.cashRevenue.toFixed(2)),
+                digitalRevenue: parseFloat(data.digitalRevenue.toFixed(2)),
+                orders: data.orders
+            });
+        }
+
+        const filledRevenueMonthly: Array<{ date: string; revenue: number; cashRevenue: number; digitalRevenue: number; orders: number }> = [];
+        for (let i = 0; i < monthlyMonths; i++) {
+            const d = new Date();
+            d.setUTCMonth(d.getUTCMonth() - (monthlyMonths - 1 - i));
+            const { key } = monthKeyAndStart(d);
+            const existing = revenueByMonth.get(key);
+            const data = existing || { revenue: 0, cashRevenue: 0, digitalRevenue: 0, orders: 0 };
+            filledRevenueMonthly.push({
+                date: key,
+                revenue: parseFloat(data.revenue.toFixed(2)),
+                cashRevenue: parseFloat(data.cashRevenue.toFixed(2)),
+                digitalRevenue: parseFloat(data.digitalRevenue.toFixed(2)),
+                orders: data.orders
+            });
+        }
+
+        const filledRevenueYearly: Array<{ date: string; revenue: number; cashRevenue: number; digitalRevenue: number; orders: number }> = [];
+        for (let i = 0; i < yearlyYears; i++) {
+            const d = new Date();
+            d.setUTCFullYear(d.getUTCFullYear() - (yearlyYears - 1 - i));
+            const { key } = yearKeyAndStart(d);
+            const existing = revenueByYear.get(key);
+            const data = existing || { revenue: 0, cashRevenue: 0, digitalRevenue: 0, orders: 0 };
+            filledRevenueYearly.push({
+                date: key,
+                revenue: parseFloat(data.revenue.toFixed(2)),
+                cashRevenue: parseFloat(data.cashRevenue.toFixed(2)),
+                digitalRevenue: parseFloat(data.digitalRevenue.toFixed(2)),
+                orders: data.orders
+            });
         }
 
         const safeDiv = (n: number, d: number) => d === 0 ? 0 : (n / d) * 100;
@@ -166,7 +274,10 @@ export async function getOwnerAnalytics(branchId: string, days: number = 30): Pr
             totalDigitalRevenue: parseFloat(totalDigitalRevenue.toFixed(2)),
             totalOrders,
             averageOrderValue: totalOrders > 0 ? parseFloat((totalRevenue / totalOrders).toFixed(2)) : 0,
-            revenueOverTime: filledRevenueOverTime
+            revenueOverTime: filledRevenueOverTime,
+            revenueWeekly: filledRevenueWeekly,
+            revenueMonthly: filledRevenueMonthly,
+            revenueYearly: filledRevenueYearly
         };
 
     } catch (error) {
@@ -183,7 +294,10 @@ export async function getOwnerAnalytics(branchId: string, days: number = 30): Pr
             totalDigitalRevenue: 0,
             totalOrders: 0,
             averageOrderValue: 0,
-            revenueOverTime: []
+            revenueOverTime: [],
+            revenueWeekly: [],
+            revenueMonthly: [],
+            revenueYearly: []
         };
     }
 }

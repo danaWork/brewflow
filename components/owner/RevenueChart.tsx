@@ -5,11 +5,21 @@ import { useMemo, useState, useRef, useEffect } from 'react';
 
 interface RevenueChartProps {
     data: Array<{ date: string; revenue: number; cashRevenue: number; digitalRevenue: number; orders: number }>;
+    title?: string;
+    subtitle?: string;
+    formatXAxisLabel?: (key: string) => string;
+    formatTooltipLabel?: (key: string) => string;
 }
 
 const MOBILE_BREAKPOINT = 768;
 
-export function RevenueChart({ data }: RevenueChartProps) {
+export function RevenueChart({
+    data,
+    title = 'Revenue Over Time',
+    subtitle = 'Daily revenue breakdown',
+    formatXAxisLabel,
+    formatTooltipLabel
+}: RevenueChartProps) {
     const [tooltip, setTooltip] = useState<{
         x: number;
         y: number;
@@ -42,13 +52,17 @@ export function RevenueChart({ data }: RevenueChartProps) {
         };
     }, []);
 
-    // Format date
-    const formatDate = useMemo(() => {
-        return (dateStr: string) => {
-            const date = new Date(dateStr);
+    // Default label formatters (works for YYYY-MM-DD and any parseable date string)
+    const formatDailyLabel = useMemo(() => {
+        return (key: string) => {
+            const date = new Date(key);
+            if (Number.isNaN(date.getTime())) return key;
             return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         };
     }, []);
+
+    const formatXAxis = formatXAxisLabel ?? formatDailyLabel;
+    const formatTooltip = formatTooltipLabel ?? formatDailyLabel;
 
     const chartData = useMemo(() => {
         if (!data || data.length === 0) {
@@ -172,8 +186,8 @@ export function RevenueChart({ data }: RevenueChartProps) {
                         <TrendingUp className="text-[#D46215]" size={20} />
                     </div>
                     <div>
-                        <h3 className="text-lg font-bold text-gray-900">Revenue Over Time</h3>
-                        <p className="text-sm text-gray-500">Daily revenue breakdown</p>
+                        <h3 className="text-lg font-bold text-gray-900">{title}</h3>
+                        <p className="text-sm text-gray-500">{subtitle}</p>
                     </div>
                 </div>
             </div>
@@ -276,7 +290,7 @@ export function RevenueChart({ data }: RevenueChartProps) {
                             textAnchor="middle"
                             className={isMobile ? 'text-[10px] fill-gray-400' : 'text-[12px] fill-gray-400'}
                         >
-                            {formatDate(point.date)}
+                            {formatXAxis(point.date)}
                         </text>
                     ))}
                 </svg>
@@ -292,7 +306,7 @@ export function RevenueChart({ data }: RevenueChartProps) {
                 >
                     <div className="flex flex-col gap-1.5">
                         <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                            {formatDate(tooltip.date)}
+                            {formatTooltip(tooltip.date)}
                         </div>
                         <div className="flex items-baseline gap-2">
                             <span className="text-xl font-bold text-[#D95D1E]">
