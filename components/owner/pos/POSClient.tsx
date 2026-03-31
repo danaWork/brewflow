@@ -409,7 +409,9 @@ export function POSClient({
                 if (hasTrigger && hasPromoItem) return promo;
             } else if (promo.type === 'CROSS_SELL') {
                 const cartCategoryTypes = cartProductIds.map((id: string) => productIdToCategoryType[id]).filter(Boolean);
-                if (cartCategoryTypes.includes(promo.triggerValue)) return promo;
+                const promotionProductIds = (promo.items || []).map((i: { productId: string }) => i.productId);
+                const hasPromoItem = promotionProductIds.some((id: string) => cartProductIds.includes(id));
+                if (cartCategoryTypes.includes(promo.triggerValue) && hasPromoItem) return promo;
             }
         }
         return null;
