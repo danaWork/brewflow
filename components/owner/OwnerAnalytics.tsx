@@ -40,6 +40,57 @@ export function OwnerAnalytics({ analytics }: OwnerAnalyticsProps) {
         };
     }, []);
 
+    const formatDailyKey = useMemo(() => {
+        return (key: string) => {
+            const d = new Date(key);
+            if (Number.isNaN(d.getTime())) return key;
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        };
+    }, []);
+
+    const isoWeekKeyToUtcMonday = (key: string): Date | null => {
+        const match = /^(\d{4})-W(\d{2})$/.exec(key);
+        if (!match) return null;
+        const year = Number(match[1]);
+        const week = Number(match[2]);
+        if (!Number.isFinite(year) || !Number.isFinite(week) || week < 1 || week > 53) return null;
+
+        // Monday of ISO week 1 is the Monday of the week containing Jan 4th.
+        const jan4 = new Date(Date.UTC(year, 0, 4));
+        const day = jan4.getUTCDay(); // 0..6
+        const isoDay = day === 0 ? 7 : day; // 1..7
+        const week1Monday = new Date(jan4);
+        week1Monday.setUTCDate(jan4.getUTCDate() - (isoDay - 1));
+
+        const monday = new Date(week1Monday);
+        monday.setUTCDate(week1Monday.getUTCDate() + (week - 1) * 7);
+        return monday;
+    };
+
+    const formatWeeklyKey = useMemo(() => {
+        return (key: string) => {
+            const monday = isoWeekKeyToUtcMonday(key);
+            if (!monday) return key;
+            return `Week of ${monday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+        };
+    }, []);
+
+    const formatMonthlyKey = useMemo(() => {
+        return (key: string) => {
+            const match = /^(\d{4})-(\d{2})$/.exec(key);
+            if (!match) return key;
+            const year = Number(match[1]);
+            const month = Number(match[2]); // 1..12
+            const d = new Date(Date.UTC(year, month - 1, 1));
+            if (Number.isNaN(d.getTime())) return key;
+            return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        };
+    }, []);
+
+    const formatYearlyKey = useMemo(() => {
+        return (key: string) => key;
+    }, []);
+
     return (
         <div className="p-4 md:p-8 lg:p-10">
             <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
@@ -121,8 +172,40 @@ export function OwnerAnalytics({ analytics }: OwnerAnalyticsProps) {
                     </div>
                 </div>
 
-                {/* Revenue Chart */}
-                <RevenueChart data={analytics.revenueOverTime} />
+                {/* Revenue Charts */}
+                <div className="space-y-6">
+                    <RevenueChart
+                        data={analytics.revenueOverTime}
+                        title="Revenue (Daily)"
+                        subtitle="Last 30 days"
+                        formatXAxisLabel={formatDailyKey}
+                        formatTooltipLabel={formatDailyKey}
+                    />
+
+                    <RevenueChart
+                        data={analytics.revenueWeekly}
+                        title="Revenue (Weekly)"
+                        subtitle="Last 12 weeks"
+                        formatXAxisLabel={(key) => key.replace(/^(\d{4})-W0?(\d{1,2})$/, 'W$2')}
+                        formatTooltipLabel={formatWeeklyKey}
+                    />
+
+                    <RevenueChart
+                        data={analytics.revenueMonthly}
+                        title="Revenue (Monthly)"
+                        subtitle="Last 12 months"
+                        formatXAxisLabel={formatMonthlyKey}
+                        formatTooltipLabel={formatMonthlyKey}
+                    />
+
+                    <RevenueChart
+                        data={analytics.revenueYearly}
+                        title="Revenue (Yearly)"
+                        subtitle="Last 5 years"
+                        formatXAxisLabel={formatYearlyKey}
+                        formatTooltipLabel={formatYearlyKey}
+                    />
+                </div>
 
                 {/* Upsell Metrics */}
                 <div>
