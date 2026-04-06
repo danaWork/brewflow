@@ -70,6 +70,30 @@ export default function PrinterSettingsClient({
           <p className="text-xs text-gray-500 mt-1">
             This is saved per shop (branch). Leave blank to disable printing.
           </p>
+          <details className="mt-3 rounded-lg border border-gray-200 bg-gray-50/50 p-3">
+            <summary className="cursor-pointer select-none text-sm font-semibold text-gray-800">
+              How do I find the printer IP?
+            </summary>
+            <div className="mt-2 text-sm text-gray-700 space-y-2">
+              <ol className="list-decimal pl-5 space-y-1.5">
+                <li>
+                  <span className="font-semibold">Print the network/status slip</span> from the printer (many printers: hold the
+                  <span className="font-semibold"> FEED </span>button while powering on). Look for “IP Address”.
+                </li>
+                <li>
+                  <span className="font-semibold">Check your WiFi router</span>: open the router admin page → “Connected devices /
+                  DHCP clients” and find the printer name, then copy its IP (example <code className="px-1 py-0.5 bg-white border border-gray-200 rounded">192.168.1.50</code>).
+                </li>
+                <li>
+                  <span className="font-semibold">Windows (if already installed)</span>: Control Panel → Devices and Printers →
+                  right‑click your printer → Printer properties → Ports tab (Standard TCP/IP).
+                </li>
+              </ol>
+              <p className="text-xs text-gray-600">
+                Tip: ask your installer to set a “DHCP reservation” so the printer IP doesn’t change.
+              </p>
+            </div>
+          </details>
         </div>
 
         <div>
