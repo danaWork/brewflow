@@ -23,6 +23,8 @@ export const branches = pgTable('branches', {
   companyId: uuid('company_id').references(() => companies.id).notNull(),
   branchName: text('branch_name').notNull(),
   address: text('address'),
+  printerHost: text('printer_host'),
+  printerPort: integer('printer_port'),
   isActive: boolean('is_active').default(true).notNull(),
 });
 
