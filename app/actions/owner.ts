@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { users, orders, orderItems, orderItemModifiers, categories, products } from '@/db/schema';
+import { users, orders, orderItems, orderItemModifiers, categories, products, branches } from '@/db/schema';
 import { eq, sql, and, gte, inArray, desc, ne } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { getUserSession } from './auth';
@@ -586,6 +586,76 @@ export async function updateStaffMember(
         return { success: true };
     } catch (error) {
         console.error('updateStaffMember:', error);
+        return { success: false, error: 'Internal server error' };
+    }
+}
+
+export async function getPrinterConfigAction(): Promise<
+    | { success: true; config: { host: string | null; port: number | null } }
+    | { success: false; error: string }
+> {
+    try {
+        const session = await getUserSession();
+        if (!session || session.role !== 'BRANCH_MANAGER') {
+            return { success: false, error: 'Unauthorized' };
+        }
+        if (!session.branchId) {
+            return { success: false, error: 'No branch assigned' };
+        }
+
+        const [row] = await db
+            .select({ host: branches.printerHost, port: branches.printerPort })
+            .from(branches)
+            .where(eq(branches.id, session.branchId))
+            .limit(1);
+
+        if (!row) {
+            return { success: false, error: 'Branch not found' };
+        }
+
+        return { success: true, config: { host: row.host ?? null, port: row.port ?? null } };
+    } catch (error) {
+        console.error('getPrinterConfigAction:', error);
+        return { success: false, error: 'Internal server error' };
+    }
+}
+
+export async function savePrinterConfigAction(
+    host: string,
+    port: number | null
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const session = await getUserSession();
+        if (!session || session.role !== 'BRANCH_MANAGER') {
+            return { success: false, error: 'Unauthorized' };
+        }
+        if (!session.branchId) {
+            return { success: false, error: 'No branch assigned' };
+        }
+
+        const trimmedHost = (host ?? '').trim();
+        const hostValue = trimmedHost ? trimmedHost : null;
+
+        let portValue: number | null = null;
+        if (port != null) {
+            const n = Number(port);
+            if (!Number.isFinite(n) || n <= 0 || n > 65535) {
+                return { success: false, error: 'Invalid port' };
+            }
+            portValue = Math.trunc(n);
+        }
+
+        await db
+            .update(branches)
+            .set({
+                printerHost: hostValue,
+                printerPort: portValue,
+            })
+            .where(eq(branches.id, session.branchId));
+
+        return { success: true };
+    } catch (error) {
+        console.error('savePrinterConfigAction:', error);
         return { success: false, error: 'Internal server error' };
     }
 }

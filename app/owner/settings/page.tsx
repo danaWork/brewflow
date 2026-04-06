@@ -1,12 +1,14 @@
 import { requireBranchManagerShopSettings } from '@/lib/roleGuard';
-import { getStaffMembersForBranch } from '@/app/actions/owner';
+import { getPrinterConfigAction, getStaffMembersForBranch } from '@/app/actions/owner';
 import OwnerSettingsFormClient from '@/components/owner/OwnerSettingsFormClient';
 import StaffManagementClient from '@/components/owner/StaffManagementClient';
+import PrinterSettingsClient from '@/components/owner/PrinterSettingsClient';
 
 export default async function OwnerSettingsPage() {
     await requireBranchManagerShopSettings();
 
     const { staff, error } = await getStaffMembersForBranch();
+    const printerRes = await getPrinterConfigAction();
 
     return (
         <div className="p-4 md:p-8 max-w-4xl mx-auto">
@@ -20,6 +22,10 @@ export default async function OwnerSettingsPage() {
             )}
 
             <div className="grid grid-cols-1 gap-8">
+                <PrinterSettingsClient
+                    initialHost={printerRes.success ? printerRes.config.host : null}
+                    initialPort={printerRes.success ? printerRes.config.port : null}
+                />
                 <StaffManagementClient initialStaff={staff} />
                 <OwnerSettingsFormClient />
             </div>

@@ -10,7 +10,7 @@ import { useOrder } from '@/context/OrderContext';
 import type { CartItem as OrderCartItem } from '@/context/CartContext';
 import { ProductAddModal } from './ProductAddModal';
 import { buildReceiptEscPosFromOrder } from '@/lib/receipt-thermal';
-import { connectAndPrint, isBluetoothSupported } from '@/lib/bluetooth-thermal-print';
+import { wifiPrint } from '@/lib/wifi-thermal-print';
 
 export type Product = {
     id: string;
@@ -627,17 +627,11 @@ export function POSClient({
             cancellationReason: (order as any).cancellationReason,
         };
         const bytes = buildReceiptEscPosFromOrder(receiptOrder, { storeName });
-        const result = await connectAndPrint(bytes);
+        const result = await wifiPrint(bytes);
         if (result.ok) {
             toast.success('Receipt sent to printer');
         } else {
-            if (result.reason === 'unsupported') {
-                toast.info('Receipt printing requires Chrome or Edge. Payment confirmed.');
-            } else if (result.reason === 'cancelled') {
-                toast.info('Printer not selected. Payment confirmed.');
-            } else {
-                toast.warning('Payment confirmed. Could not print receipt.');
-            }
+            toast.warning('Payment confirmed. Could not print receipt.');
         }
     }
 
@@ -1332,10 +1326,6 @@ export function POSClient({
 
                                             <button 
                                                 onClick={() => {
-                                                    if (!isBluetoothSupported()) {
-                                                        toast.info('Receipt printing requires Chrome or Edge.');
-                                                        return;
-                                                    }
                                                     printReceipt(order).catch(() => toast.error('Could not print receipt.'));
                                                 }}
                                                 className="w-full py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold rounded-xl transition-colors border border-gray-200 text-sm flex items-center justify-center gap-2"

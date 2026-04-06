@@ -92,6 +92,13 @@
       "when": 1774815797203,
       "tag": "0012_product_modifier_option_ingredients",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1775478697710,
+      "tag": "0013_add_branch_printer_config",
+      "breakpoints": true
     }
   ]
 }

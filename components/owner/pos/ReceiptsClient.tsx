@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { getPastOrdersAction } from '@/app/actions/orders';
 import { ReceiptText, Printer, Download, ChevronLeft, ChevronRight, CheckCircle, XCircle } from 'lucide-react';
 import { buildReceiptEscPosFromOrder } from '@/lib/receipt-thermal';
-import { connectAndPrint } from '@/lib/bluetooth-thermal-print';
+import { wifiPrint } from '@/lib/wifi-thermal-print';
 
 const formatCurrency = (val: number) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(val);
 
@@ -48,20 +48,14 @@ export default function ReceiptsClient({ branchId }: { branchId: string }) {
         ? process.env.NEXT_PUBLIC_RECEIPT_STORE_NAME
         : 'BrewFlow';
 
-    async function handleBluetoothPrint() {
+    async function handleWifiPrint() {
         if (!receiptModal) return;
         const bytes = buildReceiptEscPosFromOrder(receiptModal, { storeName });
-        const result = await connectAndPrint(bytes);
+        const result = await wifiPrint(bytes);
         if (result.ok) {
             toast.success('Receipt sent to printer');
         } else {
-            if (result.reason === 'unsupported') {
-                toast.info('Bluetooth printing requires Chrome or Edge.');
-            } else if (result.reason === 'cancelled') {
-                toast.info('Printer selection cancelled.');
-            } else {
-                toast.warning('Could not print receipt.');
-            }
+            toast.warning('Could not print receipt.');
         }
     }
 
@@ -268,7 +262,7 @@ export default function ReceiptsClient({ branchId }: { branchId: string }) {
                                 PDF
                             </button>
                             <button
-                                onClick={handleBluetoothPrint}
+                                onClick={handleWifiPrint}
                                 className="flex-1 order-1 py-3 px-4 bg-[#D95D1E] hover:bg-[#c25016] text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm"
                             >
                                 <Printer size={18} />
