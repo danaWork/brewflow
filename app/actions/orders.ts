@@ -6,8 +6,57 @@ import {
   tables as tablesSchema,
   orderItems as orderItemsSchema,
   products as productsSchema,
+  categories as categoriesSchema,
 } from "@/db/schema";
 import { eq, inArray, desc, and, gte, lte, or, sql, ilike } from "drizzle-orm";
+
+type Station = "drink" | "food";
+type StationStatus = "PREPARING" | "READY";
+
+function isDrinkCategoryType(categoryType?: string | null) {
+  return (categoryType ?? "").toLowerCase() === "drink";
+}
+
+function isFoodCategoryType(categoryType?: string | null) {
+  const t = (categoryType ?? "").toLowerCase();
+  // Codebase uses drink/snack and UI supports "meal" as well.
+  return t === "snack" || t === "meal";
+}
+
+async function computeStationApplicability(orderId: string): Promise<{
+  hasDrink: boolean;
+  hasFood: boolean;
+}> {
+  const rows = await db
+    .select({
+      productId: orderItemsSchema.productId,
+      categoryType: categoriesSchema.type,
+    })
+    .from(orderItemsSchema)
+    .leftJoin(productsSchema, eq(orderItemsSchema.productId, productsSchema.id))
+    .leftJoin(categoriesSchema, eq(productsSchema.categoryId, categoriesSchema.id))
+    .where(eq(orderItemsSchema.orderId, orderId));
+
+  let hasDrink = false;
+  let hasFood = false;
+
+  for (const r of rows) {
+    if (!r.productId) {
+      // Ad-hoc POS items default to food station
+      hasFood = true;
+      continue;
+    }
+
+    if (isDrinkCategoryType(r.categoryType)) hasDrink = true;
+    else if (isFoodCategoryType(r.categoryType)) hasFood = true;
+    else {
+      // Unknown category types route to food by default
+      hasFood = true;
+    }
+  }
+
+  return { hasDrink, hasFood };
+}
 export interface OrderData {
   id: string;
   orderNumber: number;
@@ -189,7 +238,11 @@ export async function getActiveOrdersAction(branchId: string) {
         table: true,
         items: {
           with: {
-            product: true,
+            product: {
+              with: {
+                category: true,
+              },
+            },
           },
         },
       },
@@ -234,6 +287,12 @@ export async function getActiveOrdersAction(branchId: string) {
           | "READY"
           | "COMPLETED"
           | "CANCELLED",
+        drinkStationStatus: (o.drinkStationStatus ?? null) as
+          | StationStatus
+          | null,
+        foodStationStatus: (o.foodStationStatus ?? null) as
+          | StationStatus
+          | null,
         totalAmount: parseFloat(o.totalAmount as string),
         tableId: o.tableId,
         tableNumber: o.table?.tableNumber || "Unknown Table",
@@ -249,6 +308,10 @@ export async function getActiveOrdersAction(branchId: string) {
           name: item.customName || item.product?.name || "Unknown Product",
           quantity: item.quantity,
           price: parseFloat(item.priceAtTime as string),
+          categoryType:
+            item.product?.category?.type ??
+            // Ad-hoc items (or missing product/category) are treated as food
+            "food",
           options: item.customizations
             ? JSON.parse(item.customizations)
             : undefined,
@@ -410,13 +473,29 @@ export async function updateOrderStatusAction(
       }
     }
 
+    const now = new Date();
+
+    const stationUpdate =
+      status === "PREPARING"
+        ? await (async () => {
+            const { hasDrink, hasFood } = await computeStationApplicability(
+              orderId,
+            );
+            return {
+              drinkStationStatus: hasDrink ? ("PREPARING" as const) : null,
+              foodStationStatus: hasFood ? ("PREPARING" as const) : null,
+            };
+          })()
+        : null;
+
     await db
       .update(ordersSchema)
       .set({
         status,
-        acceptedAt: status === "PREPARING" ? new Date() : undefined,
-        readyAt: status === "READY" ? new Date() : undefined,
-        completedAt: status === "COMPLETED" ? new Date() : undefined,
+        ...(stationUpdate ? stationUpdate : {}),
+        acceptedAt: status === "PREPARING" ? now : undefined,
+        readyAt: status === "READY" ? now : undefined,
+        completedAt: status === "COMPLETED" ? now : undefined,
         cancellationReason:
           status === "CANCELLED" ? (cancellationReason ?? null) : undefined,
       })
@@ -425,6 +504,54 @@ export async function updateOrderStatusAction(
   } catch (error) {
     console.error("updateOrderStatusAction error:", error);
     return { success: false, error: "Failed to update order status" };
+  }
+}
+
+export async function updateStationStatusAction(
+  orderId: string,
+  station: Station,
+) {
+  try {
+    const stationColumn =
+      station === "drink"
+        ? { drinkStationStatus: "READY" as const }
+        : { foodStationStatus: "READY" as const };
+
+    await db
+      .update(ordersSchema)
+      .set(stationColumn)
+      .where(eq(ordersSchema.id, orderId));
+
+    const [row] = await db
+      .select({
+        status: ordersSchema.status,
+        drinkStationStatus: ordersSchema.drinkStationStatus,
+        foodStationStatus: ordersSchema.foodStationStatus,
+      })
+      .from(ordersSchema)
+      .where(eq(ordersSchema.id, orderId));
+
+    if (!row) return { success: false, error: "Order not found" };
+
+    const drinkApplicable = row.drinkStationStatus !== null;
+    const foodApplicable = row.foodStationStatus !== null;
+
+    const drinkReady =
+      !drinkApplicable || row.drinkStationStatus === ("READY" as any);
+    const foodReady =
+      !foodApplicable || row.foodStationStatus === ("READY" as any);
+
+    if (row.status === "PREPARING" && drinkReady && foodReady) {
+      await db
+        .update(ordersSchema)
+        .set({ status: "READY", readyAt: new Date() })
+        .where(eq(ordersSchema.id, orderId));
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("updateStationStatusAction error:", error);
+    return { success: false, error: "Failed to update station status" };
   }
 }
 
