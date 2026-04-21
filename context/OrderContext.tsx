@@ -17,6 +17,7 @@ import {
   getOrdersStatusAction,
   updateOrderPaymentStatusAction,
   updatePOSOrderAction,
+  updateStationStatusAction,
 } from "@/app/actions/orders";
 import { getSessionAction } from "@/app/actions/auth";
 
@@ -31,7 +32,9 @@ export interface Order {
   id: string;
   orderNumber: number;
   status: OrderStatus;
-  items: CartItem[];
+  drinkStationStatus?: "PREPARING" | "READY" | null;
+  foodStationStatus?: "PREPARING" | "READY" | null;
+  items: (CartItem & { categoryType?: string })[];
   total: number;
   table: string;
   tableId?: string;
@@ -70,6 +73,10 @@ interface OrderContextType {
     note?: string,
   ) => Promise<{ success: boolean }>;
   updateOrderStatus: (orderId: string, status: OrderStatus, cancellationReason?: string) => Promise<void>;
+  updateStationStatus: (
+    orderId: string,
+    station: "drink" | "food",
+  ) => Promise<{ success: boolean; error?: string }>;
   updateOrderPaymentStatus: (
     orderId: string,
     status: "UNPAID" | "PAID",
@@ -175,6 +182,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         id: o.id,
         orderNumber: o.orderNumber,
         status: o.status as OrderStatus,
+        drinkStationStatus: o.drinkStationStatus ?? null,
+        foodStationStatus: o.foodStationStatus ?? null,
         items: o.items || [],
         total: o.totalAmount,
         table: o.tableNumber || "Unknown Table",
@@ -208,6 +217,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
                 typeof item.price === "number" ? item.price : (item.price ?? 0),
               quantity: item.quantity ?? 1,
               options: item.options,
+              categoryType: item.categoryType,
               bundleLabel: item.options?.bundleLabel,
               tag: item.options?.tag,
             }),
@@ -222,6 +232,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
             id: serverOrder.id,
             orderNumber: serverOrder.orderNumber,
             status: serverOrder.status,
+            drinkStationStatus: serverOrder.drinkStationStatus ?? null,
+            foodStationStatus: serverOrder.foodStationStatus ?? null,
             items: serverItems,
             total: serverOrder.total,
             table: serverOrder.table,
@@ -474,6 +486,19 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateStationStatus = async (
+    orderId: string,
+    station: "drink" | "food",
+  ) => {
+    const result = await updateStationStatusAction(orderId, station);
+    if (!result.success) {
+      console.error("Error updating station status:", result.error);
+      return { success: false, error: result.error };
+    }
+    await refreshActiveOrders();
+    return { success: true };
+  };
+
   const updateOrderPaymentStatus = async (
     orderId: string,
     paymentStatus: "UNPAID" | "PAID",
@@ -507,6 +532,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         createOrder,
         updateOrder,
         updateOrderStatus,
+        updateStationStatus,
         updateOrderPaymentStatus,
         dismissOrder,
         refreshActiveOrders,
