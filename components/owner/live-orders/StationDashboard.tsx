@@ -11,6 +11,7 @@ import {
   Banknote,
   Smartphone,
   History,
+  Info,
   RefreshCw,
   Search,
   X,
@@ -64,6 +65,83 @@ function stationBadgeText(order: Order) {
   if (drink !== null) parts.push(`Drinks: ${drink}`);
   if (food !== null) parts.push(`Food: ${food}`);
   return parts.join(' · ');
+}
+
+function StaffQuickTips({
+  station,
+  onRefresh,
+}: {
+  station: Station;
+  onRefresh: () => void;
+}) {
+  const isAll = station === 'all';
+
+  const bullets =
+    station === 'drink'
+      ? [
+          'This screen lists only drink items for each order.',
+          'When the drinks are finished, tap Mark Drinks Ready.',
+          'If the order also has food, it stays in Preparing until kitchen staff finishes on the Kitchen screen—then the whole order moves to Ready.',
+        ]
+      : station === 'food'
+        ? [
+            'This screen lists only food items (snacks, meals, etc.) for each order.',
+            'When the food is finished, tap Mark Food Ready.',
+            'Drinks are made on the separate Drinks screen; both sides may need to finish before the order shows as Ready.',
+          ]
+        : [
+            'Orders appear here after someone approves them at the POS (counter).',
+            'Preparing: when everything for that order is done, tap Mark Ready to move it to Ready.',
+            'Ready: when the guest has picked up the order, tap Complete Order.',
+            'If an order has both drinks and food, the small line under the table shows drink vs food progress until both sides are finished.',
+            'To open the dedicated station screens: Drinks = /owner/live-orders/drinks, Kitchen = /owner/live-orders/kitchen.',
+          ];
+
+  return (
+    <details className="group mt-3 rounded-xl border border-amber-200/90 bg-amber-50/50 px-3 py-2 md:px-4 md:py-2.5 open:bg-amber-50/70">
+      <summary className="cursor-pointer list-none flex items-center gap-2 font-semibold text-gray-800 text-sm select-none [&::-webkit-details-marker]:hidden">
+        <Info size={16} className="text-amber-700 shrink-0" aria-hidden />
+        <span>Quick tips for staff</span>
+        <ChevronDown
+          size={16}
+          className="ml-auto text-gray-500 transition-transform group-open:rotate-180 shrink-0"
+          aria-hidden
+        />
+      </summary>
+      <ul className="mt-2.5 space-y-1.5 pl-0.5 text-sm text-gray-700 list-disc list-inside marker:text-amber-700">
+        {bullets.map((text, i) => (
+          <li key={i}>{text}</li>
+        ))}
+      </ul>
+      {isAll && (
+        <div className="mt-2.5 flex flex-wrap gap-2">
+          <a
+            href="/owner/live-orders/drinks"
+            className="inline-flex items-center rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-amber-50 transition"
+          >
+            Open Drinks screen
+          </a>
+          <a
+            href="/owner/live-orders/kitchen"
+            className="inline-flex items-center rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-amber-50 transition"
+          >
+            Open Kitchen screen
+          </a>
+        </div>
+      )}
+      <p className="mt-2.5 text-xs text-gray-600 border-t border-amber-200/60 pt-2">
+        The list refreshes automatically every few seconds. If something looks stuck,{' '}
+        <button
+          type="button"
+          onClick={onRefresh}
+          className="font-semibold text-[#D95D1E] underline underline-offset-2 hover:text-[#b84a18]"
+        >
+          tap to refresh now
+        </button>
+        .
+      </p>
+    </details>
+  );
 }
 
 function CancelConfirmModal({
@@ -336,14 +414,30 @@ export default function StationDashboard({ station }: { station: Station }) {
     return visibleOrders;
   }, [station, visibleOrders]);
 
-  const { newOrderNotification, dismissNotification } = useOrderNotifications(activeOrders, isLoading);
+  // Notifications are only relevant for the manager "all" view; avoid extra work on station screens.
+  const notificationOrders = station === 'all' ? activeOrders : [];
+  const { newOrderNotification, dismissNotification } = useOrderNotifications(notificationOrders, isLoading);
 
   const columns: { id: OrderStatus, title: string, bgColor: string, borderColor: string, icon: any }[] = [
     { id: 'PREPARING', title: 'Preparing', bgColor: 'bg-[#FFF5EB]', borderColor: 'border-[#E6894A]', icon: ChefHat },
     { id: 'READY', title: 'Ready', bgColor: 'bg-[#E8F5E9]', borderColor: 'border-[#4CAF50]', icon: CheckCircle },
   ];
 
-  const getOrdersByStatus = (status: OrderStatus) => stationFilteredOrders.filter(o => o.status === status);
+  const ordersByStatus = useMemo(() => {
+    const preparing: Order[] = [];
+    const ready: Order[] = [];
+    for (const o of stationFilteredOrders) {
+      if (o.status === 'PREPARING') preparing.push(o);
+      else if (o.status === 'READY') ready.push(o);
+    }
+    return { PREPARING: preparing, READY: ready } as const;
+  }, [stationFilteredOrders]);
+
+  const getOrdersByStatus = (status: OrderStatus) => {
+    if (status === 'PREPARING') return ordersByStatus.PREPARING;
+    if (status === 'READY') return ordersByStatus.READY;
+    return [];
+  };
 
   const handleCancelClick = (order: Order) => {
     setCancelModalOrder(order);
@@ -423,6 +517,7 @@ export default function StationDashboard({ station }: { station: Station }) {
         <p className="text-sm text-gray-500 mt-1">
           {queueCount} order{queueCount !== 1 ? 's' : ''} in queue
         </p>
+        <StaffQuickTips station={station} onRefresh={() => void refreshActiveOrders()} />
       </div>
 
       <div className="flex-1 flex flex-col min-h-0 px-4 md:px-0 md:hidden mt-0">
@@ -445,12 +540,12 @@ export default function StationDashboard({ station }: { station: Station }) {
                   <col.icon size={18} className="text-gray-600" />
                   <h3 className="font-semibold text-gray-800">{col.title}</h3>
                   <span className="ml-auto bg-white/80 px-2.5 py-0.5 rounded-md text-sm font-medium text-gray-600 border border-gray-200">
-                    {getOrdersByStatus(col.id).length}
+                    {col.id === 'PREPARING' ? ordersByStatus.PREPARING.length : ordersByStatus.READY.length}
                   </span>
                 </div>
 
                 <div className="flex-1 px-4 pb-4 space-y-3 overflow-y-auto custom-scrollbar">
-                  {getOrdersByStatus(col.id).map(order => (
+                  {(col.id === 'PREPARING' ? ordersByStatus.PREPARING : ordersByStatus.READY).map(order => (
                     <div key={order.id} className="p-4 rounded-xl shadow-sm border bg-white border-gray-100 hover:shadow-md transition-shadow">
                       <div className="flex justify-between items-center mb-3">
                         <span className="font-bold text-xl text-gray-900">#{order.orderNumber}</span>
@@ -502,7 +597,12 @@ export default function StationDashboard({ station }: { station: Station }) {
                       )}
 
                       <div className="space-y-1 mb-4">
-                        {itemFilter(order).length > 0 ? itemFilter(order).map((item: any, idx: number) => (
+                        {(() => {
+                          const items = itemFilter(order);
+                          if (items.length === 0) {
+                            return <div className="text-xs text-gray-400 italic">No item details available</div>;
+                          }
+                          return items.map((item: any, idx: number) => (
                           <div key={idx} className="border-b border-gray-50 last:border-0 pb-2 last:pb-0">
                             <div className="flex justify-between items-start text-sm">
                               <div className="flex gap-2">
@@ -540,9 +640,8 @@ export default function StationDashboard({ station }: { station: Station }) {
                               </div>
                             </div>
                           </div>
-                        )) : (
-                          <div className="text-xs text-gray-400 italic">No item details available</div>
-                        )}
+                          ));
+                        })()}
                       </div>
 
                       <div className="flex justify-between items-center pt-3 border-t border-gray-100 mb-3">
@@ -587,7 +686,7 @@ export default function StationDashboard({ station }: { station: Station }) {
                     </div>
                   ))}
 
-                  {getOrdersByStatus(col.id).length === 0 && (
+                  {(col.id === 'PREPARING' ? ordersByStatus.PREPARING.length : ordersByStatus.READY.length) === 0 && (
                     <div className="flex-1 flex items-center justify-center text-gray-400 text-sm py-16">
                       No {col.title.toLowerCase()} orders
                     </div>
