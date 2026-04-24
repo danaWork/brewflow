@@ -16,6 +16,15 @@ import {
   Search,
   X,
 } from 'lucide-react';
+
+function StationReadyBadge({ label }: { label: string }) {
+  return (
+    <div className="w-full py-2 px-3 bg-emerald-500 text-white font-bold text-sm rounded-lg flex items-center justify-center gap-2 cursor-default select-none">
+      <CheckCircle size={15} className="shrink-0" />
+      <span>{label} — waiting for other station</span>
+    </div>
+  );
+}
 import LiveOrdersTabsMobile from '@/app/owner/live-orders/LiveOrdersTabsMobile';
 import { useOrderNotifications } from '@/hooks/useOrderNotifications';
 import { getCompanyPaymentMethodsAction } from '@/app/actions/payment-methods';
@@ -81,13 +90,15 @@ function StaffQuickTips({
       ? [
           'This screen lists only drink items for each order.',
           'When the drinks are finished, tap Mark Drinks Ready.',
-          'If the order also has food, it stays in Preparing until kitchen staff finishes on the Kitchen screen—then the whole order moves to Ready.',
+          'Once you tap it, the button turns green and shows "Drinks marked ready — waiting for other station". This means you\'re done; the kitchen just needs to finish their side.',
+          'When the kitchen also marks food ready, the whole order automatically moves to Ready.',
         ]
       : station === 'food'
         ? [
             'This screen lists only food items (snacks, meals, etc.) for each order.',
             'When the food is finished, tap Mark Food Ready.',
-            'Drinks are made on the separate Drinks screen; both sides may need to finish before the order shows as Ready.',
+            'Once you tap it, the button turns green and shows "Food marked ready — waiting for other station". This means you\'re done; the barista just needs to finish the drinks.',
+            'When the barista also marks drinks ready, the whole order automatically moves to Ready.',
           ]
         : [
             'Orders appear here after someone approves them at the POS (counter).',
@@ -653,19 +664,27 @@ export default function StationDashboard({ station }: { station: Station }) {
 
                       {col.id === 'PREPARING' && (
                         station === 'drink' ? (
-                          <button
-                            onClick={() => updateStationStatus(order.id, 'drink')}
-                            className="w-full py-2 bg-green-50 text-green-600 font-bold text-sm rounded-lg hover:bg-green-100 transition"
-                          >
-                            Mark Drinks Ready →
-                          </button>
+                          order.drinkStationStatus === 'READY' ? (
+                            <StationReadyBadge label="Drinks marked ready" />
+                          ) : (
+                            <button
+                              onClick={() => updateStationStatus(order.id, 'drink')}
+                              className="w-full py-2 bg-green-50 text-green-600 font-bold text-sm rounded-lg hover:bg-green-100 transition"
+                            >
+                              Mark Drinks Ready →
+                            </button>
+                          )
                         ) : station === 'food' ? (
-                          <button
-                            onClick={() => updateStationStatus(order.id, 'food')}
-                            className="w-full py-2 bg-green-50 text-green-600 font-bold text-sm rounded-lg hover:bg-green-100 transition"
-                          >
-                            Mark Food Ready →
-                          </button>
+                          order.foodStationStatus === 'READY' ? (
+                            <StationReadyBadge label="Food marked ready" />
+                          ) : (
+                            <button
+                              onClick={() => updateStationStatus(order.id, 'food')}
+                              className="w-full py-2 bg-green-50 text-green-600 font-bold text-sm rounded-lg hover:bg-green-100 transition"
+                            >
+                              Mark Food Ready →
+                            </button>
+                          )
                         ) : (
                           <button
                             onClick={() => updateOrderStatus(order.id, 'READY')}
