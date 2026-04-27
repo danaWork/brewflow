@@ -1364,8 +1364,7 @@ export function POSClient({
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
                         {/* Receipt Header */}
                         <div className="bg-gray-50 border-b border-gray-100 p-6 text-center">
-                            <h3 className="text-xl font-black text-gray-900 mb-1">{storeName}</h3>
-                            <p className="text-sm text-gray-500 font-medium tracking-wide">RECEIPT / POINT OF SALE</p>
+                            <h3 className="text-xl font-black text-gray-900 tracking-widest">INVOICE</h3>
                         </div>
                         
                         {/* Receipt Body */}
