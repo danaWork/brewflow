@@ -35,7 +35,7 @@ export default async function OwnerLayout({
         <OwnerSidebar shopName={shopName} branchId={session?.branchId || ''} role={session?.role} />
       </aside>
       {/* Mobile top nav */}
-      <div className="md:hidden shrink-0 w-full relative z-30 flex items-center bg-white border-b border-gray-200">
+      <div className="md:hidden print:hidden shrink-0 w-full relative z-30 flex items-center bg-white border-b border-gray-200">
         <div className="flex-[3]"><OwnerMobileNav shopName={shopName} branchId={session?.branchId || ''} role={session?.role} /></div>
         {session?.branchId && (
           <div className="pr-4 flex-shrink-0">

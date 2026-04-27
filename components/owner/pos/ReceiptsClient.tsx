@@ -183,8 +183,7 @@ export default function ReceiptsClient({ branchId }: { branchId: string }) {
                         
                         {/* Receipt Header */}
                         <div className="bg-gray-50 border-b border-gray-100 p-6 text-center print:bg-white print:border-none print:p-2">
-                            <h3 className="text-xl font-black text-gray-900 mb-1">{storeName}</h3>
-                            <p className="text-sm text-gray-500 font-medium tracking-wide">RECEIPT / POINT OF SALE</p>
+                            <h3 className="text-xl font-black text-gray-900 tracking-widest">INVOICE</h3>
                         </div>
                         
                         {/* Receipt Body */}
