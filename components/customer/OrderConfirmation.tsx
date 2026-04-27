@@ -76,7 +76,7 @@ export default function OrderConfirmation({
       const filename = `receipt-${formattedOrderNumber.replace('#', '')}.png`;
       const file = new File([blob], filename, { type: 'image/png' });
       if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'BrewFlow Receipt' });
+        await navigator.share({ files: [file], title: 'Invoice' });
       }
     } catch (e) {
       console.log('Share failed', e);
