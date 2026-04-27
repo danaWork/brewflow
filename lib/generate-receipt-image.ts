@@ -38,7 +38,6 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
 
 export function generateReceiptDataUrl(data: ReceiptData): string {
   const {
-    storeName = 'BrewFlow',
     orderNumber,
     table,
     paymentMethod,
@@ -64,7 +63,7 @@ export function generateReceiptDataUrl(data: ReceiptData): string {
   scratchCtx.scale(SCALE, SCALE);
   scratchCtx.font = '13px system-ui, sans-serif';
 
-  let estimatedH = PAD + 30 + 12 + 24 + 26 + 20 + 16; // header + order info + divider
+  let estimatedH = PAD + 28 + 14 + 26 + 20 + 16; // title + divider + order info + divider
   for (const item of items) {
     const nameLines = wrapText(scratchCtx, `${item.quantity}x ${item.name}`, ITEM_MAX_W);
     estimatedH += nameLines.length * LINE;
@@ -100,17 +99,12 @@ export function generateReceiptDataUrl(data: ReceiptData): string {
 
   let y = PAD;
 
-  // ── Store name ──────────────────────────────────────────────────────────────
+  // ── Document title (customer receipt / invoice) ─────────────────────────────
   ctx.font = 'bold 18px system-ui, sans-serif';
   ctx.fillStyle = '#111827';
   ctx.textAlign = 'center';
-  ctx.fillText(storeName, W / 2, y + 18);
-  y += 30;
-
-  ctx.font = '11px system-ui, sans-serif';
-  ctx.fillStyle = '#9ca3af';
-  ctx.fillText('RECEIPT', W / 2, y + 11);
-  y += 22;
+  ctx.fillText('Invoice', W / 2, y + 18);
+  y += 28;
 
   // ── Dashed divider ──────────────────────────────────────────────────────────
   ctx.strokeStyle = '#d1d5db';

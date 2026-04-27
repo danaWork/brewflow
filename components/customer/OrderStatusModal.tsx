@@ -55,7 +55,7 @@ export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: 
              const blob = await res.blob();
              const file = new File([blob], `receipt-${order.orderNumber}.png`, { type: 'image/png' });
              if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
-                 await navigator.share({ files: [file], title: 'BrewFlow Receipt' });
+                 await navigator.share({ files: [file], title: 'Invoice' });
              }
          } catch (e) {
              console.log('Share API failed', e);
