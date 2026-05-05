@@ -37,6 +37,11 @@ export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: 
                     price: item.price,
                     quantity: item.quantity,
                     options: item.options as Record<string, unknown> | undefined,
+                    extras: item.extras?.map((ex) => ({
+                        name: ex.name,
+                        price: ex.price,
+                        quantity: ex.quantity,
+                    })),
                 })),
                 discountAmount: order.discountAmount,
                 discountName: order.discountName,
@@ -318,10 +323,27 @@ export default function OrderStatusModal({ isOpen, onClose, order, onDismiss }: 
                         </button>
                     ) : (
                         <div className="space-y-4">
-                            <div className="flex justify-between items-center">
-                                <span className="text-gray-500 font-medium text-lg">Total Amount</span>
-                                <span className="text-[#D95D1E] font-bold text-2xl">₱{order.total.toFixed(2)}</span>
-                            </div>
+                            {order.discountAmount && order.discountAmount > 0 ? (
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center text-sm font-medium text-gray-500">
+                                        <span>Subtotal</span>
+                                        <span>₱{(order.total + order.discountAmount).toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm font-medium text-green-600">
+                                        <span>Discount ({order.discountName || 'Applied'})</span>
+                                        <span>-₱{order.discountAmount.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center pt-1.5 border-t border-gray-100">
+                                        <span className="text-gray-500 font-medium text-lg">Total Amount</span>
+                                        <span className="text-[#D95D1E] font-bold text-2xl">₱{order.total.toFixed(2)}</span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex justify-between items-center">
+                                    <span className="text-gray-500 font-medium text-lg">Total Amount</span>
+                                    <span className="text-[#D95D1E] font-bold text-2xl">₱{order.total.toFixed(2)}</span>
+                                </div>
+                            )}
                             
                             {['PREPARING', 'READY', 'COMPLETED'].includes(order.status) && (
                                 <div className="flex gap-2">

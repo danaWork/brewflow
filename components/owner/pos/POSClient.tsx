@@ -545,7 +545,28 @@ export function POSClient({
                             name: item.name,
                             price: effectiveItemPrice(item),
                             quantity: item.quantity,
-                            options: item.options,
+                            options:
+                                item.options ||
+                                (item.itemDiscountType &&
+                                  item.itemDiscountValue != null &&
+                                  item.itemDiscountValue > 0) ||
+                                item.itemDiscountLabel
+                                    ? {
+                                          ...(item.options || {}),
+                                          ...(item.itemDiscountType &&
+                                          item.itemDiscountValue != null &&
+                                          item.itemDiscountValue > 0
+                                              ? {
+                                                    itemDiscount: {
+                                                        type: item.itemDiscountType,
+                                                        value: item.itemDiscountValue,
+                                                        label: item.itemDiscountLabel,
+                                                        originalUnitPrice: item.price,
+                                                    },
+                                                }
+                                              : {}),
+                                      }
+                                    : undefined,
                             extras: item.extras?.map(ex => ({ name: ex.name, price: ex.price, quantity: ex.quantity }))
                         })),
                         discountName: discountNameDisplay === 'None' ? null : discountNameDisplay,
